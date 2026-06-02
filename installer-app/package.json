@@ -1,0 +1,34 @@
+{
+  "name": "clipmaster-installer",
+  "version": "1.0.0",
+  "description": "ClipMaster Custom Installer",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder"
+  },
+  "build": {
+    "appId": "com.clipmaster.installer",
+    "productName": "ClipMaster Installer",
+    "directories": {
+      "output": "../release"
+    },
+    "files": [
+      "**/*",
+      "!node_modules/**/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "../public/icon.ico"
+    },
+    "nsis": {
+      "oneClick": true,
+      "allowToChangeInstallationDirectory": false
+    }
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "electron": "^27.3.11",
+    "electron-builder": "^24.9.1"
+  }
+}

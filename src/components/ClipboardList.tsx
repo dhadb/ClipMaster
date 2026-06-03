@@ -94,7 +94,7 @@ const ClipboardList: React.FC = () => {
   }, [filteredHistory, selectedId, setSelectedId])
 
   return (
-    <div ref={containerRef} className="h-full overflow-y-auto px-2 py-1.5" style={{ willChange: 'scroll-position' }}>
+    <div ref={containerRef} className="h-full overflow-y-auto px-2 py-1" style={{ willChange: 'scroll-position' }}>
       <div style={{ height: totalH, position: 'relative' }}>
         <div style={{ position: 'absolute', top: range.start * ITEM_H, width: '100%' }}>
           {visible.map((item, i) => (
@@ -104,8 +104,8 @@ const ClipboardList: React.FC = () => {
               className="item-enter"
               style={{
                 height: ITEM_H,
-                paddingBottom: 6,
-                animationDelay: `${Math.min(i * 15, 100)}ms`,
+                paddingBottom: 5,
+                animationDelay: `${Math.min(i * 12, 80)}ms`,
               }}
             >
               <ClipboardItemCard

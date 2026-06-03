@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { Search, X, Sparkles, SlidersHorizontal } from 'lucide-react'
+import { Search, X, SlidersHorizontal, Star } from 'lucide-react'
 import { useClipboardStore } from '../store/clipboardStore'
 
 const SearchBar: React.FC = () => {
@@ -9,6 +9,8 @@ const SearchBar: React.FC = () => {
   const filteredLen = useClipboardStore(s => s.filteredHistory.length)
   const filterType = useClipboardStore(s => s.filterType)
   const setFilterType = useClipboardStore(s => s.setFilterType)
+  const activeTab = useClipboardStore(s => s.activeTab)
+  const setActiveTab = useClipboardStore(s => s.setActiveTab)
 
   const [local, setLocal] = useState(searchQuery)
   const [focused, setFocused] = useState(false)
@@ -18,7 +20,6 @@ const SearchBar: React.FC = () => {
 
   useEffect(() => { setLocal(searchQuery) }, [searchQuery])
 
-  // Cleanup timer on unmount
   useEffect(() => {
     return () => { if (timerRef.current) clearTimeout(timerRef.current) }
   }, [])
@@ -46,83 +47,115 @@ const SearchBar: React.FC = () => {
   }, [onClear])
 
   const stats = useMemo(() => ({
-    pinned: history.filter(h => h.pinned).length,
+    favorited: history.filter(h => h.favorited).length,
     today: history.filter(h => new Date(h.timestamp).toDateString() === new Date().toDateString()).length,
   }), [history])
 
   const filters = useMemo(() => [
-    { id: 'text', label: '文本', emoji: '📝' },
-    { id: 'link', label: '链接', emoji: '🔗' },
-    { id: 'code', label: '代码', emoji: '💻' },
-    { id: 'email', label: '邮箱', emoji: '📧' },
-    { id: 'color', label: '颜色', emoji: '🎨' },
+    { id: 'text', label: '文本', icon: 'T' },
+    { id: 'link', label: '链接', icon: '↗' },
+    { id: 'code', label: '代码', icon: '<>' },
+    { id: 'email', label: '邮箱', icon: '@' },
+    { id: 'color', label: '颜色', icon: '●' },
   ], [])
 
   const onFilterClick = useCallback((id: string | null) => {
     setFilterType(filterType === id ? null : id)
   }, [filterType, setFilterType])
 
+  const resultCount = local || filterType ? filteredLen : history.length
+
   return (
-    <div className="px-3 py-2 space-y-2">
+    <div style={{ padding: '8px 12px' }}>
+      {/* 搜索框 */}
       <div className="search-input rounded-xl overflow-hidden">
-        <div className="flex items-center px-3 py-2.5">
-          <Search size={16} color={focused ? '#4c6ef5' : 'rgba(144,146,150,0.5)'} style={{ transition: 'color 0.15s', flexShrink: 0 }} />
+        <div className="flex items-center px-3 py-2">
+          <Search size={15} color={focused ? 'var(--color-primary)' : 'var(--text-placeholder)'}
+            style={{ transition: 'color 0.15s', flexShrink: 0 }} />
           <input
             ref={inputRef}
             type="text"
-            placeholder="搜索剪贴板历史..."
+            placeholder="搜索剪贴板内容..."
             value={local}
             onChange={onChange}
             onFocus={() => setFocused(true)}
             onBlur={() => setTimeout(() => setFocused(false), 150)}
-            className="flex-1 bg-transparent border-none outline-none text-sm ml-2.5"
-            style={{ color: 'rgba(255,255,255,0.9)' }}
+            className="flex-1 bg-transparent border-none outline-none text-[13px] ml-2.5"
+            style={{ color: 'var(--text-primary)' }}
           />
-          <div className="flex items-center gap-1 flex-shrink-0">
+          <div className="flex items-center gap-0.5 flex-shrink-0">
             {local && (
               <button onClick={onClear} className="action-btn" style={{ width: 28, height: 28 }}>
-                <X size={14} />
+                <X size={13} />
               </button>
             )}
-            <button onClick={() => setShowFilters(v => !v)} className={`action-btn ${showFilters ? 'expand' : ''}`} style={{ width: 28, height: 28 }}>
-              <SlidersHorizontal size={14} />
+            <button onClick={() => setShowFilters(v => !v)}
+              className={`action-btn ${showFilters ? 'expand' : ''}`}
+              style={{ width: 28, height: 28 }}>
+              <SlidersHorizontal size={13} />
             </button>
           </div>
         </div>
-        {focused && (
-          <div className="px-3 pb-2 fade-in">
-            <div className="flex items-center gap-3 text-[11px]" style={{ color: 'rgba(255,255,255,0.25)' }}>
-              <div className="flex items-center gap-1">
-                <Sparkles size={10} color="rgba(76,110,245,0.5)" />
-                <span>{local || filterType ? `${filteredLen} 条结果` : `${history.length} 条记录`}</span>
-              </div>
-              <span style={{ color: 'rgba(255,255,255,0.1)' }}>|</span>
-              <span>⭐ {stats.pinned} 收藏</span>
-              <span style={{ color: 'rgba(255,255,255,0.1)' }}>|</span>
-              <span>📅 今日 {stats.today}</span>
-            </div>
-          </div>
-        )}
       </div>
 
-      {showFilters && (
-        <div className="flex items-center gap-1.5 px-1 overflow-x-auto fade-in" style={{ scrollbarWidth: 'none' }}>
-          <button onClick={() => onFilterClick(null)} className="flex-shrink-0 px-2.5 py-1 rounded-full text-[11px] font-medium"
+      {/* 状态栏 - 固定高度，始终显示 */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 4px', minHeight: '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px', color: 'var(--text-ghost)', whiteSpace: 'nowrap' }}>
+          <span style={{ fontVariantNumeric: 'tabular-nums' }}>{resultCount}</span>
+          <span>条记录</span>
+          {(local || filterType) && resultCount !== history.length && (
+            <span style={{ opacity: 0.6 }}>/ {history.length} 总计</span>
+          )}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap' }}>
+          <button
+            onClick={() => setActiveTab(activeTab === 'favorites' ? 'history' : 'favorites')}
             style={{
-              background: !filterType ? 'rgba(76,110,245,0.2)' : 'rgba(255,255,255,0.05)',
-              color: !filterType ? 'rgba(116,143,252,0.8)' : 'rgba(255,255,255,0.4)',
-              border: `1px solid ${!filterType ? 'rgba(76,110,245,0.3)' : 'rgba(255,255,255,0.05)'}`,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '2px',
+              fontSize: '10px',
+              color: activeTab === 'favorites' ? '#fbbf24' : 'var(--text-ghost)',
+              opacity: activeTab === 'favorites' ? 1 : 0.6,
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: 0,
+            }}
+            title={activeTab === 'favorites' ? '返回历史' : '查看收藏'}
+          >
+            <Star size={10} fill={activeTab === 'favorites' ? '#fbbf24' : 'none'} strokeWidth={2} />
+            <span style={{ fontVariantNumeric: 'tabular-nums' }}>{stats.favorited}</span>
+          </button>
+          <span style={{ fontSize: '10px', color: 'var(--text-ghost)', opacity: 0.3 }}>|</span>
+          <span style={{ fontSize: '10px', fontVariantNumeric: 'tabular-nums', color: 'var(--text-ghost)', opacity: 0.6 }}>
+            今日 {stats.today}
+          </span>
+        </div>
+      </div>
+
+      {/* 筛选器 */}
+      {showFilters && (
+        <div className="flex items-center gap-1 px-0.5 overflow-x-auto fade-in" style={{ scrollbarWidth: 'none', marginTop: '6px' }}>
+          <button onClick={() => onFilterClick(null)}
+            className="flex-shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all"
+            style={{
+              background: !filterType ? 'rgba(99,102,241,0.12)' : 'transparent',
+              color: !filterType ? 'rgba(129,140,248,0.9)' : 'var(--text-tertiary)',
+              border: `1px solid ${!filterType ? 'rgba(99,102,241,0.2)' : 'transparent'}`,
             }}>
             全部
           </button>
           {filters.map(f => (
-            <button key={f.id} onClick={() => onFilterClick(f.id)} className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium"
+            <button key={f.id} onClick={() => onFilterClick(f.id)}
+              className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all"
               style={{
-                background: filterType === f.id ? 'rgba(76,110,245,0.2)' : 'rgba(255,255,255,0.05)',
-                color: filterType === f.id ? 'rgba(116,143,252,0.8)' : 'rgba(255,255,255,0.4)',
-                border: `1px solid ${filterType === f.id ? 'rgba(76,110,245,0.3)' : 'rgba(255,255,255,0.05)'}`,
+                background: filterType === f.id ? 'rgba(99,102,241,0.12)' : 'transparent',
+                color: filterType === f.id ? 'rgba(129,140,248,0.9)' : 'var(--text-tertiary)',
+                border: `1px solid ${filterType === f.id ? 'rgba(99,102,241,0.2)' : 'transparent'}`,
               }}>
-              <span>{f.emoji}</span><span>{f.label}</span>
+              <span className="text-[10px] opacity-60">{f.icon}</span>
+              <span>{f.label}</span>
             </button>
           ))}
         </div>

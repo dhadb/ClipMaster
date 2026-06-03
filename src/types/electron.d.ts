@@ -5,6 +5,7 @@ export interface ElectronAPI {
   copyToClipboard: (content: string) => Promise<void>
   deleteItem: (id: string) => Promise<ClipboardItem[]>
   togglePin: (id: string) => Promise<ClipboardItem[]>
+  toggleFavorite: (id: string) => Promise<ClipboardItem[]>
   clearHistory: () => Promise<ClipboardItem[]>
   searchHistory: (query: string) => Promise<ClipboardItem[]>
   getSettings: () => Promise<Settings>

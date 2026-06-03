@@ -8,6 +8,13 @@ import StatsPanel from './components/StatsPanel'
 import EmptyState from './components/EmptyState'
 import { useClipboardStore } from './store/clipboardStore'
 
+function getResolvedTheme(theme: 'dark' | 'light' | 'auto'): 'dark' | 'light' {
+  if (theme === 'auto') {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  }
+  return theme
+}
+
 function App() {
   const activeTab = useClipboardStore(s => s.activeTab)
   const showSettings = useClipboardStore(s => s.showSettings)
@@ -21,6 +28,31 @@ function App() {
 
   const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // 立即应用主题 (同步执行，避免闪烁)
+  const resolvedTheme = useMemo(() => getResolvedTheme(settings.theme), [settings.theme])
+
+  // 使用 useLayoutEffect 同步设置主题属性，在浏览器绘制前完成
+  React.useLayoutEffect(() => {
+    document.documentElement.setAttribute('data-theme', resolvedTheme)
+  }, [resolvedTheme])
+
+  // 同步字体大小到 html 根元素，使 rem 单位生效
+  React.useLayoutEffect(() => {
+    document.documentElement.style.fontSize = `${settings.fontSize}px`
+  }, [settings.fontSize])
+
+  // 监听系统主题变化 (auto 模式)
+  useEffect(() => {
+    if (settings.theme !== 'auto') return
+    const mq = window.matchMedia('(prefers-color-scheme: dark)')
+    const handler = () => {
+      const t = mq.matches ? 'dark' : 'light'
+      document.documentElement.setAttribute('data-theme', t)
+    }
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [settings.theme])
 
   useEffect(() => {
     let cleanups: (() => void)[] = []
@@ -66,15 +98,18 @@ function App() {
 
   if (!loaded) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center" style={{ background: '#141517' }}>
-        <div className="flex flex-col items-center gap-3 fade-in">
-          <div className="w-12 h-12 rounded-xl flex items-center justify-center"
-            style={{ background: 'linear-gradient(135deg, #4c6ef5, #3b5bdb)' }}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+      <div className="h-screen w-screen flex items-center justify-center" style={{ background: 'var(--bg-root)' }}>
+        <div className="flex flex-col items-center gap-4 fade-in">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+            style={{
+              background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
+              boxShadow: '0 4px 16px rgba(99,102,241,0.25)',
+            }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
               <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
             </svg>
           </div>
-          <span className="text-sm" style={{ color: 'rgba(255,255,255,0.5)' }}>加载中...</span>
+          <span className="text-[12px]" style={{ color: 'var(--text-tertiary)' }}>加载中...</span>
         </div>
       </div>
     )
@@ -82,11 +117,18 @@ function App() {
 
   if (error) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center" style={{ background: '#141517' }}>
+      <div className="h-screen w-screen flex items-center justify-center" style={{ background: 'var(--bg-root)' }}>
         <div className="flex flex-col items-center gap-3">
-          <span className="text-sm" style={{ color: '#ff6b6b' }}>{error}</span>
-          <button onClick={() => window.location.reload()} className="text-xs px-4 py-2 rounded-lg"
-            style={{ background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.6)' }}>重试</button>
+          <span className="text-[13px]" style={{ color: 'var(--color-danger)' }}>{error}</span>
+          <button onClick={() => window.location.reload()}
+            className="text-[12px] px-4 py-2 rounded-lg"
+            style={{
+              background: 'var(--bg-elevated)',
+              color: 'var(--text-secondary)',
+              border: '1px solid var(--border-card)',
+            }}>
+            重试
+          </button>
         </div>
       </div>
     )
@@ -94,21 +136,24 @@ function App() {
 
   return (
     <div
-      className="h-screen w-screen overflow-hidden rounded-xl glass-effect flex flex-col"
+      className="h-screen w-screen overflow-hidden rounded-2xl glass-effect flex flex-col"
       style={{ opacity: settings.opacity, transform: 'translateZ(0)' }}
     >
       <TitleBar />
       {showSearch && <SearchBar />}
       <TabBar />
       <div className="flex-1 overflow-hidden">{content}</div>
-      <div className="px-4 py-1.5 border-t border-white/5 flex items-center justify-between">
-        <div className="flex items-center gap-2 text-[10px]" style={{ color: 'rgba(255,255,255,0.2)' }}>
+      <div className="px-4 py-1.5 flex items-center justify-between"
+        style={{ borderTop: '1px solid var(--border-divider)' }}>
+        <div className="flex items-center gap-2 text-[10px]" style={{ color: 'var(--text-ghost)' }}>
           <div className="pulse-dot" />
           <span>监控中</span>
-          <span style={{ color: 'rgba(255,255,255,0.1)' }}>|</span>
+          <span style={{ color: 'var(--text-ghost)', opacity: 0.4 }}>·</span>
           <span>{history.length} 条记录</span>
         </div>
-        <div className="text-[10px]" style={{ color: 'rgba(255,255,255,0.15)' }}>Ctrl+Shift+V 唤起</div>
+        <div className="text-[10px]" style={{ color: 'var(--text-ghost)', opacity: 0.6 }}>
+          Ctrl+Shift+V 唤起
+        </div>
       </div>
     </div>
   )

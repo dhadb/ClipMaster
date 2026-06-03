@@ -6,6 +6,7 @@ export interface ClipboardItem {
   type: 'text' | 'link' | 'email' | 'color' | 'number' | 'code' | 'long-text'
   timestamp: number
   pinned: boolean
+  favorited: boolean
 }
 
 export interface Settings {
@@ -41,7 +42,7 @@ const defaultSettings: Settings = {
 function filterHistory(history: ClipboardItem[], activeTab: string, searchQuery: string): ClipboardItem[] {
   let filtered = history
   if (activeTab === 'favorites') {
-    filtered = filtered.filter(item => item.pinned)
+    filtered = filtered.filter(item => item.favorited)
   }
   if (searchQuery) {
     const q = searchQuery.toLowerCase()
@@ -71,6 +72,7 @@ interface ClipboardStore {
   setFilterType: (type: string | null) => void
   deleteItem: (id: string) => Promise<void>
   togglePin: (id: string) => Promise<void>
+  toggleFavorite: (id: string) => Promise<void>
   clearHistory: () => Promise<void>
   copyItem: (id: string) => Promise<void>
 }
@@ -149,6 +151,18 @@ export const useClipboardStore = create<ClipboardStore>((set, get) => ({
         set({ history: newHistory, filteredHistory: filtered })
       }
     } catch (err) { console.error('togglePin failed:', err) }
+  },
+
+  toggleFavorite: async (id) => {
+    try {
+      if (window.electronAPI) {
+        const newHistory = await window.electronAPI.toggleFavorite(id)
+        const { searchQuery, activeTab, filterType } = get()
+        let filtered = filterHistory(newHistory, activeTab, searchQuery)
+        if (filterType) filtered = filtered.filter(item => item.type === filterType)
+        set({ history: newHistory, filteredHistory: filtered })
+      }
+    } catch (err) { console.error('toggleFavorite failed:', err) }
   },
 
   clearHistory: async () => {

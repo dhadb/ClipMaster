@@ -1,5 +1,5 @@
 import React, { useState, useCallback, memo } from 'react'
-import { Copy, Pin, PinOff, Trash2, ExternalLink, Mail, Hash, Code, FileText, Type, Check, Eye, EyeOff } from 'lucide-react'
+import { Copy, Pin, PinOff, Trash2, ExternalLink, Mail, Hash, Code, FileText, Type, Check, Eye, EyeOff, Heart } from 'lucide-react'
 import { useClipboardStore, ClipboardItem } from '../store/clipboardStore'
 import { formatDistanceToNow } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
@@ -10,20 +10,21 @@ interface Props {
   onSelect: () => void
 }
 
-const TYPE_CFG: Record<string, { Icon: any; color: string; bg: string; label: string; bar: string }> = {
-  text: { Icon: Type, color: '#5c7cfa', bg: 'rgba(92,124,250,0.1)', label: '文本', bar: 'type-text' },
-  link: { Icon: ExternalLink, color: '#20c997', bg: 'rgba(32,201,151,0.1)', label: '链接', bar: 'type-link' },
-  email: { Icon: Mail, color: '#f06595', bg: 'rgba(240,101,149,0.1)', label: '邮箱', bar: 'type-email' },
-  color: { Icon: Hash, color: '#ff922b', bg: 'rgba(255,146,43,0.1)', label: '颜色', bar: 'type-color' },
-  number: { Icon: Hash, color: '#fab005', bg: 'rgba(250,176,5,0.1)', label: '数字', bar: 'type-number' },
-  code: { Icon: Code, color: '#845ef7', bg: 'rgba(132,94,247,0.1)', label: '代码', bar: 'type-code' },
-  'long-text': { Icon: FileText, color: '#748ffc', bg: 'rgba(116,143,252,0.1)', label: '长文本', bar: 'type-long-text' },
+const TYPE_CFG: Record<string, { Icon: any; label: string; bar: string; cssVar: string }> = {
+  text: { Icon: Type, label: '文本', bar: 'type-text', cssVar: 'var(--type-text)' },
+  link: { Icon: ExternalLink, label: '链接', bar: 'type-link', cssVar: 'var(--type-link)' },
+  email: { Icon: Mail, label: '邮箱', bar: 'type-email', cssVar: 'var(--type-email)' },
+  color: { Icon: Hash, label: '颜色', bar: 'type-color', cssVar: 'var(--type-color)' },
+  number: { Icon: Hash, label: '数字', bar: 'type-number', cssVar: 'var(--type-number)' },
+  code: { Icon: Code, label: '代码', bar: 'type-code', cssVar: 'var(--type-code)' },
+  'long-text': { Icon: FileText, label: '长文本', bar: 'type-long-text', cssVar: 'var(--type-long-text)' },
 }
 
 const ClipboardItemCard: React.FC<Props> = memo(({ item, isSelected, onSelect }) => {
   const copyItem = useClipboardStore(s => s.copyItem)
   const deleteItem = useClipboardStore(s => s.deleteItem)
   const togglePin = useClipboardStore(s => s.togglePin)
+  const toggleFavorite = useClipboardStore(s => s.toggleFavorite)
   const copiedId = useClipboardStore(s => s.copiedId)
   const fontSize = useClipboardStore(s => s.settings.fontSize)
 
@@ -39,7 +40,12 @@ const ClipboardItemCard: React.FC<Props> = memo(({ item, isSelected, onSelect })
   const onCopy = useCallback((e: React.MouseEvent) => { e.stopPropagation(); copyItem(item.id) }, [copyItem, item.id])
   const onDelete = useCallback((e: React.MouseEvent) => { e.stopPropagation(); deleteItem(item.id) }, [deleteItem, item.id])
   const onPin = useCallback((e: React.MouseEvent) => { e.stopPropagation(); togglePin(item.id) }, [togglePin, item.id])
+  const onFavorite = useCallback((e: React.MouseEvent) => { e.stopPropagation(); toggleFavorite(item.id) }, [toggleFavorite, item.id])
   const onExpand = useCallback((e: React.MouseEvent) => { e.stopPropagation(); setExpanded(v => !v) }, [])
+
+  // 类型颜色和背景 - 使用 CSS 变量自动适配主题
+  const typeColor = cfg.cssVar
+  const typeBg = `color-mix(in srgb, ${cfg.cssVar} 8%, transparent)`
 
   return (
     <div
@@ -54,13 +60,20 @@ const ClipboardItemCard: React.FC<Props> = memo(({ item, isSelected, onSelect })
       <div className="flex-1 flex items-start gap-3 p-3 overflow-hidden">
         {/* 类型图标 */}
         <div
-          className="flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center relative"
-          style={{ background: cfg.bg }}
+          className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center relative"
+          style={{ background: typeBg }}
         >
-          <cfg.Icon size={16} color={cfg.color} />
+          <cfg.Icon size={14} color={typeColor} strokeWidth={2} />
           {item.pinned && (
-            <div className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full flex items-center justify-center" style={{ background: '#fab005' }}>
-              <Pin size={7} color="white" />
+            <div className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full flex items-center justify-center"
+              style={{ background: 'var(--color-warning)', boxShadow: '0 1px 4px rgba(251,191,36,0.3)' }}>
+              <Pin size={7} color="white" strokeWidth={3} />
+            </div>
+          )}
+          {item.favorited && (
+            <div className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full flex items-center justify-center"
+              style={{ background: '#f472b6', boxShadow: '0 1px 4px rgba(244,114,182,0.3)', right: item.pinned ? '-8px' : '-4px' }}>
+              <Heart size={7} color="white" strokeWidth={3} fill="white" />
             </div>
           )}
         </div>
@@ -69,60 +82,69 @@ const ClipboardItemCard: React.FC<Props> = memo(({ item, isSelected, onSelect })
         <div className="flex-1 min-w-0 flex flex-col">
           <div className="flex items-center gap-2 mb-1">
             <span
-              className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
-              style={{ color: cfg.color, background: cfg.bg }}
+              className="text-[10px] font-medium px-2 py-0.5 rounded-md"
+              style={{ color: typeColor, background: typeBg }}
             >
               {cfg.label}
             </span>
-            <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.25)' }}>{timeAgo}</span>
-            <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.15)' }}>{item.content.length}字符</span>
+            <span className="text-[10px]" style={{ color: 'var(--text-ghost)' }}>{timeAgo}</span>
+            <span className="text-[10px]" style={{ color: 'var(--text-ghost)', opacity: 0.6 }}>{item.content.length}字符</span>
           </div>
 
           <p
             className={`text-[13px] leading-relaxed break-all ${expanded ? '' : 'line-clamp-2'}`}
-            style={{ color: 'rgba(255,255,255,0.65)', fontSize: fontSize - 2 }}
+            style={{ color: 'var(--text-secondary)', fontSize: fontSize - 2 }}
           >
             {expanded ? item.content : truncated}
           </p>
 
           {item.type === 'color' && (
-            <div className="flex items-center gap-2 mt-2 p-1.5 rounded" style={{ background: 'rgba(0,0,0,0.2)' }}>
-              <div className="w-7 h-7 rounded" style={{ background: item.content, border: '1px solid rgba(255,255,255,0.1)' }} />
-              <span className="text-[11px] font-mono" style={{ color: 'rgba(255,255,255,0.4)' }}>{item.content}</span>
+            <div className="flex items-center gap-2 mt-2 p-2 rounded-lg" style={{ background: 'var(--bg-overlay)' }}>
+              <div className="w-6 h-6 rounded-md"
+                style={{ background: item.content, border: '1px solid var(--border-card)' }} />
+              <span className="text-[11px] font-mono" style={{ color: 'var(--text-tertiary)' }}>{item.content}</span>
             </div>
           )}
 
           {item.type === 'link' && (
-            <div className="mt-1.5 px-2 py-1 rounded" style={{ background: 'rgba(32,201,151,0.05)', border: '1px solid rgba(32,201,151,0.1)' }}>
-              <span className="text-[11px] truncate block" style={{ color: 'rgba(32,201,151,0.7)' }}>{item.content}</span>
+            <div className="mt-1.5 px-2 py-1.5 rounded-lg"
+              style={{ background: 'color-mix(in srgb, var(--type-link) 4%, transparent)', border: '1px solid color-mix(in srgb, var(--type-link) 8%, transparent)' }}>
+              <span className="text-[11px] truncate block" style={{ color: 'color-mix(in srgb, var(--type-link) 65%, transparent)' }}>{item.content}</span>
             </div>
           )}
 
           {item.type === 'code' && (
-            <div className="mt-1.5 p-1.5 rounded" style={{ background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(132,94,247,0.1)' }}>
-              <pre className="text-[11px] font-mono overflow-x-auto" style={{ color: 'rgba(132,94,247,0.6)' }}>
+            <div className="mt-1.5 p-2 rounded-lg"
+              style={{ background: 'var(--bg-overlay)', border: '1px solid color-mix(in srgb, var(--type-code) 8%, transparent)' }}>
+              <pre className="text-[11px] font-mono overflow-x-auto" style={{ color: 'color-mix(in srgb, var(--type-code) 55%, transparent)' }}>
                 <code>{item.content.slice(0, 150)}{item.content.length > 150 ? '...' : ''}</code>
               </pre>
             </div>
           )}
 
           {expanded && (
-            <div className="mt-2 flex items-center gap-3 text-[10px]" style={{ color: 'rgba(255,255,255,0.25)' }}>
-              <span>📝 {item.content.length} 字符</span>
-              <span>📊 {item.content.split(/\s+/).filter(Boolean).length} 词</span>
-              <span>📏 {item.content.split('\n').length} 行</span>
+            <div className="mt-2 flex items-center gap-3 text-[10px]" style={{ color: 'var(--text-ghost)' }}>
+              <span>{item.content.length} 字符</span>
+              <span>·</span>
+              <span>{item.content.split(/\s+/).filter(Boolean).length} 词</span>
+              <span>·</span>
+              <span>{item.content.split('\n').length} 行</span>
             </div>
           )}
         </div>
 
         {/* 操作按钮 */}
         {hovered && (
-          <div className="flex flex-col items-center gap-1 flex-shrink-0 fade-in">
+          <div className="flex items-center gap-0.5 flex-shrink-0 fade-in">
             <button onClick={onCopy} className="action-btn copy" title="复制">
-              {isCopied ? <Check size={13} color="#20c997" /> : <Copy size={13} />}
+              {isCopied ? <Check size={13} color="var(--color-success)" strokeWidth={3} /> : <Copy size={13} />}
             </button>
-            <button onClick={onPin} className={`action-btn pin ${item.pinned ? 'active' : ''}`} title={item.pinned ? '取消收藏' : '收藏'}>
+            <button onClick={onPin} className={`action-btn pin ${item.pinned ? 'active' : ''}`} title={item.pinned ? '取消置顶' : '置顶'}>
               {item.pinned ? <PinOff size={13} /> : <Pin size={13} />}
+            </button>
+            <button onClick={onFavorite} className={`action-btn ${item.favorited ? 'active' : ''}`} title={item.favorited ? '取消收藏' : '收藏'}
+              style={item.favorited ? { color: '#f472b6', background: 'rgba(244,114,182,0.12)' } : undefined}>
+              <Heart size={13} fill={item.favorited ? '#f472b6' : 'none'} />
             </button>
             <button onClick={onExpand} className="action-btn expand" title={expanded ? '收起' : '展开'}>
               {expanded ? <EyeOff size={13} /> : <Eye size={13} />}
@@ -137,18 +159,19 @@ const ClipboardItemCard: React.FC<Props> = memo(({ item, isSelected, onSelect })
       {/* 已复制覆盖 */}
       {isCopied && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none copied-overlay"
-          style={{ background: 'rgba(32,201,151,0.1)', backdropFilter: 'blur(4px)', borderRadius: 12 }}
-        >
-          <div className="flex items-center gap-2 px-4 py-2 rounded-full" style={{ background: 'rgba(32,201,151,0.9)', boxShadow: '0 4px 12px rgba(32,201,151,0.3)' }}>
-            <Check size={16} color="white" />
-            <span className="text-sm font-medium text-white">已复制</span>
+          style={{ background: 'color-mix(in srgb, var(--color-success) 8%, transparent)', backdropFilter: 'blur(4px)', borderRadius: 12 }}>
+          <div className="flex items-center gap-2 px-4 py-2 rounded-full"
+            style={{ background: 'var(--color-success)', boxShadow: '0 4px 16px rgba(52,211,153,0.3)' }}>
+            <Check size={15} color="white" strokeWidth={3} />
+            <span className="text-[13px] font-medium text-white">已复制</span>
           </div>
         </div>
       )}
 
       {/* 选中指示 */}
       {isSelected && (
-        <div className="absolute left-0 top-0 bottom-0 w-1 rounded-r" style={{ background: 'linear-gradient(to bottom, #748ffc, #4c6ef5)' }} />
+        <div className="absolute left-0 top-0 bottom-0 w-[2px] rounded-r"
+          style={{ background: 'linear-gradient(to bottom, var(--color-primary-light), var(--color-primary))' }} />
       )}
     </div>
   )

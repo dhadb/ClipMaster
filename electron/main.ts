@@ -7,12 +7,14 @@ let tray: Tray | null = null
 let clipboardWatcher: ReturnType<typeof setInterval> | null = null
 let lastClipboardContent = ''
 let isQuitting = false
+let isMaximized = false
+let savedBounds: { x: number; y: number; width: number; height: number } | null = null
 
 // === Persistence ===
 const dataPath = path.join(app.getPath('userData'), 'clipmaster-data.json')
 
 interface AppData {
-  history: Array<{id: string, content: string, type: string, timestamp: number, pinned: boolean}>
+  history: Array<{id: string, content: string, type: string, timestamp: number, pinned: boolean, favorited: boolean}>
   settings: typeof defaultSettings
 }
 
@@ -137,7 +139,7 @@ function createTray() {
     { label: '显示 ClipMaster', click: () => toggleWindow() },
     { type: 'separator' },
     { label: '清空历史', click: () => {
-      clipboardHistory = clipboardHistory.filter(item => item.pinned)
+      clipboardHistory = clipboardHistory.filter(item => item.pinned || item.favorited)
       mainWindow?.webContents.send('history-updated', clipboardHistory)
       scheduleSave()
     }},
@@ -192,6 +194,7 @@ function startClipboardWatcher() {
             type: getClipboardContentType(currentContent),
             timestamp: Date.now(),
             pinned: false,
+            favorited: false,
           })
         }
 
@@ -239,8 +242,18 @@ ipcMain.handle('toggle-pin', (_, id: string) => {
   return clipboardHistory
 })
 
+ipcMain.handle('toggle-favorite', (_, id: string) => {
+  const item = clipboardHistory.find(item => item.id === id)
+  if (item) {
+    item.favorited = !item.favorited
+  }
+  mainWindow?.webContents.send('history-updated', clipboardHistory)
+  scheduleSave()
+  return clipboardHistory
+})
+
 ipcMain.handle('clear-history', () => {
-  clipboardHistory = clipboardHistory.filter(item => item.pinned)
+  clipboardHistory = clipboardHistory.filter(item => item.pinned || item.favorited)
   mainWindow?.webContents.send('history-updated', clipboardHistory)
   scheduleSave()
   return clipboardHistory
@@ -262,10 +275,21 @@ ipcMain.handle('update-settings', (_, newSettings: Partial<typeof settings>) => 
 ipcMain.handle('minimize-window', () => mainWindow?.minimize())
 ipcMain.handle('close-window', () => mainWindow?.hide())
 ipcMain.handle('toggle-maximize', () => {
-  if (mainWindow?.isMaximized()) {
-    mainWindow.unmaximize()
+  if (!mainWindow) return
+  if (isMaximized) {
+    // 恢复之前的窗口大小和位置
+    if (savedBounds) {
+      mainWindow.setBounds(savedBounds)
+    } else {
+      mainWindow.unmaximize()
+    }
+    isMaximized = false
   } else {
-    mainWindow?.maximize()
+    // 保存当前窗口大小和位置
+    savedBounds = mainWindow.getBounds()
+    const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize
+    mainWindow.setBounds({ x: 0, y: 0, width: screenWidth, height: screenHeight })
+    isMaximized = true
   }
 })
 

@@ -6,6 +6,7 @@ export interface ClipboardItem {
   type: 'text' | 'link' | 'email' | 'color' | 'number' | 'code' | 'long-text'
   timestamp: number
   pinned: boolean
+  favorited: boolean
 }
 
 export interface Settings {
@@ -28,6 +29,7 @@ const electronAPI = {
   copyToClipboard: (content: string): Promise<void> => ipcRenderer.invoke('copy-to-clipboard', content),
   deleteItem: (id: string): Promise<ClipboardItem[]> => ipcRenderer.invoke('delete-item', id),
   togglePin: (id: string): Promise<ClipboardItem[]> => ipcRenderer.invoke('toggle-pin', id),
+  toggleFavorite: (id: string): Promise<ClipboardItem[]> => ipcRenderer.invoke('toggle-favorite', id),
   clearHistory: (): Promise<ClipboardItem[]> => ipcRenderer.invoke('clear-history'),
   getSettings: (): Promise<Settings> => ipcRenderer.invoke('get-settings'),
   updateSettings: (settings: Partial<Settings>): Promise<Settings> => ipcRenderer.invoke('update-settings', settings),

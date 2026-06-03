@@ -164,14 +164,15 @@
       flex: 1;
       padding: 0 32px 24px;
       display: none;
-      animation: pageEnter 0.4s ease-out;
+      animation: pageEnter 0.46s cubic-bezier(0.16, 1, 0.3, 1);
+      will-change: transform, opacity;
     }
 
     .page.active { display: flex; flex-direction: column; }
 
     @keyframes pageEnter {
-      from { opacity: 0; transform: translateY(20px); }
-      to { opacity: 1; transform: translateY(0); }
+      from { opacity: 0; transform: translateY(18px) scale(0.985); filter: blur(4px); }
+      to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
     }
 
     /* Welcome Page */
@@ -227,6 +228,14 @@
       border-radius: 10px;
       border: 1px solid rgba(255,255,255,0.04);
       animation: featureSlide 0.5s ease-out backwards;
+      transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), background 0.28s, border-color 0.28s, box-shadow 0.28s;
+    }
+
+    .feature:hover {
+      transform: translateY(-2px);
+      background: rgba(255,255,255,0.055);
+      border-color: rgba(76,110,245,0.24);
+      box-shadow: 0 10px 28px rgba(76,110,245,0.12);
     }
 
     .feature:nth-child(1) { animation-delay: 0.1s; }
@@ -316,9 +325,26 @@
       font-size: 14px;
       font-weight: 600;
       cursor: pointer;
-      transition: all 0.2s;
+      transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.28s, background 0.28s, color 0.28s, border-color 0.28s;
       -webkit-app-region: no-drag;
+      position: relative;
+      overflow: hidden;
     }
+
+    .btn::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -120%;
+      width: 70%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.22), transparent);
+      transform: skewX(-18deg);
+      transition: left 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+      pointer-events: none;
+    }
+
+    .btn:hover::before { left: 130%; }
 
     .btn-secondary {
       background: rgba(255,255,255,0.06);
@@ -339,12 +365,255 @@
 
     .btn-primary:hover {
       background: linear-gradient(135deg, #5c7cfa, #4c6ef5);
-      box-shadow: 0 6px 20px rgba(76,110,245,0.4);
-      transform: translateY(-1px);
+      box-shadow: 0 10px 28px rgba(76,110,245,0.45), 0 0 0 1px rgba(255,255,255,0.08) inset;
+      transform: translateY(-2px) scale(1.015);
     }
 
     .btn-primary:active {
-      transform: translateY(0);
+      transform: translateY(0) scale(0.985);
+    }
+
+    .btn-secondary:hover {
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary:active {
+      transform: scale(0.985);
+    }
+
+    /* Special Premium Page */
+    .special-page {
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding-bottom: 20px;
+    }
+
+    .premium-stage {
+      width: 152px;
+      height: 152px;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 18px;
+      border-radius: 38px;
+      background:
+        radial-gradient(circle at 35% 25%, rgba(255,255,255,0.16), transparent 28%),
+        linear-gradient(135deg, rgba(99,102,241,0.18), rgba(167,139,250,0.08));
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow:
+        0 24px 55px rgba(76,110,245,0.22),
+        0 0 0 1px rgba(255,255,255,0.04) inset;
+      overflow: hidden;
+      animation: premiumStageEnter 0.74s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    }
+
+    .premium-stage::before,
+    .premium-stage::after {
+      content: '';
+      position: absolute;
+      border-radius: 50%;
+      pointer-events: none;
+    }
+
+    .premium-stage::before {
+      width: 112px;
+      height: 112px;
+      background: radial-gradient(circle, rgba(116,143,252,0.36), transparent 68%);
+      animation: premiumGlowPulse 2.4s ease-in-out infinite;
+    }
+
+    .premium-stage::after {
+      width: 220px;
+      height: 46px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.17), transparent);
+      transform: rotate(-28deg) translateX(-95px);
+      animation: premiumSweep 2.6s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+    }
+
+    .premium-orb {
+      position: absolute;
+      width: 86px;
+      height: 86px;
+      border-radius: 28px;
+      background: linear-gradient(135deg, #6366f1 0%, #748ffc 48%, #a78bfa 100%);
+      box-shadow:
+        0 18px 45px rgba(99,102,241,0.45),
+        0 0 28px rgba(167,139,250,0.35) inset;
+      animation: premiumOrbFloat 3s ease-in-out infinite;
+    }
+
+    .premium-ring {
+      position: absolute;
+      width: 122px;
+      height: 122px;
+      border-radius: 50%;
+      border: 1px solid rgba(116,143,252,0.34);
+      border-top-color: rgba(255,255,255,0.9);
+      border-right-color: rgba(167,139,250,0.6);
+      animation: premiumRingSpin 7s linear infinite;
+    }
+
+    .premium-ring.secondary {
+      width: 104px;
+      height: 104px;
+      border-color: rgba(255,255,255,0.12);
+      border-left-color: rgba(116,143,252,0.68);
+      border-bottom-color: rgba(99,102,241,0.58);
+      animation-direction: reverse;
+      animation-duration: 9s;
+    }
+
+    .premium-core {
+      position: relative;
+      z-index: 2;
+      width: 62px;
+      height: 62px;
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255,255,255,0.16);
+      border: 1px solid rgba(255,255,255,0.22);
+      box-shadow: 0 12px 24px rgba(0,0,0,0.22);
+      backdrop-filter: blur(12px);
+      animation: premiumCoreBounce 0.78s 0.18s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    }
+
+    .premium-core svg {
+      width: 32px;
+      height: 32px;
+      stroke: white;
+      filter: drop-shadow(0 4px 10px rgba(0,0,0,0.26));
+    }
+
+    .premium-title {
+      font-size: 23px;
+      font-weight: 800;
+      line-height: 1.18;
+      letter-spacing: -0.6px;
+      color: rgba(255,255,255,0.96);
+      margin-bottom: 8px;
+      animation: premiumTextEnter 0.54s 0.18s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    .premium-desc {
+      max-width: 390px;
+      color: rgba(255,255,255,0.54);
+      font-size: 13px;
+      line-height: 1.65;
+      margin-bottom: 18px;
+      animation: premiumTextEnter 0.54s 0.26s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    .premium-chips {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .premium-chip {
+      padding: 7px 11px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.055);
+      border: 1px solid rgba(255,255,255,0.08);
+      color: rgba(255,255,255,0.72);
+      font-size: 11px;
+      font-weight: 600;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+      animation: premiumChipPop 0.52s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    }
+
+    .premium-chip:nth-child(1) { animation-delay: 0.36s; }
+    .premium-chip:nth-child(2) { animation-delay: 0.44s; }
+    .premium-chip:nth-child(3) { animation-delay: 0.52s; }
+    .premium-chip:nth-child(4) { animation-delay: 0.60s; }
+
+    .premium-loading-line {
+      width: 230px;
+      height: 6px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.06);
+      position: relative;
+      animation: premiumTextEnter 0.5s 0.68s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    .premium-loading-line::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: -35%;
+      width: 42%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, transparent, #748ffc, #a78bfa, transparent);
+      box-shadow: 0 0 18px rgba(116,143,252,0.55);
+      animation: premiumLineFlow 1.18s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+    }
+
+    @keyframes premiumStageEnter {
+      0% { opacity: 0; transform: translateY(18px) scale(0.78) rotate(-3deg); }
+      62% { opacity: 1; transform: translateY(-4px) scale(1.045) rotate(1deg); }
+      100% { opacity: 1; transform: translateY(0) scale(1) rotate(0); }
+    }
+
+    @keyframes premiumGlowPulse {
+      0%, 100% { transform: scale(0.9); opacity: 0.45; }
+      50% { transform: scale(1.16); opacity: 0.85; }
+    }
+
+    @keyframes premiumSweep {
+      0% { transform: rotate(-28deg) translateX(-130px); opacity: 0; }
+      18% { opacity: 0.9; }
+      58%, 100% { transform: rotate(-28deg) translateX(130px); opacity: 0; }
+    }
+
+    @keyframes premiumOrbFloat {
+      0%, 100% { transform: translateY(0) scale(1); }
+      50% { transform: translateY(-7px) scale(1.035); }
+    }
+
+    @keyframes premiumRingSpin {
+      to { transform: rotate(360deg); }
+    }
+
+    @keyframes premiumCoreBounce {
+      0% { opacity: 0; transform: scale(0.48) rotate(-8deg); }
+      58% { opacity: 1; transform: scale(1.16) rotate(3deg); }
+      78% { transform: scale(0.96) rotate(-1deg); }
+      100% { opacity: 1; transform: scale(1) rotate(0); }
+    }
+
+    @keyframes premiumTextEnter {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes premiumChipPop {
+      0% { opacity: 0; transform: translateY(12px) scale(0.74); }
+      68% { opacity: 1; transform: translateY(-2px) scale(1.08); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    @keyframes premiumLineFlow {
+      0% { left: -42%; }
+      100% { left: 100%; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
+      }
     }
 
     /* Progress Page */
@@ -517,13 +786,15 @@
       border-radius: 10px;
       border: 1px solid rgba(255,255,255,0.04);
       cursor: pointer;
-      transition: all 0.2s;
+      transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), background 0.28s, border-color 0.28s, box-shadow 0.28s;
       -webkit-app-region: no-drag;
     }
 
     .success-option:hover {
       background: rgba(255,255,255,0.05);
       border-color: rgba(76,110,245,0.2);
+      transform: translateY(-2px);
+      box-shadow: 0 12px 28px rgba(76,110,245,0.12);
     }
 
     .success-option-icon {
@@ -664,6 +935,34 @@
         </div>
       </div>
 
+      <!-- Special Premium Page -->
+      <div class="page special-page" id="specialPage">
+        <div class="premium-stage">
+          <div class="premium-orb"></div>
+          <div class="premium-ring"></div>
+          <div class="premium-ring secondary"></div>
+          <div class="premium-core">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8">
+              <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+              <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
+              <path d="M9 14l2 2 4-4"/>
+            </svg>
+          </div>
+        </div>
+
+        <h2 class="premium-title">高级体验正在就绪</h2>
+        <p class="premium-desc">正在为 ClipMaster 注入顺滑动效、快捷工作流与高效剪贴板体验</p>
+
+        <div class="premium-chips">
+          <span class="premium-chip">极速启动</span>
+          <span class="premium-chip">平滑动画</span>
+          <span class="premium-chip">智能历史</span>
+          <span class="premium-chip">全局唤起</span>
+        </div>
+
+        <div class="premium-loading-line"></div>
+      </div>
+
       <!-- Progress Page -->
       <div class="page progress-page" id="progressPage">
         <div class="progress-icon">
@@ -730,6 +1029,7 @@
           <div class="status-dot active" id="dot1"></div>
           <div class="status-dot" id="dot2"></div>
           <div class="status-dot" id="dot3"></div>
+          <div class="status-dot" id="dot4"></div>
         </div>
       </div>
     </div>
@@ -767,46 +1067,73 @@
       }
     }
 
+    // Page transitions
+    function showPage(pageId, dotId) {
+      document.querySelectorAll('.page').forEach(page => page.classList.remove('active'))
+      document.getElementById(pageId).classList.add('active')
+
+      document.querySelectorAll('.status-dot').forEach(dot => dot.classList.remove('active'))
+      if (dotId) document.getElementById(dotId).classList.add('active')
+    }
+
+    function sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms))
+    }
+
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+    let displayedProgress = 0
+    let targetProgress = 0
+    let progressMeta = { current: 0, total: 0, file: '准备中' }
+
+    function updateProgressDom(progress, meta) {
+      const ring = document.getElementById('progressRing')
+      const circumference = 2 * Math.PI * 45
+      ring.style.strokeDashoffset = circumference - (progress / 100) * circumference
+      document.getElementById('progressPercent').textContent = progress + '%'
+      document.getElementById('progressBar').style.width = progress + '%'
+      document.getElementById('progressFile').textContent = meta.file || '准备中'
+      document.getElementById('progressStats').textContent = `${meta.current || 0} / ${meta.total || 0} 文件`
+    }
+
+    function renderProgress() {
+      displayedProgress += (targetProgress - displayedProgress) * 0.14
+      if (Math.abs(targetProgress - displayedProgress) < 0.12) displayedProgress = targetProgress
+      updateProgressDom(Math.round(displayedProgress), progressMeta)
+      requestAnimationFrame(renderProgress)
+    }
+    requestAnimationFrame(renderProgress)
+
     // Start installation
     async function startInstall() {
-      // Switch to progress page
-      document.getElementById('welcomePage').classList.remove('active')
-      document.getElementById('progressPage').classList.add('active')
-      document.getElementById('dot2').classList.add('active')
+      showPage('specialPage', 'dot2')
+      await sleep(reducedMotion ? 120 : 1400)
+
+      showPage('progressPage', 'dot3')
+      targetProgress = 0
+      displayedProgress = 0
+      progressMeta = { current: 0, total: 0, file: '准备中' }
+      updateProgressDom(0, progressMeta)
 
       // Start installation
       const result = await ipcRenderer.invoke('start-install')
 
       if (result.success) {
-        // Switch to success page
-        document.getElementById('progressPage').classList.remove('active')
-        document.getElementById('successPage').classList.add('active')
-        document.getElementById('dot3').classList.add('active')
+        targetProgress = 100
+        displayedProgress = 100
+        updateProgressDom(100, progressMeta)
+        showPage('successPage', 'dot4')
       } else {
         alert('安装失败: ' + result.error)
+        showPage('welcomePage', 'dot1')
       }
     }
 
     // Listen for progress updates
     ipcRenderer.on('install-progress', (event, data) => {
       const { progress, current, total, file } = data
-
-      // Update progress ring
-      const ring = document.getElementById('progressRing')
-      const circumference = 2 * Math.PI * 45
-      ring.style.strokeDashoffset = circumference - (progress / 100) * circumference
-
-      // Update percentage
-      document.getElementById('progressPercent').textContent = progress + '%'
-
-      // Update progress bar
-      document.getElementById('progressBar').style.width = progress + '%'
-
-      // Update file info
-      document.getElementById('progressFile').textContent = file
-
-      // Update stats
-      document.getElementById('progressStats').textContent = `${current} / ${total} 文件`
+      targetProgress = progress
+      progressMeta = { current, total, file }
     })
 
     // Launch app

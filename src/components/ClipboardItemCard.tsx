@@ -17,7 +17,10 @@ const TYPE_CFG: Record<string, { Icon: any; label: string; bar: string; cssVar: 
   color: { Icon: Hash, label: '颜色', bar: 'type-color', cssVar: 'var(--type-color)' },
   number: { Icon: Hash, label: '数字', bar: 'type-number', cssVar: 'var(--type-number)' },
   code: { Icon: Code, label: '代码', bar: 'type-code', cssVar: 'var(--type-code)' },
-  'long-text': { Icon: FileText, label: '长文本', bar: 'type-long-text', cssVar: 'var(--type-long-text)' },
+  json: { Icon: Code, label: 'JSON', bar: 'type-code', cssVar: 'var(--type-code)' },
+  markdown: { Icon: FileText, label: 'Markdown', bar: 'type-long-text', cssVar: 'var(--type-long-text)' },
+  'file-path': { Icon: FileText, label: '路径', bar: 'type-text', cssVar: 'var(--type-text)' },
+  phone: { Icon: Hash, label: '电话', bar: 'type-number', cssVar: 'var(--type-number)' },
 }
 
 const ClipboardItemCard: React.FC<Props> = memo(({ item, isSelected, onSelect }) => {
@@ -27,6 +30,8 @@ const ClipboardItemCard: React.FC<Props> = memo(({ item, isSelected, onSelect })
   const toggleFavorite = useClipboardStore(s => s.toggleFavorite)
   const copiedId = useClipboardStore(s => s.copiedId)
   const fontSize = useClipboardStore(s => s.settings.fontSize)
+  const showPreview = useClipboardStore(s => s.settings.showPreview)
+  const copyOnSelect = useClipboardStore(s => s.settings.copyOnSelect)
 
   const [hovered, setHovered] = useState(false)
   const [expanded, setExpanded] = useState(false)
@@ -35,9 +40,14 @@ const ClipboardItemCard: React.FC<Props> = memo(({ item, isSelected, onSelect })
   const isCopied = copiedId === item.id
 
   const timeAgo = formatDistanceToNow(item.timestamp, { locale: zhCN, addSuffix: true })
+  const firstTimeAgo = formatDistanceToNow(item.firstTimestamp || item.timestamp, { locale: zhCN, addSuffix: true })
   const truncated = item.content.length > 120 ? item.content.slice(0, 120) + '...' : item.content
 
   const onCopy = useCallback((e: React.MouseEvent) => { e.stopPropagation(); copyItem(item.id) }, [copyItem, item.id])
+  const onDoubleClickCopy = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (copyOnSelect) copyItem(item.id)
+  }, [copyOnSelect, copyItem, item.id])
   const onDelete = useCallback((e: React.MouseEvent) => { e.stopPropagation(); deleteItem(item.id) }, [deleteItem, item.id])
   const onPin = useCallback((e: React.MouseEvent) => { e.stopPropagation(); togglePin(item.id) }, [togglePin, item.id])
   const onFavorite = useCallback((e: React.MouseEvent) => { e.stopPropagation(); toggleFavorite(item.id) }, [toggleFavorite, item.id])
@@ -50,7 +60,7 @@ const ClipboardItemCard: React.FC<Props> = memo(({ item, isSelected, onSelect })
   return (
     <div
       onClick={onSelect}
-      onDoubleClick={onCopy}
+      onDoubleClick={onDoubleClickCopy}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       className={`glass-card rounded-xl overflow-hidden cursor-pointer h-full flex flex-col ${isSelected ? 'selected' : ''}`}
@@ -89,6 +99,7 @@ const ClipboardItemCard: React.FC<Props> = memo(({ item, isSelected, onSelect })
             </span>
             <span className="text-[10px]" style={{ color: 'var(--text-ghost)' }}>{timeAgo}</span>
             <span className="text-[10px]" style={{ color: 'var(--text-ghost)', opacity: 0.6 }}>{item.content.length}字符</span>
+            {(item.copyCount || 1) > 1 && <span className="text-[10px]" style={{ color: 'var(--text-ghost)', opacity: 0.6 }}>复制{item.copyCount}次</span>}
           </div>
 
           <p
@@ -98,7 +109,7 @@ const ClipboardItemCard: React.FC<Props> = memo(({ item, isSelected, onSelect })
             {expanded ? item.content : truncated}
           </p>
 
-          {item.type === 'color' && (
+          {showPreview && item.type === 'color' && (
             <div className="flex items-center gap-2 mt-2 p-2 rounded-lg" style={{ background: 'var(--bg-overlay)' }}>
               <div className="w-6 h-6 rounded-md"
                 style={{ background: item.content, border: '1px solid var(--border-card)' }} />
@@ -106,14 +117,14 @@ const ClipboardItemCard: React.FC<Props> = memo(({ item, isSelected, onSelect })
             </div>
           )}
 
-          {item.type === 'link' && (
+          {showPreview && item.type === 'link' && (
             <div className="mt-1.5 px-2 py-1.5 rounded-lg"
               style={{ background: 'color-mix(in srgb, var(--type-link) 4%, transparent)', border: '1px solid color-mix(in srgb, var(--type-link) 8%, transparent)' }}>
               <span className="text-[11px] truncate block" style={{ color: 'color-mix(in srgb, var(--type-link) 65%, transparent)' }}>{item.content}</span>
             </div>
           )}
 
-          {item.type === 'code' && (
+          {showPreview && (item.type === 'code' || item.type === 'json' || item.type === 'markdown') && (
             <div className="mt-1.5 p-2 rounded-lg"
               style={{ background: 'var(--bg-overlay)', border: '1px solid color-mix(in srgb, var(--type-code) 8%, transparent)' }}>
               <pre className="text-[11px] font-mono overflow-x-auto" style={{ color: 'color-mix(in srgb, var(--type-code) 55%, transparent)' }}>
@@ -129,6 +140,10 @@ const ClipboardItemCard: React.FC<Props> = memo(({ item, isSelected, onSelect })
               <span>{item.content.split(/\s+/).filter(Boolean).length} 词</span>
               <span>·</span>
               <span>{item.content.split('\n').length} 行</span>
+              {(item.copyCount || 1) > 1 && <>
+                <span>·</span>
+                <span>复制过 {item.copyCount} 次，首次 {firstTimeAgo}</span>
+              </>}
             </div>
           )}
         </div>

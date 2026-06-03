@@ -5,12 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ClipMaster 安装向导</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
-      font-family: 'Inter', system-ui, sans-serif;
+      font-family: 'Segoe UI', 'Microsoft YaHei', system-ui, sans-serif;
       background: transparent;
       overflow: hidden;
       user-select: none;
@@ -177,9 +175,9 @@
 
     /* Welcome Page */
     .welcome-icon {
-      width: 80px;
-      height: 80px;
-      margin: 10px auto 20px;
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 14px;
       background: linear-gradient(135deg, rgba(76,110,245,0.2), rgba(59,91,219,0.2));
       border-radius: 24px;
       display: flex;
@@ -194,36 +192,36 @@
       50% { transform: translateY(-8px); }
     }
 
-    .welcome-icon svg { width: 40px; height: 40px; }
+    .welcome-icon svg { width: 32px; height: 32px; }
 
     .welcome-title {
       text-align: center;
-      font-size: 22px;
+      font-size: 20px;
       font-weight: 700;
       color: rgba(255,255,255,0.95);
-      margin-bottom: 8px;
+      margin-bottom: 6px;
     }
 
     .welcome-desc {
       text-align: center;
       font-size: 13px;
       color: rgba(255,255,255,0.5);
-      margin-bottom: 24px;
+      margin-bottom: 14px;
       line-height: 1.5;
     }
 
     .features {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 12px;
-      margin-bottom: 24px;
+      gap: 8px;
+      margin-bottom: 12px;
     }
 
     .feature {
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 12px;
+      padding: 9px 10px;
       background: rgba(255,255,255,0.03);
       border-radius: 10px;
       border: 1px solid rgba(255,255,255,0.04);
@@ -249,8 +247,8 @@
     }
 
     .feature-icon {
-      width: 32px;
-      height: 32px;
+      width: 28px;
+      height: 28px;
       background: rgba(76,110,245,0.15);
       border-radius: 8px;
       display: flex;
@@ -270,11 +268,11 @@
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 12px 14px;
+      padding: 10px 12px;
       background: rgba(255,255,255,0.03);
       border-radius: 10px;
       border: 1px solid rgba(255,255,255,0.06);
-      margin-bottom: 20px;
+      margin-bottom: 12px;
     }
 
     .install-path-label {
@@ -285,12 +283,25 @@
 
     .install-path-value {
       flex: 1;
+      min-width: 0;
       font-size: 12px;
-      color: rgba(255,255,255,0.7);
+      color: rgba(255,255,255,0.78);
       font-family: 'Consolas', monospace;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      background: transparent;
+      border: none;
+      outline: none;
+      -webkit-app-region: no-drag;
+    }
+
+    .install-path-value::placeholder {
+      color: rgba(255,255,255,0.28);
+    }
+
+    .install-path-value:focus {
+      color: rgba(255,255,255,0.94);
     }
 
     .install-path-btn {
@@ -319,7 +330,7 @@
 
     .btn {
       flex: 1;
-      padding: 14px 24px;
+      padding: 12px 24px;
       border: none;
       border-radius: 12px;
       font-size: 14px;
@@ -926,7 +937,7 @@
 
         <div class="install-path">
           <span class="install-path-label">安装目录</span>
-          <span class="install-path-value" id="installPath">加载中...</span>
+          <input class="install-path-value" id="installPath" type="text" spellcheck="false" placeholder="输入安装目录" />
           <button class="install-path-btn" onclick="selectFolder()">更改</button>
         </div>
 
@@ -1055,7 +1066,7 @@
     // Load install path
     async function loadInstallPath() {
       const path = await ipcRenderer.invoke('get-install-path')
-      document.getElementById('installPath').textContent = path
+      document.getElementById('installPath').value = path
     }
     loadInstallPath()
 
@@ -1063,8 +1074,12 @@
     async function selectFolder() {
       const path = await ipcRenderer.invoke('select-folder')
       if (path) {
-        document.getElementById('installPath').textContent = path
+        document.getElementById('installPath').value = path
       }
+    }
+
+    function getInstallPathInput() {
+      return document.getElementById('installPath').value.trim()
     }
 
     // Page transitions
@@ -1096,35 +1111,66 @@
       document.getElementById('progressStats').textContent = `${meta.current || 0} / ${meta.total || 0} 文件`
     }
 
+    let progressAnimationId = null
+
     function renderProgress() {
       displayedProgress += (targetProgress - displayedProgress) * 0.14
       if (Math.abs(targetProgress - displayedProgress) < 0.12) displayedProgress = targetProgress
       updateProgressDom(Math.round(displayedProgress), progressMeta)
-      requestAnimationFrame(renderProgress)
+      progressAnimationId = requestAnimationFrame(renderProgress)
     }
-    requestAnimationFrame(renderProgress)
+
+    function startProgressAnimation() {
+      if (progressAnimationId === null) {
+        progressAnimationId = requestAnimationFrame(renderProgress)
+      }
+    }
+
+    function stopProgressAnimation() {
+      if (progressAnimationId !== null) {
+        cancelAnimationFrame(progressAnimationId)
+        progressAnimationId = null
+      }
+    }
 
     // Start installation
     async function startInstall() {
-      showPage('specialPage', 'dot2')
-      await sleep(reducedMotion ? 120 : 1400)
+      const customInstallPath = getInstallPathInput()
+      if (!customInstallPath) {
+        alert('请输入安装目录')
+        document.getElementById('installPath').focus()
+        return
+      }
 
-      showPage('progressPage', 'dot3')
-      targetProgress = 0
-      displayedProgress = 0
-      progressMeta = { current: 0, total: 0, file: '准备中' }
-      updateProgressDom(0, progressMeta)
+      try {
+        await ipcRenderer.invoke('set-install-path', customInstallPath)
 
-      // Start installation
-      const result = await ipcRenderer.invoke('start-install')
+        showPage('specialPage', 'dot2')
+        await sleep(reducedMotion ? 120 : 1400)
 
-      if (result.success) {
-        targetProgress = 100
-        displayedProgress = 100
-        updateProgressDom(100, progressMeta)
-        showPage('successPage', 'dot4')
-      } else {
-        alert('安装失败: ' + result.error)
+        showPage('progressPage', 'dot3')
+        targetProgress = 0
+        displayedProgress = 0
+        progressMeta = { current: 0, total: 0, file: '准备中' }
+        updateProgressDom(0, progressMeta)
+        startProgressAnimation()
+
+        // Start installation
+        const result = await ipcRenderer.invoke('start-install', customInstallPath)
+        stopProgressAnimation()
+
+        if (result.success) {
+          targetProgress = 100
+          displayedProgress = 100
+          updateProgressDom(100, progressMeta)
+          showPage('successPage', 'dot4')
+        } else {
+          alert('安装失败: ' + result.error)
+          showPage('welcomePage', 'dot1')
+        }
+      } catch (error) {
+        stopProgressAnimation()
+        alert('安装失败: ' + (error && error.message ? error.message : String(error)))
         showPage('welcomePage', 'dot1')
       }
     }

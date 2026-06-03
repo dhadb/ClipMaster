@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, memo } from 'react'
-import { Clock, Star, Trash2, Download, BarChart3 } from 'lucide-react'
+import { Clock, Star, Trash2, Download, BarChart3, Wand2 } from 'lucide-react'
 import { useClipboardStore } from '../store/clipboardStore'
 
 const TabBar: React.FC = memo(() => {
@@ -24,11 +24,23 @@ const TabBar: React.FC = memo(() => {
   const onExport = useCallback(() => {
     const blob = new Blob([JSON.stringify({ version: '1.0', items: history, settings }, null, 2)], { type: 'application/json' })
     const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
+    const url = URL.createObjectURL(blob)
+    a.href = url
     a.download = `clipmaster-${new Date().toISOString().slice(0, 10)}.json`
     a.click()
-    URL.revokeObjectURL(a.href)
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
   }, [history, settings])
+
+  const onSmartOrganize = useCallback(async () => {
+    const recent = history.slice(0, 20).map(item => item.content.trim()).filter(Boolean)
+    const unique = Array.from(new Set(recent))
+    const allLinks = unique.every(item => /^https?:\/\//i.test(item))
+    const result = allLinks
+      ? unique.map(item => `- ${item}`).join('\n')
+      : unique.map((item, index) => `${index + 1}. ${item}`).join('\n')
+    const markdown = `# ClipMaster 一键整理\n\n${result}`
+    await window.electronAPI?.copyToClipboard(markdown)
+  }, [history])
 
   return (
     <div className="flex items-center justify-between px-3 py-1 h-10"
@@ -56,6 +68,9 @@ const TabBar: React.FC = memo(() => {
       <div className="flex items-center gap-0.5" style={{ minWidth: '80px', justifyContent: 'flex-end' }}>
         {activeTab === 'history' && (
           <>
+            <button onClick={onSmartOrganize} className="action-btn" title="一键整理最近 20 条为 Markdown" style={{ width: 28, height: 28 }}>
+              <Wand2 size={12} />
+            </button>
             <button onClick={onExport} className="action-btn" title="导出" style={{ width: 28, height: 28 }}>
               <Download size={12} />
             </button>

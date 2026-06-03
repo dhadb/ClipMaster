@@ -21,6 +21,9 @@ function App() {
   const filteredHistory = useClipboardStore(s => s.filteredHistory)
   const history = useClipboardStore(s => s.history)
   const settings = useClipboardStore(s => s.settings)
+  const privacy = useClipboardStore(s => s.privacy)
+  const pauseMonitoring = useClipboardStore(s => s.pauseMonitoring)
+  const resumeMonitoring = useClipboardStore(s => s.resumeMonitoring)
   const setHistory = useClipboardStore(s => s.setHistory)
   const setSettings = useClipboardStore(s => s.setSettings)
   const setShowSettings = useClipboardStore(s => s.setShowSettings)
@@ -60,20 +63,23 @@ function App() {
     const init = async () => {
       try {
         if (window.electronAPI) {
-          const [hist, s] = await Promise.all([
+          const [hist, s, privacy] = await Promise.all([
             window.electronAPI.getHistory(),
             window.electronAPI.getSettings(),
+            window.electronAPI.getPrivacyState(),
           ])
           setHistory(hist)
           setSettings(s)
+          useClipboardStore.getState().setPrivacy(privacy)
 
           const c1 = window.electronAPI.onHistoryUpdated(setHistory)
           const c2 = window.electronAPI.onSettingsUpdated(setSettings)
+          const cPrivacy = window.electronAPI.onPrivacyUpdated(useClipboardStore.getState().setPrivacy)
           const c3 = window.electronAPI.onShowSettings(() => {
             setShowSettings(true)
             setActiveTab('settings')
           })
-          cleanups.push(c1, c2, c3)
+          cleanups.push(c1, c2, cPrivacy, c3)
         }
         setLoaded(true)
       } catch (err) {
@@ -146,14 +152,20 @@ function App() {
       <div className="px-4 py-1.5 flex items-center justify-between"
         style={{ borderTop: '1px solid var(--border-divider)' }}>
         <div className="flex items-center gap-2 text-[10px]" style={{ color: 'var(--text-ghost)' }}>
-          <div className="pulse-dot" />
-          <span>监控中</span>
+          <div className="pulse-dot" style={privacy.paused ? { background: 'var(--color-warning)' } : undefined} />
+          <span>{privacy.paused ? '已暂停记录' : '监控中'}</span>
           <span style={{ color: 'var(--text-ghost)', opacity: 0.4 }}>·</span>
           <span>{history.length} 条记录</span>
+          <span style={{ color: 'var(--text-ghost)', opacity: 0.4 }}>·</span>
+          <span>今日保护 {privacy.protectedToday} 条</span>
         </div>
-        <div className="text-[10px]" style={{ color: 'var(--text-ghost)', opacity: 0.6 }}>
-          Ctrl+Shift+V 唤起
-        </div>
+        <button
+          onClick={() => privacy.paused ? resumeMonitoring() : pauseMonitoring(5)}
+          className="text-[10px] px-2 py-1 rounded-md transition-all"
+          style={{ color: privacy.paused ? 'var(--color-success)' : 'var(--text-ghost)', background: 'var(--bg-surface)' }}
+        >
+          {privacy.paused ? '恢复记录' : '暂停 5 分钟'}
+        </button>
       </div>
     </div>
   )

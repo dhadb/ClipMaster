@@ -3,10 +3,12 @@ import { contextBridge, ipcRenderer } from 'electron'
 export interface ClipboardItem {
   id: string
   content: string
-  type: 'text' | 'link' | 'email' | 'color' | 'number' | 'code' | 'long-text'
+  type: 'text' | 'link' | 'email' | 'color' | 'number' | 'code' | 'long-text' | 'json' | 'markdown' | 'file-path' | 'phone'
   timestamp: number
   pinned: boolean
   favorited: boolean
+  copyCount: number
+  firstTimestamp: number
 }
 
 export interface Settings {
@@ -22,6 +24,15 @@ export interface Settings {
   showPreview: boolean
   copyOnSelect: boolean
   soundEnabled: boolean
+  ignoreSensitive: boolean
+  autoDeleteDays: number
+  verificationCodeTtlMinutes: number
+}
+
+export interface PrivacyState {
+  paused: boolean
+  pauseUntil: number
+  protectedToday: number
 }
 
 const electronAPI = {
@@ -33,6 +44,9 @@ const electronAPI = {
   clearHistory: (): Promise<ClipboardItem[]> => ipcRenderer.invoke('clear-history'),
   getSettings: (): Promise<Settings> => ipcRenderer.invoke('get-settings'),
   updateSettings: (settings: Partial<Settings>): Promise<Settings> => ipcRenderer.invoke('update-settings', settings),
+  getPrivacyState: (): Promise<PrivacyState> => ipcRenderer.invoke('get-privacy-state'),
+  pauseMonitoring: (minutes: number): Promise<PrivacyState> => ipcRenderer.invoke('pause-monitoring', minutes),
+  resumeMonitoring: (): Promise<PrivacyState> => ipcRenderer.invoke('resume-monitoring'),
   minimizeWindow: (): Promise<void> => ipcRenderer.invoke('minimize-window'),
   closeWindow: (): Promise<void> => ipcRenderer.invoke('close-window'),
   toggleMaximize: (): Promise<void> => ipcRenderer.invoke('toggle-maximize'),
@@ -45,6 +59,11 @@ const electronAPI = {
     const handler = (_: any, settings: Settings) => callback(settings)
     ipcRenderer.on('settings-updated', handler)
     return () => { ipcRenderer.removeListener('settings-updated', handler) }
+  },
+  onPrivacyUpdated: (callback: (state: PrivacyState) => void) => {
+    const handler = (_: any, state: PrivacyState) => callback(state)
+    ipcRenderer.on('privacy-updated', handler)
+    return () => { ipcRenderer.removeListener('privacy-updated', handler) }
   },
   onShowSettings: (callback: () => void) => {
     const handler = () => callback()

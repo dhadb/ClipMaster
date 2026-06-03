@@ -51,6 +51,14 @@ const ClipboardList: React.FC = () => {
   // 键盘导航
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null
+      const isEditing = target && (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable
+      )
+      if (isEditing) return
+
       const idx = filteredHistory.findIndex(i => i.id === selectedId)
       if (e.key === 'ArrowDown') {
         e.preventDefault()

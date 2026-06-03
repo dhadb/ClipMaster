@@ -7,12 +7,18 @@ const SettingsPanel: React.FC = memo(() => {
   const setSettings = useClipboardStore(s => s.setSettings)
   const historyLen = useClipboardStore(s => s.history.length)
   const [section, setSection] = useState('general')
+  const [hotkeyDraft, setHotkeyDraft] = useState(settings.hotkey)
 
   const update = useCallback(<K extends keyof typeof settings>(key: K, val: typeof settings[K]) => {
     const current = useClipboardStore.getState().settings
     const next = { ...current, [key]: val }
     setSettings(next)
-    window.electronAPI?.updateSettings(next)
+    window.electronAPI?.updateSettings({ [key]: val } as Partial<typeof settings>)
+      .then(applied => applied && setSettings(applied))
+      .catch(err => {
+        console.error('updateSettings failed:', err)
+        setSettings(current)
+      })
   }, [setSettings])
 
   const sections = [
@@ -66,11 +72,19 @@ const SettingsPanel: React.FC = memo(() => {
               <div className="h-px" style={{ background: 'var(--border-divider)' }} />
               <Item label="双击复制" desc="双击项目时自动复制"><Toggle on={settings.copyOnSelect} set={v => update('copyOnSelect', v)} /></Item>
               <div className="h-px" style={{ background: 'var(--border-divider)' }} />
+              <Item label="敏感内容保护" desc="自动跳过密码、Token、验证码等内容"><Toggle on={settings.ignoreSensitive} set={v => update('ignoreSensitive', v)} /></Item>
+              <div className="h-px" style={{ background: 'var(--border-divider)' }} />
               <Item label="悬停预览" desc="鼠标悬停时显示完整内容"><Toggle on={settings.showPreview} set={v => update('showPreview', v)} /></Item>
             </Card>
             <Card title="历史记录" icon={<Database size={14} color="#6366f1" />}>
               <Item label="最大保存数量"><span className="text-[13px] tabular-nums" style={{ color: 'var(--text-secondary)' }}>{settings.maxHistory} 条</span></Item>
               <Slider value={settings.maxHistory} min={50} max={500} step={10} set={v => update('maxHistory', v)} />
+              <div className="h-px" style={{ background: 'var(--border-divider)' }} />
+              <Item label="普通记录保留天数" desc="0 表示不过期"><span className="text-[13px] tabular-nums" style={{ color: 'var(--text-secondary)' }}>{settings.autoDeleteDays} 天</span></Item>
+              <Slider value={settings.autoDeleteDays} min={0} max={365} step={1} set={v => update('autoDeleteDays', v)} unit="天" />
+              <div className="h-px" style={{ background: 'var(--border-divider)' }} />
+              <Item label="验证码保留时间" desc="0 表示不过期"><span className="text-[13px] tabular-nums" style={{ color: 'var(--text-secondary)' }}>{settings.verificationCodeTtlMinutes} 分钟</span></Item>
+              <Slider value={settings.verificationCodeTtlMinutes} min={0} max={1440} step={5} set={v => update('verificationCodeTtlMinutes', v)} unit="分" />
             </Card>
           </div>
         )
@@ -119,9 +133,21 @@ const SettingsPanel: React.FC = memo(() => {
       case 'hotkeys':
         return (
           <div className="space-y-4 slide-in-right">
+            <Card title="全局快捷键" icon={<Keyboard size={14} color="#6366f1" />}>
+              <Item label="显示/隐藏窗口" desc="例如 CommandOrControl+Shift+V">
+                <input
+                  value={hotkeyDraft}
+                  onChange={e => setHotkeyDraft(e.target.value)}
+                  onBlur={() => update('hotkey', hotkeyDraft)}
+                  onKeyDown={e => { if (e.key === 'Enter') update('hotkey', hotkeyDraft) }}
+                  className="px-2 py-1 rounded-md text-[12px] font-mono w-44"
+                  style={{ background: 'var(--bg-elevated)', color: 'var(--text-secondary)', border: '1px solid var(--border-card)' }}
+                />
+              </Item>
+            </Card>
             <Card title="快捷键说明" icon={<Keyboard size={14} color="#6366f1" />}>
               {[
-                { keys: ['Ctrl', 'Shift', 'V'], desc: '显示/隐藏窗口', global: true },
+                { keys: settings.hotkey.split('+'), desc: '显示/隐藏窗口', global: true },
                 { keys: ['Ctrl', 'F'], desc: '聚焦搜索框', global: false },
                 { keys: ['↑', '↓'], desc: '上下导航', global: false },
                 { keys: ['Enter'], desc: '复制选中项', global: false },

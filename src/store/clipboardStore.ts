@@ -3,10 +3,12 @@ import { create } from 'zustand'
 export interface ClipboardItem {
   id: string
   content: string
-  type: 'text' | 'link' | 'email' | 'color' | 'number' | 'code' | 'long-text'
+  type: 'text' | 'link' | 'email' | 'color' | 'number' | 'code' | 'long-text' | 'json' | 'markdown' | 'file-path' | 'phone'
   timestamp: number
   pinned: boolean
   favorited: boolean
+  copyCount: number
+  firstTimestamp: number
 }
 
 export interface Settings {
@@ -22,6 +24,15 @@ export interface Settings {
   showPreview: boolean
   copyOnSelect: boolean
   soundEnabled: boolean
+  ignoreSensitive: boolean
+  autoDeleteDays: number
+  verificationCodeTtlMinutes: number
+}
+
+export interface PrivacyState {
+  paused: boolean
+  pauseUntil: number
+  protectedToday: number
 }
 
 const defaultSettings: Settings = {
@@ -37,6 +48,9 @@ const defaultSettings: Settings = {
   showPreview: true,
   copyOnSelect: true,
   soundEnabled: false,
+  ignoreSensitive: true,
+  autoDeleteDays: 30,
+  verificationCodeTtlMinutes: 10,
 }
 
 function filterHistory(history: ClipboardItem[], activeTab: string, searchQuery: string): ClipboardItem[] {
@@ -57,6 +71,7 @@ interface ClipboardStore {
   searchQuery: string
   selectedId: string | null
   settings: Settings
+  privacy: PrivacyState
   showSettings: boolean
   activeTab: 'history' | 'favorites' | 'stats' | 'settings'
   copiedId: string | null
@@ -67,6 +82,7 @@ interface ClipboardStore {
   setSearchQuery: (query: string) => void
   setSelectedId: (id: string | null) => void
   setSettings: (settings: Settings) => void
+  setPrivacy: (privacy: PrivacyState) => void
   setShowSettings: (show: boolean) => void
   setActiveTab: (tab: 'history' | 'favorites' | 'stats' | 'settings') => void
   setFilterType: (type: string | null) => void
@@ -75,6 +91,8 @@ interface ClipboardStore {
   toggleFavorite: (id: string) => Promise<void>
   clearHistory: () => Promise<void>
   copyItem: (id: string) => Promise<void>
+  pauseMonitoring: (minutes: number) => Promise<void>
+  resumeMonitoring: () => Promise<void>
 }
 
 export const useClipboardStore = create<ClipboardStore>((set, get) => ({
@@ -83,6 +101,7 @@ export const useClipboardStore = create<ClipboardStore>((set, get) => ({
   searchQuery: '',
   selectedId: null,
   settings: defaultSettings,
+  privacy: { paused: false, pauseUntil: 0, protectedToday: 0 },
   showSettings: false,
   activeTab: 'history',
   copiedId: null,
@@ -108,7 +127,8 @@ export const useClipboardStore = create<ClipboardStore>((set, get) => ({
   },
 
   setSelectedId: (selectedId) => set({ selectedId }),
-  setSettings: (settings) => set({ settings }),
+  setSettings: (settings) => set({ settings: { ...defaultSettings, ...settings } }),
+  setPrivacy: (privacy) => set({ privacy }),
   setShowSettings: (showSettings) => set({ showSettings }),
 
   setActiveTab: (activeTab) => {
@@ -133,10 +153,7 @@ export const useClipboardStore = create<ClipboardStore>((set, get) => ({
     try {
       if (window.electronAPI) {
         const newHistory = await window.electronAPI.deleteItem(id)
-        const { searchQuery, activeTab, filterType } = get()
-        let filtered = filterHistory(newHistory, activeTab, searchQuery)
-        if (filterType) filtered = filtered.filter(item => item.type === filterType)
-        set({ history: newHistory, filteredHistory: filtered })
+        get().setHistory(newHistory)
       }
     } catch (err) { console.error('deleteItem failed:', err) }
   },
@@ -145,10 +162,7 @@ export const useClipboardStore = create<ClipboardStore>((set, get) => ({
     try {
       if (window.electronAPI) {
         const newHistory = await window.electronAPI.togglePin(id)
-        const { searchQuery, activeTab, filterType } = get()
-        let filtered = filterHistory(newHistory, activeTab, searchQuery)
-        if (filterType) filtered = filtered.filter(item => item.type === filterType)
-        set({ history: newHistory, filteredHistory: filtered })
+        get().setHistory(newHistory)
       }
     } catch (err) { console.error('togglePin failed:', err) }
   },
@@ -157,10 +171,7 @@ export const useClipboardStore = create<ClipboardStore>((set, get) => ({
     try {
       if (window.electronAPI) {
         const newHistory = await window.electronAPI.toggleFavorite(id)
-        const { searchQuery, activeTab, filterType } = get()
-        let filtered = filterHistory(newHistory, activeTab, searchQuery)
-        if (filterType) filtered = filtered.filter(item => item.type === filterType)
-        set({ history: newHistory, filteredHistory: filtered })
+        get().setHistory(newHistory)
       }
     } catch (err) { console.error('toggleFavorite failed:', err) }
   },
@@ -169,23 +180,45 @@ export const useClipboardStore = create<ClipboardStore>((set, get) => ({
     try {
       if (window.electronAPI) {
         const newHistory = await window.electronAPI.clearHistory()
-        const { searchQuery, activeTab, filterType } = get()
-        let filtered = filterHistory(newHistory, activeTab, searchQuery)
-        if (filterType) filtered = filtered.filter(item => item.type === filterType)
-        set({ history: newHistory, filteredHistory: filtered })
+        get().setHistory(newHistory)
       }
     } catch (err) { console.error('clearHistory failed:', err) }
   },
 
   copyItem: async (id) => {
-    const { history, _copiedTimer } = get()
+    const { history, _copiedTimer, settings } = get()
     const item = history.find(h => h.id === id)
     if (!item || !window.electronAPI) return
     try {
       if (_copiedTimer) clearTimeout(_copiedTimer)
       await window.electronAPI.copyToClipboard(item.content)
+      if (settings.soundEnabled) {
+        try {
+          const audio = new Audio('data:audio/wav;base64,UklGRjQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YRAAAAAAAP//AAD//wAA//8AAP//AAA=')
+          audio.volume = 0.12
+          audio.play().catch(() => {})
+        } catch {}
+      }
       const timer = setTimeout(() => set({ copiedId: null, _copiedTimer: null }), 1000)
       set({ copiedId: id, _copiedTimer: timer })
     } catch (err) { console.error('copyItem failed:', err) }
+  },
+
+  pauseMonitoring: async (minutes) => {
+    try {
+      if (window.electronAPI) {
+        const state = await window.electronAPI.pauseMonitoring(minutes)
+        set({ privacy: state })
+      }
+    } catch (err) { console.error('pauseMonitoring failed:', err) }
+  },
+
+  resumeMonitoring: async () => {
+    try {
+      if (window.electronAPI) {
+        const state = await window.electronAPI.resumeMonitoring()
+        set({ privacy: state })
+      }
+    } catch (err) { console.error('resumeMonitoring failed:', err) }
   },
 }))

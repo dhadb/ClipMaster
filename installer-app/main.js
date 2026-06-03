@@ -1,7 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron')
 const path = require('path')
 const fs = require('fs')
-const { execSync } = require('child_process')
+const { spawnSync } = require('child_process')
 
 let mainWindow
 let installPath = path.join(app.getPath('userData'), '..', 'Local', 'Programs', 'ClipMaster')
@@ -48,31 +48,50 @@ ipcMain.handle('select-folder', async () => {
 
 ipcMain.handle('get-install-path', () => installPath)
 
-ipcMain.handle('start-install', async () => {
+ipcMain.handle('set-install-path', (event, customPath) => {
+  if (typeof customPath !== 'string') return installPath
+
+  const trimmedPath = customPath.trim()
+  if (trimmedPath) {
+    installPath = trimmedPath
+  }
+
+  return installPath
+})
+
+ipcMain.handle('start-install', async (event, customPath) => {
+  if (typeof customPath === 'string' && customPath.trim()) {
+    installPath = customPath.trim()
+  }
+
   try {
     // Create installation directory
     if (!fs.existsSync(installPath)) {
       fs.mkdirSync(installPath, { recursive: true })
     }
 
-    // Source files (the unpacked app)
-    const sourcePath = path.join(__dirname, '..', 'release', 'win-unpacked')
+    // Source files (the unpacked app payload bundled with this animated installer)
+    const candidates = [
+      path.join(process.resourcesPath || '', 'app-payload'),
+      path.join(__dirname, '..', 'release', 'win-unpacked'),
+      path.join(app.getAppPath(), '..', 'win-unpacked'),
+      path.join(app.getAppPath(), 'app-payload'),
+      path.join(app.getAppPath(), 'app'),
+    ]
 
-    // Check if source exists, if not, try relative to app
-    let actualSource = sourcePath
-    if (!fs.existsSync(actualSource)) {
-      actualSource = path.join(app.getAppPath(), '..', 'win-unpacked')
-    }
-
-    // If still not found, use the built-in files
-    if (!fs.existsSync(actualSource)) {
-      // Copy from the installer's bundled files
-      actualSource = path.join(app.getAppPath(), 'app')
-    }
+    const actualSource = candidates.find(candidate => candidate && fs.existsSync(candidate))
 
     // Get list of files to copy
+    if (!actualSource || !fs.existsSync(actualSource)) {
+      throw new Error('安装源不存在，请重新下载安装包')
+    }
+
     const files = getAllFiles(actualSource)
     const totalFiles = files.length
+    if (totalFiles === 0) {
+      throw new Error('安装包内容为空，请重新下载安装包')
+    }
+
     let copiedFiles = 0
 
     // Copy files with progress
@@ -104,6 +123,11 @@ ipcMain.handle('start-install', async () => {
     }
 
     // Create shortcuts
+    const installedExe = path.join(installPath, 'ClipMaster.exe')
+    if (!fs.existsSync(installedExe)) {
+      throw new Error('安装失败：未找到 ClipMaster.exe')
+    }
+
     await createShortcuts()
 
     // Register in Windows
@@ -143,6 +167,20 @@ function getAllFiles(dirPath, arrayOfFiles = []) {
   return arrayOfFiles
 }
 
+function runPowerShell(script) {
+  const result = spawnSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', script], {
+    encoding: 'utf8',
+    stdio: 'pipe',
+  })
+  if (result.status !== 0) {
+    throw new Error(result.stderr || result.stdout || 'PowerShell command failed')
+  }
+}
+
+function psString(value) {
+  return `'${String(value).replace(/'/g, "''")}'`
+}
+
 async function createShortcuts() {
   try {
     const exePath = path.join(installPath, 'ClipMaster.exe')
@@ -151,17 +189,14 @@ async function createShortcuts() {
     const desktopPath = app.getPath('desktop')
     const shortcutPath = path.join(desktopPath, 'ClipMaster.lnk')
 
-    // Use PowerShell to create shortcut
-    const psCommand = `
+    runPowerShell(`
       $ws = New-Object -ComObject WScript.Shell
-      $shortcut = $ws.CreateShortcut('${shortcutPath.replace(/\\/g, '\\\\')}')
-      $shortcut.TargetPath = '${exePath.replace(/\\/g, '\\\\')}'
-      $shortcut.WorkingDirectory = '${installPath.replace(/\\/g, '\\\\')}'
-      $shortcut.Description = 'ClipMaster - 现代剪贴板管理器'
+      $shortcut = $ws.CreateShortcut(${psString(shortcutPath)})
+      $shortcut.TargetPath = ${psString(exePath)}
+      $shortcut.WorkingDirectory = ${psString(installPath)}
+      $shortcut.Description = ${psString('ClipMaster - 现代剪贴板管理器')}
       $shortcut.Save()
-    `
-
-    execSync(`powershell -Command "${psCommand.replace(/\n/g, ' ')}"`, { stdio: 'ignore' })
+    `)
 
     // Start menu shortcut
     const startMenuPath = path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'ClipMaster')
@@ -170,44 +205,37 @@ async function createShortcuts() {
     }
 
     const menuShortcutPath = path.join(startMenuPath, 'ClipMaster.lnk')
-    const psCommand2 = `
+    runPowerShell(`
       $ws = New-Object -ComObject WScript.Shell
-      $shortcut = $ws.CreateShortcut('${menuShortcutPath.replace(/\\/g, '\\\\')}')
-      $shortcut.TargetPath = '${exePath.replace(/\\/g, '\\\\')}'
-      $shortcut.WorkingDirectory = '${installPath.replace(/\\/g, '\\\\')}'
-      $shortcut.Description = 'ClipMaster - 现代剪贴板管理器'
+      $shortcut = $ws.CreateShortcut(${psString(menuShortcutPath)})
+      $shortcut.TargetPath = ${psString(exePath)}
+      $shortcut.WorkingDirectory = ${psString(installPath)}
+      $shortcut.Description = ${psString('ClipMaster - 现代剪贴板管理器')}
       $shortcut.Save()
-    `
-
-    execSync(`powershell -Command "${psCommand2.replace(/\n/g, ' ')}"`, { stdio: 'ignore' })
+    `)
   } catch (error) {
     console.error('Failed to create shortcuts:', error)
+    throw error
   }
 }
 
 async function registerApp() {
   try {
     const exePath = path.join(installPath, 'ClipMaster.exe')
+    const uninstallPath = path.join(installPath, 'Uninstall.exe')
+    const uninstallString = fs.existsSync(uninstallPath) ? `\"${uninstallPath}\"` : `\"${exePath}\" --uninstall`
 
-    // Register uninstaller
-    const regCommand = `
-      New-Item -Path "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ClipMaster" -Force
-      Set-ItemProperty -Path "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ClipMaster" -Name "DisplayName" -Value "ClipMaster"
-      Set-ItemProperty -Path "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ClipMaster" -Name "UninstallString" -Value "\\"${path.join(installPath, 'Uninstall.exe').replace(/\\/g, '\\\\')}\\""
-      Set-ItemProperty -Path "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ClipMaster" -Name "DisplayIcon" -Value "\\"${exePath.replace(/\\/g, '\\\\')}\\""
-      Set-ItemProperty -Path "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ClipMaster" -Name "Publisher" -Value "ClipMaster Team"
-      Set-ItemProperty -Path "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ClipMaster" -Name "DisplayVersion" -Value "1.0.0"
-    `
-
-    execSync(`powershell -Command "${regCommand.replace(/\n/g, ' ')}"`, { stdio: 'ignore' })
-
-    // Auto-start
-    const autoStartCommand = `
-      Set-ItemProperty -Path "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run" -Name "ClipMaster" -Value "\\"${exePath.replace(/\\/g, '\\\\')}\\""
-    `
-
-    execSync(`powershell -Command "${autoStartCommand.replace(/\n/g, ' ')}"`, { stdio: 'ignore' })
+    runPowerShell(`
+      New-Item -Path 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ClipMaster' -Force | Out-Null
+      Set-ItemProperty -Path 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ClipMaster' -Name 'DisplayName' -Value ${psString('ClipMaster')}
+      Set-ItemProperty -Path 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ClipMaster' -Name 'UninstallString' -Value ${psString(uninstallString)}
+      Set-ItemProperty -Path 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ClipMaster' -Name 'DisplayIcon' -Value ${psString(`\"${exePath}\"`)}
+      Set-ItemProperty -Path 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ClipMaster' -Name 'Publisher' -Value ${psString('ClipMaster Team')}
+      Set-ItemProperty -Path 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ClipMaster' -Name 'DisplayVersion' -Value ${psString('1.0.0')}
+      Set-ItemProperty -Path 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run' -Name 'ClipMaster' -Value ${psString(`\"${exePath}\"`)}
+    `)
   } catch (error) {
     console.error('Failed to register app:', error)
+    throw error
   }
 }

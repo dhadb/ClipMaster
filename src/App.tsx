@@ -1,11 +1,13 @@
-import React, { useEffect, useState, useMemo } from 'react'
+﻿import React, { useEffect, useState, useMemo } from 'react'
 import TitleBar from './components/TitleBar'
 import SearchBar from './components/SearchBar'
 import TabBar from './components/TabBar'
 import ClipboardList from './components/ClipboardList'
+import ClipboardDetail from './components/ClipboardDetail'
 import SettingsPanel from './components/SettingsPanel'
 import StatsPanel from './components/StatsPanel'
 import EmptyState from './components/EmptyState'
+import ShortcutHintBar from './components/ShortcutHintBar'
 import { useClipboardStore } from './store/clipboardStore'
 
 function getResolvedTheme(theme: 'dark' | 'light' | 'auto'): 'dark' | 'light' {
@@ -32,7 +34,7 @@ function App() {
   const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // 立即应用主题 (同步执行，避免闪烁)
+  // 立即应用主题，同步执行，避免闪烁
   const resolvedTheme = useMemo(() => getResolvedTheme(settings.theme), [settings.theme])
 
   // 使用 useLayoutEffect 同步设置主题属性，在浏览器绘制前完成
@@ -136,7 +138,7 @@ function App() {
     return (
       <div className="h-screen w-screen flex items-center justify-center" style={{ background: 'var(--bg-root)' }}>
         <div className="flex flex-col items-center gap-4 fade-in">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center shimmer soft-float"
             style={{
               background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
               boxShadow: '0 4px 16px rgba(99,102,241,0.25)',
@@ -157,7 +159,7 @@ function App() {
         <div className="flex flex-col items-center gap-3">
           <span className="text-[13px]" style={{ color: 'var(--color-danger)' }}>{error}</span>
           <button onClick={() => window.location.reload()}
-            className="text-[12px] px-4 py-2 rounded-lg"
+            className="text-[12px] px-4 py-2 rounded-lg interactive-chip"
             style={{
               background: 'var(--bg-elevated)',
               color: 'var(--text-secondary)',
@@ -178,21 +180,23 @@ function App() {
       <TitleBar />
       {showSearch && <SearchBar />}
       <TabBar />
-      <div className="flex-1 overflow-hidden">{content}</div>
+      <div key={`${activeTab}-${showSettings ? 'settings' : 'content'}`} className="flex-1 overflow-hidden content-fade">{content}</div>
+      {showSearch && settings.showShortcutHints && filteredHistory.length > 0 && <ShortcutHintBar />}
+      <ClipboardDetail />
       <div className="px-4 py-1.5 flex items-center justify-between"
         style={{ borderTop: '1px solid var(--border-divider)' }}>
-        <div className="flex items-center gap-2 text-[10px]" style={{ color: 'var(--text-ghost)' }}>
+        <div className="flex items-center gap-2 text-[10px]" style={{ color: 'var(--text-tertiary)' }}>
           <div className="pulse-dot" style={privacy.paused ? { background: 'var(--color-warning)' } : undefined} />
           <span>{privacy.paused ? '已暂停记录' : '监控中'}</span>
-          <span style={{ color: 'var(--text-ghost)', opacity: 0.4 }}>·</span>
+          <span style={{ color: 'var(--text-ghost)', opacity: 0.6 }}>·</span>
           <span>{history.length} 条记录</span>
-          <span style={{ color: 'var(--text-ghost)', opacity: 0.4 }}>·</span>
+          <span style={{ color: 'var(--text-ghost)', opacity: 0.6 }}>·</span>
           <span>今日保护 {privacy.protectedToday} 条</span>
         </div>
         <button
           onClick={() => privacy.paused ? resumeMonitoring() : pauseMonitoring(5)}
-          className="text-[10px] px-2 py-1 rounded-md transition-all"
-          style={{ color: privacy.paused ? 'var(--color-success)' : 'var(--text-ghost)', background: 'var(--bg-surface)' }}
+          className="text-[10px] px-2 py-1 rounded-md interactive-chip"
+          style={{ color: privacy.paused ? 'var(--color-success)' : 'var(--text-tertiary)', background: 'var(--bg-surface)' }}
         >
           {privacy.paused ? '恢复记录' : '暂停 5 分钟'}
         </button>

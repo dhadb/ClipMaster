@@ -64,7 +64,7 @@
 
 ### 安装使用
 
-1. 前往 [Releases](https://github.com/your-username/clipmaster/releases) 页面下载最新版本
+1. 前往 [Releases](https://github.com/dhadb/-/releases) 页面下载最新版本
 2. 运行 `ClipMaster Setup 1.0.0.exe`
 3. 按照安装向导完成安装
 4. 开始使用！复制任意内容，按 `Ctrl+Shift+V` 查看
@@ -182,7 +182,7 @@ clipmaster/
 ### 克隆项目
 
 ```bash
-git clone https://github.com/your-username/clipmaster.git
+git clone https://github.com/dhadb/-.git
 cd clipmaster
 ```
 

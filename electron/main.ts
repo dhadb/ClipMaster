@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Tray, Menu, clipboard, globalShortcut, nativeImage, ipcMain, screen } from 'electron'
+import { app, BrowserWindow, Tray, Menu, clipboard, globalShortcut, nativeImage, ipcMain, screen, shell } from 'electron'
 import path from 'path'
 import fs from 'fs'
 
@@ -55,9 +55,14 @@ const defaultSettings = {
   windowWidth: 420,
   windowHeight: 600,
   showPreview: true,
+  showShortcutHints: true,
+  listDensity: 'normal' as 'compact' | 'normal' | 'comfortable',
   copyOnSelect: true,
+  recordImages: true,
   soundEnabled: false,
   ignoreSensitive: true,
+  ignoredPatterns: [] as string[],
+  hideAfterCopy: false,
   autoDeleteDays: 30,
   verificationCodeTtlMinutes: 10,
 }
@@ -91,9 +96,16 @@ function sanitizeSettings(input: Partial<Settings> | undefined): Settings {
     windowWidth: Math.round(clamp(raw.windowWidth, 350, 600, defaultSettings.windowWidth)),
     windowHeight: Math.round(clamp(raw.windowHeight, 400, 800, defaultSettings.windowHeight)),
     showPreview: Boolean(raw.showPreview),
+    showShortcutHints: raw.showShortcutHints !== false,
+    listDensity: raw.listDensity === 'compact' || raw.listDensity === 'comfortable' ? raw.listDensity : 'normal',
     copyOnSelect: Boolean(raw.copyOnSelect),
+    recordImages: raw.recordImages !== false,
     soundEnabled: Boolean(raw.soundEnabled),
     ignoreSensitive: raw.ignoreSensitive !== false,
+    ignoredPatterns: Array.isArray(raw.ignoredPatterns)
+      ? raw.ignoredPatterns.filter((pattern): pattern is string => typeof pattern === 'string').map(pattern => pattern.trim()).filter(Boolean).slice(0, 50)
+      : [],
+    hideAfterCopy: Boolean(raw.hideAfterCopy),
     autoDeleteDays: Math.round(clamp(raw.autoDeleteDays, 0, 365, defaultSettings.autoDeleteDays)),
     verificationCodeTtlMinutes: Math.round(clamp(raw.verificationCodeTtlMinutes, 0, 1440, defaultSettings.verificationCodeTtlMinutes)),
   }
@@ -123,6 +135,76 @@ function getImageHash(buffer: Buffer): string {
 
 function isImageHistoryItem(item: ClipboardItem | undefined): item is ClipboardItem & { imagePath: string } {
   return item?.type === 'image' && typeof item.imagePath === 'string' && item.imagePath.length > 0
+}
+
+function getSafeImageDataUrl(imagePath: string | undefined) {
+  if (!imagePath) return null
+  try {
+    const resolvedImagesDir = path.resolve(imagesDir)
+    const resolvedImagePath = path.resolve(imagePath)
+    if (!resolvedImagePath.startsWith(resolvedImagesDir + path.sep)) return null
+    if (!fs.existsSync(resolvedImagePath)) return null
+    const buffer = fs.readFileSync(resolvedImagePath)
+    if (buffer.byteLength > 8 * 1024 * 1024) return null
+    return `data:image/png;base64,${buffer.toString('base64')}`
+  } catch (err) {
+    console.error('Failed to read image data url:', err)
+    return null
+  }
+}
+
+function getImageInfo(imagePath: string | undefined) {
+  if (!imagePath) return null
+  try {
+    const resolvedImagesDir = path.resolve(imagesDir)
+    const resolvedImagePath = path.resolve(imagePath)
+    if (!resolvedImagePath.startsWith(resolvedImagesDir + path.sep)) return null
+    if (!fs.existsSync(resolvedImagePath)) return null
+    const stat = fs.statSync(resolvedImagePath)
+    const image = nativeImage.createFromPath(resolvedImagePath)
+    const size = image.isEmpty() ? { width: 0, height: 0 } : image.getSize()
+    return { bytes: stat.size, width: size.width, height: size.height }
+  } catch (err) {
+    console.error('Failed to read image info:', err)
+    return null
+  }
+}
+
+function cleanupImageCache() {
+  try {
+    if (!fs.existsSync(imagesDir)) return { deleted: 0, bytes: 0 }
+    const used = new Set(
+      clipboardHistory
+        .map(item => item.imagePath)
+        .filter((imagePath): imagePath is string => Boolean(imagePath))
+        .map(imagePath => path.resolve(imagePath))
+    )
+    let deleted = 0
+    let bytes = 0
+    for (const fileName of fs.readdirSync(imagesDir)) {
+      const filePath = path.resolve(imagesDir, fileName)
+      if (!filePath.startsWith(path.resolve(imagesDir) + path.sep)) continue
+      if (used.has(filePath)) continue
+      const stat = fs.statSync(filePath)
+      if (!stat.isFile()) continue
+      bytes += stat.size
+      fs.unlinkSync(filePath)
+      deleted += 1
+    }
+    return { deleted, bytes }
+  } catch (err) {
+    console.error('Failed to cleanup image cache:', err)
+    return { deleted: 0, bytes: 0 }
+  }
+}
+
+function canOpenExternalUrl(url: string) {
+  return /^(?:https?:\/\/|mailto:)/i.test(url.trim())
+}
+
+function canShowFilePath(filePath: string) {
+  const trimmed = filePath.trim()
+  return /^(?:[a-z]:\\|\\\\|\/)[^<>:*?"|]+/i.test(trimmed)
 }
 
 function safeDeleteImageFile(imagePath: string | undefined) {
@@ -191,6 +273,39 @@ function sanitizeHistoryItem(item: any): ClipboardItem | null {
     imagePath: typeof item.imagePath === 'string' && item.imagePath ? item.imagePath : undefined,
     tags: Array.isArray(item.tags) ? item.tags.filter((tag: unknown) => typeof tag === 'string') : undefined,
   }
+}
+
+function getHistoryDedupeKey(item: ClipboardItem) {
+  return `${item.type}:${item.content}`
+}
+
+function dedupeHistory(items: ClipboardItem[]) {
+  const byContent = new Map<string, ClipboardItem>()
+  for (const item of items.sort((a, b) => b.timestamp - a.timestamp)) {
+    const key = getHistoryDedupeKey(item)
+    const existing = byContent.get(key)
+    if (!existing) {
+      byContent.set(key, { ...item })
+      continue
+    }
+    existing.pinned = existing.pinned || item.pinned
+    existing.favorited = existing.favorited || item.favorited
+    existing.copyCount = Math.max(existing.copyCount || 1, item.copyCount || 1)
+    existing.firstTimestamp = Math.min(existing.firstTimestamp || existing.timestamp, item.firstTimestamp || item.timestamp)
+    if (!existing.imagePath && item.imagePath) existing.imagePath = item.imagePath
+  }
+  return Array.from(byContent.values()).sort((a, b) => b.timestamp - a.timestamp)
+}
+
+function getImportedItems(payload: any) {
+  const source = Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload?.items)
+      ? payload.items
+      : Array.isArray(payload?.history)
+        ? payload.history
+        : []
+  return source.map(sanitizeHistoryItem).filter(Boolean) as ClipboardItem[]
 }
 
 function loadData() {
@@ -266,7 +381,19 @@ function isSensitiveClipboardContent(text: string) {
     /\b\d{15,19}\b/,
     /\b\d{17}[\dXx]\b/,
   ]
-  return isVerificationCode(trimmed) || patterns.some(pattern => pattern.test(trimmed))
+  return patterns.some(pattern => pattern.test(trimmed))
+}
+
+function matchesIgnoredPattern(text: string) {
+  const trimmed = text.trim()
+  if (!trimmed || settings.ignoredPatterns.length === 0) return false
+  return settings.ignoredPatterns.some(pattern => {
+    try {
+      return new RegExp(pattern, 'i').test(trimmed)
+    } catch {
+      return trimmed.toLowerCase().includes(pattern.toLowerCase())
+    }
+  })
 }
 
 function applyRetentionRules() {
@@ -318,14 +445,22 @@ function applyAutoStart() {
   }
 }
 
-function registerHotkey() {
+function registerHotkey(nextHotkey = settings.hotkey) {
+  const hotkey = nextHotkey.trim()
+  if (!hotkey) return false
+  if (currentHotkey === hotkey) return true
   try {
+    const ok = globalShortcut.register(hotkey, () => toggleWindow())
+    if (!ok) {
+      console.error(`Failed to register shortcut: ${hotkey}`)
+      return false
+    }
     if (currentHotkey) globalShortcut.unregister(currentHotkey)
-    currentHotkey = settings.hotkey
-    const ok = globalShortcut.register(settings.hotkey, () => toggleWindow())
-    if (!ok) console.error(`Failed to register shortcut: ${settings.hotkey}`)
+    currentHotkey = hotkey
+    return true
   } catch (err) {
     console.error('Failed to register shortcut:', err)
+    return false
   }
 }
 
@@ -485,6 +620,14 @@ function startClipboardWatcher() {
         hasError = true
       }
 
+      if (currentContent && currentContent !== lastClipboardContent && matchesIgnoredPattern(currentContent)) {
+        lastClipboardContent = currentContent
+        protectedToday += 1
+        emitPrivacyState()
+        scheduleSave()
+        return
+      }
+
       if (settings.ignoreSensitive && currentContent && currentContent !== lastClipboardContent && isSensitiveClipboardContent(currentContent)) {
         lastClipboardContent = currentContent
         protectedToday += 1
@@ -495,8 +638,8 @@ function startClipboardWatcher() {
 
       // 检查图片内容
       let imageInfo: { path: string; hash: string } | null = null
-      const shouldCheckImage = Date.now() - lastImageCheckAt >= 1000
-      if (shouldCheckImage) {
+      const shouldCheckImage = Date.now() - lastImageCheckAt >= 2500
+      if (settings.recordImages && shouldCheckImage) {
         lastImageCheckAt = Date.now()
         try {
           imageInfo = saveClipboardImage()
@@ -582,16 +725,34 @@ function startClipboardWatcher() {
         scheduleClipboardWatcherRestart()
       }
     }
-  }, 300)
+  }, 650)
 }
 
 // IPC Handlers
+ipcMain.handle('get-image-data-url', (_, imagePath: string | undefined) => getSafeImageDataUrl(imagePath))
+ipcMain.handle('get-image-info', (_, imagePath: string | undefined) => getImageInfo(imagePath))
+ipcMain.handle('cleanup-image-cache', () => cleanupImageCache())
+ipcMain.handle('open-external-url', async (_, url: string) => {
+  if (!canOpenExternalUrl(url)) return false
+  await shell.openExternal(url.trim())
+  return true
+})
+ipcMain.handle('show-file-in-folder', async (_, filePath: string) => {
+  if (!canShowFilePath(filePath)) return false
+  shell.showItemInFolder(filePath.trim())
+  return true
+})
 ipcMain.handle('get-history', () => clipboardHistory)
 
 ipcMain.handle('copy-to-clipboard', (_, itemOrContent: ClipboardItem | string) => {
+  const finishCopy = () => {
+    if (settings.hideAfterCopy) mainWindow?.hide()
+  }
+
   if (typeof itemOrContent === 'string') {
     clipboard.writeText(itemOrContent)
     lastClipboardContent = itemOrContent
+    finishCopy()
     return
   }
 
@@ -601,12 +762,14 @@ ipcMain.handle('copy-to-clipboard', (_, itemOrContent: ClipboardItem | string) =
       clipboard.writeImage(image)
       lastClipboardImageHash = itemOrContent.content.replace(/^\[图片\]\s*/, '')
       lastImageCheckAt = Date.now()
+      finishCopy()
       return
     }
   }
 
   clipboard.writeText(itemOrContent.content)
   lastClipboardContent = itemOrContent.content
+  finishCopy()
 })
 
 ipcMain.handle('delete-item', (_, id: string) => {
@@ -645,14 +808,51 @@ ipcMain.handle('clear-history', () => {
   return clipboardHistory
 })
 
+ipcMain.handle('clear-all-history', () => {
+  removeHistoryItems(() => true)
+  mainWindow?.webContents.send('history-updated', clipboardHistory)
+  scheduleSave()
+  return clipboardHistory
+})
+
+ipcMain.handle('import-history', (_, payload: any, mode: 'merge' | 'replace' = 'merge') => {
+  const imported = getImportedItems(payload)
+  if (imported.length === 0) return { history: clipboardHistory, imported: 0 }
+
+  if (mode === 'replace') {
+    clipboardHistory = dedupeHistory(imported)
+  } else {
+    clipboardHistory = dedupeHistory([...imported, ...clipboardHistory])
+  }
+
+  const importedSettings = sanitizeSettings(payload?.settings)
+  if (payload?.settings && typeof payload.settings === 'object') {
+    const oldSettings = settings
+    const nextSettings = { ...importedSettings, hotkey: oldSettings.hotkey }
+    settings = nextSettings
+    applyAutoStart()
+    mainWindow?.webContents.send('settings-updated', settings)
+  }
+
+  applyRetentionRules()
+  mainWindow?.webContents.send('history-updated', clipboardHistory)
+  scheduleSave()
+  return { history: clipboardHistory, imported: imported.length }
+})
+
 ipcMain.handle('get-settings', () => settings)
 
 ipcMain.handle('update-settings', (_, newSettings: Partial<Settings>) => {
   const oldSettings = settings
-  settings = sanitizeSettings({ ...settings, ...newSettings })
+  const nextSettings = sanitizeSettings({ ...settings, ...newSettings })
+
+  if (oldSettings.hotkey !== nextSettings.hotkey && !registerHotkey(nextSettings.hotkey)) {
+    nextSettings.hotkey = oldSettings.hotkey
+  }
+
+  settings = nextSettings
 
   if (oldSettings.autoStart !== settings.autoStart) applyAutoStart()
-  if (oldSettings.hotkey !== settings.hotkey) registerHotkey()
   if (oldSettings.maxHistory !== settings.maxHistory || oldSettings.autoDeleteDays !== settings.autoDeleteDays || oldSettings.verificationCodeTtlMinutes !== settings.verificationCodeTtlMinutes) {
     applyRetentionRules()
     mainWindow?.webContents.send('history-updated', clipboardHistory)

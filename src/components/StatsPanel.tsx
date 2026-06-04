@@ -1,5 +1,5 @@
 import React, { useMemo, memo } from 'react'
-import { BarChart3, Clock, Type, Link, Code, Mail, Hash, FileText, Zap } from 'lucide-react'
+import { BarChart3, Clock, Type, Link, Code, Mail, Hash, FileText, Zap, Image as ImageIcon, Phone, FolderOpen } from 'lucide-react'
 import { useClipboardStore } from '../store/clipboardStore'
 
 const TYPE_MAP: Record<string, { Icon: any; cssVar: string; label: string }> = {
@@ -9,7 +9,12 @@ const TYPE_MAP: Record<string, { Icon: any; cssVar: string; label: string }> = {
   email: { Icon: Mail, cssVar: 'var(--type-email)', label: '邮箱' },
   color: { Icon: Hash, cssVar: 'var(--type-color)', label: '颜色' },
   number: { Icon: Hash, cssVar: 'var(--type-number)', label: '数字' },
+  json: { Icon: Code, cssVar: 'var(--type-code)', label: 'JSON' },
+  markdown: { Icon: FileText, cssVar: 'var(--type-long-text)', label: 'Markdown' },
   'long-text': { Icon: FileText, cssVar: 'var(--type-long-text)', label: '长文本' },
+  'file-path': { Icon: FolderOpen, cssVar: 'var(--type-text)', label: '路径' },
+  phone: { Icon: Phone, cssVar: 'var(--type-number)', label: '电话' },
+  image: { Icon: ImageIcon, cssVar: 'var(--type-long-text)', label: '图片' },
 }
 
 const StatsPanel: React.FC = memo(() => {
@@ -69,7 +74,7 @@ const StatsPanel: React.FC = memo(() => {
           { label: '今日', value: stats.today, color: '#34d399' },
           { label: '本周', value: stats.week, color: '#818cf8' },
         ].map((s, i) => (
-          <div key={i} className="glass-card rounded-xl p-3.5">
+          <div key={i} className="glass-card rounded-xl p-3.5 slide-up" style={{ animationDelay: `${80 + i * 35}ms` }}>
             <p className="text-[10px] mb-1.5" style={{ color: 'var(--text-ghost)' }}>{s.label}</p>
             <p className="text-xl font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>{s.value}</p>
           </div>

@@ -24,9 +24,14 @@ export interface Settings {
   windowWidth: number
   windowHeight: number
   showPreview: boolean
+  showShortcutHints: boolean
+  listDensity: 'compact' | 'normal' | 'comfortable'
   copyOnSelect: boolean
+  recordImages: boolean
   soundEnabled: boolean
   ignoreSensitive: boolean
+  ignoredPatterns: string[]
+  hideAfterCopy: boolean
   autoDeleteDays: number
   verificationCodeTtlMinutes: number
 }
@@ -38,12 +43,19 @@ export interface PrivacyState {
 }
 
 const electronAPI = {
+  getImageDataUrl: (imagePath?: string): Promise<string | null> => ipcRenderer.invoke('get-image-data-url', imagePath),
+  getImageInfo: (imagePath?: string): Promise<{ bytes: number; width: number; height: number } | null> => ipcRenderer.invoke('get-image-info', imagePath),
+  cleanupImageCache: (): Promise<{ deleted: number; bytes: number }> => ipcRenderer.invoke('cleanup-image-cache'),
+  openExternalUrl: (url: string): Promise<boolean> => ipcRenderer.invoke('open-external-url', url),
+  showFileInFolder: (filePath: string): Promise<boolean> => ipcRenderer.invoke('show-file-in-folder', filePath),
   getHistory: (): Promise<ClipboardItem[]> => ipcRenderer.invoke('get-history'),
   copyToClipboard: (item: ClipboardItem | string): Promise<void> => ipcRenderer.invoke('copy-to-clipboard', item),
   deleteItem: (id: string): Promise<ClipboardItem[]> => ipcRenderer.invoke('delete-item', id),
   togglePin: (id: string): Promise<ClipboardItem[]> => ipcRenderer.invoke('toggle-pin', id),
   toggleFavorite: (id: string): Promise<ClipboardItem[]> => ipcRenderer.invoke('toggle-favorite', id),
   clearHistory: (): Promise<ClipboardItem[]> => ipcRenderer.invoke('clear-history'),
+  clearAllHistory: (): Promise<ClipboardItem[]> => ipcRenderer.invoke('clear-all-history'),
+  importHistory: (payload: unknown, mode: 'merge' | 'replace' = 'merge'): Promise<{ history: ClipboardItem[]; imported: number }> => ipcRenderer.invoke('import-history', payload, mode),
   getSettings: (): Promise<Settings> => ipcRenderer.invoke('get-settings'),
   updateSettings: (settings: Partial<Settings>): Promise<Settings> => ipcRenderer.invoke('update-settings', settings),
   getPrivacyState: (): Promise<PrivacyState> => ipcRenderer.invoke('get-privacy-state'),

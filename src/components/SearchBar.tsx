@@ -57,16 +57,24 @@ const SearchBar: React.FC = () => {
   const filters = useMemo(() => [
     { id: 'text', label: '文本', icon: 'T' },
     { id: 'link', label: '链接', icon: '↗' },
-    { id: 'code', label: '代码', icon: '<>' },
     { id: 'email', label: '邮箱', icon: '@' },
     { id: 'color', label: '颜色', icon: '●' },
+    { id: 'number', label: '数字', icon: '#' },
+    { id: 'code', label: '代码', icon: '<>' },
+    { id: 'json', label: 'JSON', icon: '{}' },
+    { id: 'markdown', label: 'MD', icon: 'M' },
+    { id: 'long-text', label: '长文', icon: '¶' },
+    { id: 'file-path', label: '路径', icon: '/' },
+    { id: 'phone', label: '电话', icon: '☎' },
+    { id: 'image', label: '图片', icon: '□' },
   ], [])
 
   const onFilterClick = useCallback((id: string | null) => {
     setFilterType(filterType === id ? null : id)
   }, [filterType, setFilterType])
 
-  const resultCount = local || filterType ? filteredLen : history.length
+  const resultCount = local || filterType || activeTab === 'favorites' ? filteredLen : history.length
+  const hasFilter = Boolean(local || filterType || activeTab === 'favorites')
 
   return (
     <div style={{ padding: '8px 12px' }}>
@@ -88,7 +96,7 @@ const SearchBar: React.FC = () => {
           />
           <div className="flex items-center gap-0.5 flex-shrink-0">
             {local && (
-              <button onClick={onClear} className="action-btn" style={{ width: 28, height: 28 }}>
+              <button onClick={onClear} className="action-btn scale-in" style={{ width: 28, height: 28 }}>
                 <X size={13} />
               </button>
             )}
@@ -104,22 +112,24 @@ const SearchBar: React.FC = () => {
       {/* 状态栏 - 固定高度，始终显示 */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 4px', minHeight: '20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px', color: 'var(--text-ghost)', whiteSpace: 'nowrap' }}>
+          <span>{hasFilter ? '当前显示' : '共'}</span>
           <span style={{ fontVariantNumeric: 'tabular-nums' }}>{resultCount}</span>
-          <span>条记录</span>
-          {(local || filterType) && resultCount !== history.length && (
-            <span style={{ opacity: 0.6 }}>/ {history.length} 总计</span>
+          <span>条</span>
+          {hasFilter && resultCount !== history.length && (
+            <span style={{ opacity: 0.75 }}>/ 总计 {history.length}</span>
           )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap' }}>
           <button
             onClick={() => setActiveTab(activeTab === 'favorites' ? 'history' : 'favorites')}
+            className="interactive-chip"
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: '2px',
               fontSize: '10px',
               color: activeTab === 'favorites' ? '#fbbf24' : 'var(--text-ghost)',
-              opacity: activeTab === 'favorites' ? 1 : 0.6,
+              opacity: activeTab === 'favorites' ? 1 : 0.75,
               background: 'none',
               border: 'none',
               cursor: 'pointer',
@@ -130,8 +140,8 @@ const SearchBar: React.FC = () => {
             <Star size={10} fill={activeTab === 'favorites' ? '#fbbf24' : 'none'} strokeWidth={2} />
             <span style={{ fontVariantNumeric: 'tabular-nums' }}>{stats.favorited}</span>
           </button>
-          <span style={{ fontSize: '10px', color: 'var(--text-ghost)', opacity: 0.3 }}>|</span>
-          <span style={{ fontSize: '10px', fontVariantNumeric: 'tabular-nums', color: 'var(--text-ghost)', opacity: 0.6 }}>
+          <span style={{ fontSize: '10px', color: 'var(--text-ghost)', opacity: 0.6 }}>|</span>
+          <span style={{ fontSize: '10px', fontVariantNumeric: 'tabular-nums', color: 'var(--text-ghost)', opacity: 0.75 }}>
             今日 {stats.today}
           </span>
         </div>
@@ -141,7 +151,7 @@ const SearchBar: React.FC = () => {
       {showFilters && (
         <div className="flex items-center gap-1 px-0.5 overflow-x-auto fade-in" style={{ scrollbarWidth: 'none', marginTop: '6px' }}>
           <button onClick={() => onFilterClick(null)}
-            className="flex-shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all"
+            className="flex-shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-medium interactive-chip"
             style={{
               background: !filterType ? 'rgba(99,102,241,0.12)' : 'transparent',
               color: !filterType ? 'rgba(129,140,248,0.9)' : 'var(--text-tertiary)',
@@ -151,7 +161,7 @@ const SearchBar: React.FC = () => {
           </button>
           {filters.map(f => (
             <button key={f.id} onClick={() => onFilterClick(f.id)}
-              className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all"
+              className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium interactive-chip"
               style={{
                 background: filterType === f.id ? 'rgba(99,102,241,0.12)' : 'transparent',
                 color: filterType === f.id ? 'rgba(129,140,248,0.9)' : 'var(--text-tertiary)',
@@ -168,3 +178,4 @@ const SearchBar: React.FC = () => {
 }
 
 export default React.memo(SearchBar)
+

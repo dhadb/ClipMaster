@@ -24,9 +24,14 @@ export interface Settings {
   windowWidth: number
   windowHeight: number
   showPreview: boolean
+  showShortcutHints: boolean
+  listDensity: 'compact' | 'normal' | 'comfortable'
   copyOnSelect: boolean
+  recordImages: boolean
   soundEnabled: boolean
   ignoreSensitive: boolean
+  ignoredPatterns: string[]
+  hideAfterCopy: boolean
   autoDeleteDays: number
   verificationCodeTtlMinutes: number
 }
@@ -43,16 +48,30 @@ const defaultSettings: Settings = {
   autoStart: true,
   minimizeToTray: true,
   theme: 'dark',
-  opacity: 0.95,
+  opacity: 0.98,
   fontSize: 14,
   windowWidth: 420,
   windowHeight: 600,
   showPreview: true,
+  showShortcutHints: true,
+  listDensity: 'normal',
   copyOnSelect: true,
+  recordImages: true,
   soundEnabled: false,
   ignoreSensitive: true,
+  ignoredPatterns: [],
+  hideAfterCopy: false,
   autoDeleteDays: 30,
   verificationCodeTtlMinutes: 10,
+}
+
+function normalizeSettings(settings: Partial<Settings>): Settings {
+  const merged = { ...defaultSettings, ...settings }
+  return {
+    ...merged,
+    ignoredPatterns: Array.isArray(merged.ignoredPatterns) ? merged.ignoredPatterns : [],
+    opacity: Math.min(1, Math.max(0.7, merged.opacity)),
+  }
 }
 
 function filterHistory(history: ClipboardItem[], activeTab: string, searchQuery: string): ClipboardItem[] {
@@ -77,6 +96,7 @@ interface ClipboardStore {
   showSettings: boolean
   activeTab: 'history' | 'favorites' | 'stats' | 'settings'
   copiedId: string | null
+  detailItemId: string | null
   filterType: string | null
   _copiedTimer: any
 
@@ -87,11 +107,14 @@ interface ClipboardStore {
   setPrivacy: (privacy: PrivacyState) => void
   setShowSettings: (show: boolean) => void
   setActiveTab: (tab: 'history' | 'favorites' | 'stats' | 'settings') => void
+  setDetailItemId: (id: string | null) => void
   setFilterType: (type: string | null) => void
   deleteItem: (id: string) => Promise<void>
   togglePin: (id: string) => Promise<void>
   toggleFavorite: (id: string) => Promise<void>
   clearHistory: () => Promise<void>
+  clearAllHistory: () => Promise<void>
+  importHistory: (payload: unknown, mode?: 'merge' | 'replace') => Promise<number>
   copyItem: (id: string) => Promise<void>
   pauseMonitoring: (minutes: number) => Promise<void>
   resumeMonitoring: () => Promise<void>
@@ -107,6 +130,7 @@ export const useClipboardStore = create<ClipboardStore>((set, get) => ({
   showSettings: false,
   activeTab: 'history',
   copiedId: null,
+  detailItemId: null,
   filterType: null,
   _copiedTimer: null,
 
@@ -129,9 +153,10 @@ export const useClipboardStore = create<ClipboardStore>((set, get) => ({
   },
 
   setSelectedId: (selectedId) => set({ selectedId }),
-  setSettings: (settings) => set({ settings: { ...defaultSettings, ...settings } }),
+  setSettings: (settings) => set({ settings: normalizeSettings(settings) }),
   setPrivacy: (privacy) => set({ privacy }),
   setShowSettings: (showSettings) => set({ showSettings }),
+  setDetailItemId: (detailItemId) => set({ detailItemId }),
 
   setActiveTab: (activeTab) => {
     const { history, searchQuery, filterType } = get()
@@ -185,6 +210,27 @@ export const useClipboardStore = create<ClipboardStore>((set, get) => ({
         get().setHistory(newHistory)
       }
     } catch (err) { console.error('clearHistory failed:', err) }
+  },
+
+  clearAllHistory: async () => {
+    try {
+      if (window.electronAPI) {
+        const newHistory = await window.electronAPI.clearAllHistory()
+        get().setHistory(newHistory)
+      }
+    } catch (err) { console.error('clearAllHistory failed:', err) }
+  },
+
+  importHistory: async (payload, mode = 'merge') => {
+    try {
+      if (!window.electronAPI) return 0
+      const result = await window.electronAPI.importHistory(payload, mode)
+      get().setHistory(result.history)
+      return result.imported
+    } catch (err) {
+      console.error('importHistory failed:', err)
+      return 0
+    }
   },
 
   copyItem: async (id) => {

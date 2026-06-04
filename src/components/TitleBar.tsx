@@ -1,6 +1,8 @@
 import React, { useCallback, memo } from 'react'
-import { Minus, X, Maximize2, Clipboard, Settings } from 'lucide-react'
+import { Minus, X, Maximize2, Settings } from 'lucide-react'
 import { useClipboardStore } from '../store/clipboardStore'
+
+const appIconUrl = './icon.png'
 
 const TitleBar: React.FC = memo(() => {
   const showSettings = useClipboardStore(s => s.showSettings)
@@ -21,13 +23,15 @@ const TitleBar: React.FC = memo(() => {
     <div className="flex items-center justify-between px-4 py-2 drag-region select-none"
       style={{ borderBottom: '1px solid var(--border-divider)' }}>
       <div className="flex items-center gap-2.5 cursor-pointer no-drag" onClick={onLogo}>
-        <div className="relative w-7 h-7 rounded-lg flex items-center justify-center"
-          style={{
-            background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
-            boxShadow: '0 2px 8px rgba(99,102,241,0.25)',
-          }}>
-          <Clipboard size={13} color="white" strokeWidth={2.5} />
-          <div className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full"
+        <div className="relative w-7 h-7 rounded-lg flex items-center justify-center">
+          <img
+            src={appIconUrl}
+            alt=""
+            className="w-7 h-7 rounded-lg"
+            draggable={false}
+            style={{ boxShadow: '0 2px 8px rgba(15,118,110,0.25)' }}
+          />
+          <div className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full icon-badge"
             style={{
               background: 'var(--color-success)',
               boxShadow: 'var(--shadow-glow)',

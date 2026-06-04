@@ -1,72 +1,69 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <defs>
-    <!-- 背景渐变 -->
-    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#4c6ef5"/>
-      <stop offset="50%" style="stop-color:#3b5bdb"/>
-      <stop offset="100%" style="stop-color:#364fc7"/>
+    <linearGradient id="bg" x1="120" y1="80" x2="904" y2="944" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#22304B"/>
+      <stop offset="0.52" stop-color="#0E766E"/>
+      <stop offset="1" stop-color="#F59E0B"/>
     </linearGradient>
-    <!-- 高光渐变 -->
-    <linearGradient id="shine" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:rgba(255,255,255,0.15)"/>
-      <stop offset="100%" style="stop-color:rgba(255,255,255,0)"/>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(280 196) rotate(48) scale(620)">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.34"/>
+      <stop offset="0.44" stop-color="#FFFFFF" stop-opacity="0.08"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="paper" x1="346" y1="232" x2="680" y2="786" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#EAF3F0"/>
     </linearGradient>
-    <!-- 剪贴板渐变 -->
-    <linearGradient id="boardGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#ffffff"/>
-      <stop offset="100%" style="stop-color:#e9ecef"/>
+    <linearGradient id="clip" x1="410" y1="160" x2="612" y2="326" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F8FAFC"/>
+      <stop offset="1" stop-color="#BFEDE7"/>
     </linearGradient>
-    <!-- 勾选渐变 -->
-    <linearGradient id="checkGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#20c997"/>
-      <stop offset="100%" style="stop-color:#12b886"/>
+    <linearGradient id="accent" x1="374" y1="394" x2="708" y2="610" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#14B8A6"/>
+      <stop offset="0.55" stop-color="#6366F1"/>
+      <stop offset="1" stop-color="#F97316"/>
     </linearGradient>
-    <!-- 阴影 -->
-    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="8" stdDeviation="16" flood-color="#000" flood-opacity="0.25"/>
+    <filter id="tileShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="24" stdDeviation="32" flood-color="#0B1220" flood-opacity="0.28"/>
     </filter>
-    <filter id="innerShadow" x="-10%" y="-10%" width="120%" height="120%">
-      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#000" flood-opacity="0.15"/>
+    <filter id="paperShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="20" stdDeviation="26" flood-color="#0B1220" flood-opacity="0.36"/>
     </filter>
-    <!-- 圆角矩形裁剪 -->
-    <clipPath id="roundClip">
-      <rect x="0" y="0" width="1024" height="1024" rx="220" ry="220"/>
-    </clipPath>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#0B1220" flood-opacity="0.24"/>
+    </filter>
   </defs>
 
-  <!-- 背景 -->
-  <rect width="1024" height="1024" rx="220" ry="220" fill="url(#bgGrad)"/>
-  <rect width="1024" height="1024" rx="220" ry="220" fill="url(#shine)"/>
+  <rect x="40" y="40" width="944" height="944" rx="214" fill="url(#bg)" filter="url(#tileShadow)"/>
+  <rect x="40" y="40" width="944" height="944" rx="214" fill="url(#glow)"/>
+  <path d="M760 88C847 116 922 195 947 288C882 256 801 250 732 279C690 296 656 322 628 353C592 276 635 149 760 88Z" fill="#FFFFFF" opacity="0.08"/>
+  <path d="M116 720C198 656 299 650 372 696C440 739 478 818 474 924H228C170 881 131 810 116 720Z" fill="#FFFFFF" opacity="0.07"/>
 
-  <!-- 装饰圆点 -->
-  <circle cx="180" cy="180" r="60" fill="rgba(255,255,255,0.06)"/>
-  <circle cx="850" cy="250" r="40" fill="rgba(255,255,255,0.04)"/>
-  <circle cx="900" cy="800" r="50" fill="rgba(255,255,255,0.05)"/>
-  <circle cx="150" cy="750" r="35" fill="rgba(255,255,255,0.04)"/>
-
-  <!-- 剪贴板主体 -->
-  <g transform="translate(512, 512)" filter="url(#shadow)">
-    <!-- 剪贴板底板 -->
-    <rect x="-200" y="-240" width="400" height="480" rx="32" ry="32" fill="url(#boardGrad)" opacity="0.95"/>
-
-    <!-- 夹子 -->
-    <rect x="-110" y="-290" width="220" height="100" rx="24" ry="24" fill="white" opacity="0.95"/>
-    <rect x="-75" y="-275" width="150" height="70" rx="16" ry="16" fill="url(#bgGrad)" opacity="0.2"/>
-
-    <!-- 内容行 -->
-    <rect x="-140" y="-110" width="280" height="16" rx="8" ry="8" fill="#4c6ef5" opacity="0.15"/>
-    <rect x="-140" y="-70" width="220" height="16" rx="8" ry="8" fill="#4c6ef5" opacity="0.12"/>
-    <rect x="-140" y="-30" width="260" height="16" rx="8" ry="8" fill="#4c6ef5" opacity="0.15"/>
-    <rect x="-140" y="10" width="180" height="16" rx="8" ry="8" fill="#4c6ef5" opacity="0.12"/>
-    <rect x="-140" y="50" width="240" height="16" rx="8" ry="8" fill="#4c6ef5" opacity="0.1"/>
-    <rect x="-140" y="90" width="200" height="16" rx="8" ry="8" fill="#4c6ef5" opacity="0.08"/>
-
-    <!-- 勾选圆圈 -->
-    <circle cx="130" cy="150" r="52" fill="url(#checkGrad)" filter="url(#innerShadow)"/>
-    <!-- 勾选 -->
-    <path d="M108 150 L124 166 L154 136" stroke="white" stroke-width="12" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <g filter="url(#paperShadow)">
+    <rect x="252" y="306" width="412" height="520" rx="72" fill="#B7F2E8" opacity="0.35"/>
+    <rect x="316" y="244" width="424" height="556" rx="76" fill="url(#paper)"/>
+    <rect x="356" y="286" width="344" height="472" rx="48" fill="#FFFFFF" opacity="0.62"/>
   </g>
 
-  <!-- 顶部高光 -->
-  <ellipse cx="512" cy="200" rx="300" ry="80" fill="rgba(255,255,255,0.05)"/>
+  <g filter="url(#softShadow)">
+    <path d="M418 266C418 212 460 170 512 170C564 170 606 212 606 266H648C673 266 694 287 694 312V346H330V312C330 287 351 266 376 266H418Z" fill="url(#clip)"/>
+    <path d="M468 262C468 238 488 218 512 218C536 218 556 238 556 262H468Z" fill="#22304B" opacity="0.88"/>
+    <rect x="374" y="336" width="276" height="30" rx="15" fill="#0F766E" opacity="0.18"/>
+  </g>
+
+  <g>
+    <rect x="388" y="430" width="266" height="34" rx="17" fill="#0F766E" opacity="0.20"/>
+    <rect x="388" y="498" width="226" height="34" rx="17" fill="#22304B" opacity="0.18"/>
+    <rect x="388" y="566" width="284" height="34" rx="17" fill="#F97316" opacity="0.20"/>
+    <rect x="388" y="634" width="186" height="34" rx="17" fill="#6366F1" opacity="0.20"/>
+  </g>
+
+  <g filter="url(#softShadow)">
+    <rect x="594" y="594" width="182" height="182" rx="50" fill="url(#accent)"/>
+    <path d="M664 642H718C734 642 746 655 746 670V724" fill="none" stroke="#FFFFFF" stroke-width="28" stroke-linecap="round"/>
+    <path d="M706 746H652C636 746 624 733 624 718V664" fill="none" stroke="#FFFFFF" stroke-width="28" stroke-linecap="round"/>
+  </g>
+
+  <path d="M216 191L240 247L300 256L256 297L267 356L216 328L164 356L176 297L132 256L192 247Z" fill="#FFFFFF" opacity="0.16"/>
+  <path d="M814 706L830 744L870 750L841 778L848 818L814 799L778 818L786 778L756 750L797 744Z" fill="#FFFFFF" opacity="0.16"/>
 </svg>

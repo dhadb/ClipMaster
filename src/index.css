@@ -14,12 +14,12 @@
 
   --bg-root: #09090b;
   --bg-app: rgba(9, 9, 11, 0.96);
-  --bg-card: rgba(24, 24, 27, 0.6);
+  --bg-card: rgba(24, 24, 27, 0.72);
   --bg-card-hover: rgba(30, 30, 34, 0.8);
   --bg-card-selected: rgba(99, 102, 241, 0.06);
-  --bg-input: rgba(24, 24, 27, 0.5);
+  --bg-input: rgba(24, 24, 27, 0.68);
   --bg-input-focus: rgba(24, 24, 27, 0.85);
-  --bg-surface: rgba(255, 255, 255, 0.02);
+  --bg-surface: rgba(255, 255, 255, 0.035);
   --bg-elevated: rgba(255, 255, 255, 0.04);
   --bg-overlay: rgba(0, 0, 0, 0.2);
 
@@ -32,11 +32,11 @@
   --border-divider: rgba(255, 255, 255, 0.04);
   --border-subtle: rgba(255, 255, 255, 0.06);
 
-  --text-primary: rgba(255, 255, 255, 0.92);
-  --text-secondary: rgba(255, 255, 255, 0.55);
-  --text-tertiary: rgba(255, 255, 255, 0.3);
-  --text-ghost: rgba(255, 255, 255, 0.15);
-  --text-placeholder: rgba(113, 113, 122, 0.6);
+  --text-primary: rgba(255, 255, 255, 0.96);
+  --text-secondary: rgba(255, 255, 255, 0.74);
+  --text-tertiary: rgba(255, 255, 255, 0.52);
+  --text-ghost: rgba(255, 255, 255, 0.34);
+  --text-placeholder: rgba(212, 212, 216, 0.62);
 
   --shadow-app: 0 0 0 1px rgba(255,255,255,0.03), 0 8px 40px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.3);
   --shadow-card-hover: 0 4px 16px rgba(0,0,0,0.15);
@@ -57,6 +57,13 @@
   --type-number: #fbbf24;
   --type-code: #a78bfa;
   --type-long-text: #60a5fa;
+
+  /* 动效曲线 */
+  --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.2, 0.9, 0.22, 1.15);
+  --duration-fast: 150ms;
+  --duration-normal: 240ms;
+  --duration-slow: 420ms;
 }
 
 /* 浅色主题 */
@@ -74,26 +81,26 @@
   --bg-card: rgba(255, 255, 255, 0.8);
   --bg-card-hover: rgba(255, 255, 255, 0.95);
   --bg-card-selected: rgba(99, 102, 241, 0.06);
-  --bg-input: rgba(244, 244, 245, 0.8);
+  --bg-input: rgba(244, 244, 245, 0.9);
   --bg-input-focus: rgba(255, 255, 255, 0.95);
-  --bg-surface: rgba(0, 0, 0, 0.02);
+  --bg-surface: rgba(0, 0, 0, 0.035);
   --bg-elevated: rgba(0, 0, 0, 0.04);
   --bg-overlay: rgba(0, 0, 0, 0.05);
 
   --border-app: rgba(0, 0, 0, 0.08);
-  --border-card: rgba(0, 0, 0, 0.06);
+  --border-card: rgba(0, 0, 0, 0.08);
   --border-card-hover: rgba(0, 0, 0, 0.1);
   --border-card-selected: rgba(99, 102, 241, 0.25);
-  --border-input: rgba(0, 0, 0, 0.08);
+  --border-input: rgba(0, 0, 0, 0.1);
   --border-input-focus: rgba(99, 102, 241, 0.4);
-  --border-divider: rgba(0, 0, 0, 0.06);
-  --border-subtle: rgba(0, 0, 0, 0.08);
+  --border-divider: rgba(0, 0, 0, 0.08);
+  --border-subtle: rgba(0, 0, 0, 0.1);
 
-  --text-primary: rgba(9, 9, 11, 0.9);
-  --text-secondary: rgba(9, 9, 11, 0.55);
-  --text-tertiary: rgba(9, 9, 11, 0.35);
-  --text-ghost: rgba(9, 9, 11, 0.18);
-  --text-placeholder: rgba(9, 9, 11, 0.3);
+  --text-primary: rgba(9, 9, 11, 0.94);
+  --text-secondary: rgba(9, 9, 11, 0.72);
+  --text-tertiary: rgba(9, 9, 11, 0.52);
+  --text-ghost: rgba(9, 9, 11, 0.34);
+  --text-placeholder: rgba(9, 9, 11, 0.48);
 
   --shadow-app: 0 0 0 1px rgba(0,0,0,0.05), 0 8px 40px rgba(0,0,0,0.1), 0 2px 8px rgba(0,0,0,0.06);
   --shadow-card-hover: 0 4px 16px rgba(0,0,0,0.06);
@@ -155,13 +162,22 @@
     position: relative;
     background: var(--bg-card);
     border: 1px solid var(--border-card);
-    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    transition:
+      transform var(--duration-normal) var(--ease-out-soft),
+      background var(--duration-normal) var(--ease-out-soft),
+      border-color var(--duration-normal) var(--ease-out-soft),
+      box-shadow var(--duration-normal) var(--ease-out-soft),
+      opacity var(--duration-normal) ease;
   }
 
   .glass-card:hover {
     background: var(--bg-card-hover);
     border-color: var(--border-card-hover);
     box-shadow: var(--shadow-card-hover);
+  }
+
+  .glass-card:active {
+    background: var(--bg-card-selected);
   }
 
   .glass-card.selected {
@@ -174,13 +190,23 @@
   .search-input {
     background: var(--bg-input);
     border: 1px solid var(--border-input);
-    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    transition:
+      transform var(--duration-normal) var(--ease-out-soft),
+      background var(--duration-normal) var(--ease-out-soft),
+      border-color var(--duration-normal) var(--ease-out-soft),
+      box-shadow var(--duration-normal) var(--ease-out-soft);
+  }
+
+  .search-input:hover {
+    transform: translateY(-1px);
+    border-color: var(--border-card-hover);
   }
 
   .search-input:focus-within {
     background: var(--bg-input-focus);
     border-color: var(--border-input-focus);
     box-shadow: var(--shadow-input-focus);
+    transform: translateY(-1px) scale(1.005);
   }
 
   /* 拖拽区域 */
@@ -188,6 +214,13 @@
   .no-drag { -webkit-app-region: no-drag; }
 
   /* 文本截断 */
+  .line-clamp-1 {
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
   .line-clamp-2 {
     display: -webkit-box;
     -webkit-line-clamp: 2;
@@ -197,39 +230,84 @@
 
   /* 进入动画 */
   .item-enter {
-    animation: itemEnter 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: itemEnter 0.16s ease-out both;
   }
 
   @keyframes itemEnter {
-    from { opacity: 0; transform: translateY(6px) scale(0.99); }
-    to { opacity: 1; transform: translateY(0) scale(1); }
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
   }
 
   .fade-in {
-    animation: fadeIn 0.15s ease-out both;
+    animation: fadeIn 0.22s ease-out both;
   }
 
   @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .scale-in {
+    animation: scaleIn var(--duration-normal) var(--ease-spring) both;
+  }
+
+  @keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.94); }
+    to { opacity: 1; transform: scale(1); }
   }
 
   .slide-in-right {
-    animation: slideInRight 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: slideInRight var(--duration-normal) var(--ease-out-soft) both;
   }
 
   @keyframes slideInRight {
-    from { opacity: 0; transform: translateX(8px); }
-    to { opacity: 1; transform: translateX(0); }
+    from { opacity: 0; transform: translateX(14px); filter: blur(2px); }
+    to { opacity: 1; transform: translateX(0); filter: blur(0); }
+  }
+
+  .slide-up {
+    animation: slideUp var(--duration-normal) var(--ease-out-soft) both;
+  }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .panel-switch {
+    animation: panelSwitch 0.28s var(--ease-out-soft) both;
+  }
+
+  @keyframes panelSwitch {
+    from { opacity: 0; transform: translateY(8px) scale(0.995); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  .detail-backdrop {
+    animation: backdropIn var(--duration-normal) ease-out both;
+  }
+
+  @keyframes backdropIn {
+    from { opacity: 0; backdrop-filter: blur(0); }
+    to { opacity: 1; backdrop-filter: blur(12px); }
+  }
+
+  .detail-panel {
+    animation: detailPanelIn 0.32s var(--ease-out-soft) both;
+  }
+
+  @keyframes detailPanelIn {
+    from { opacity: 0; transform: translateY(18px) scale(0.985); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
   }
 
   /* 已复制覆盖层 */
   .copied-overlay {
-    animation: copiedPop 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: copiedPop 0.22s ease-out both;
   }
 
   @keyframes copiedPop {
-    from { opacity: 0; transform: scale(0.95); }
+    from { opacity: 0; transform: scale(0.96); }
     to { opacity: 1; transform: scale(1); }
   }
 
@@ -243,10 +321,41 @@
   .type-code { background: var(--type-code); }
   .type-long-text { background: var(--type-long-text); }
 
+  .clipboard-card {
+    height: 76px;
+  }
+
+  [data-density="compact"] .clipboard-card { height: 64px; }
+  [data-density="comfortable"] .clipboard-card { height: 88px; }
+
+  .verification-card {
+    border-color: color-mix(in srgb, var(--color-warning) 18%, var(--border-card));
+    background: color-mix(in srgb, var(--color-warning) 5%, var(--bg-card));
+  }
+
+  .verification-card.selected {
+    border-color: color-mix(in srgb, var(--color-warning) 32%, var(--border-card-selected));
+  }
+
+  .card-actions {
+    width: 120px;
+    justify-content: flex-end;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms ease;
+  }
+
+  .clipboard-card:hover .card-actions,
+  .clipboard-card.selected .card-actions,
+  .clipboard-card:focus-within .card-actions {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
   /* 动作按钮 */
   .action-btn {
-    width: 30px;
-    height: 30px;
+    width: 28px;
+    height: 28px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -255,12 +364,21 @@
     background: transparent;
     border: none;
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition:
+      transform var(--duration-fast) var(--ease-spring),
+      color var(--duration-fast) ease,
+      background var(--duration-fast) ease,
+      box-shadow var(--duration-fast) ease;
   }
 
   .action-btn:hover {
     background: var(--bg-elevated);
     color: var(--text-secondary);
+    transform: translateY(-1px) scale(1.06);
+  }
+
+  .action-btn:active {
+    transform: translateY(0) scale(0.92);
   }
 
   .action-btn.copy:hover { color: var(--color-success); background: rgba(52,211,153,0.1); }
@@ -283,17 +401,27 @@
     background: transparent;
     border: none;
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition:
+      transform var(--duration-fast) var(--ease-spring),
+      color var(--duration-fast) ease,
+      background var(--duration-fast) ease;
     letter-spacing: 0.01em;
     white-space: nowrap;
     flex-shrink: 0;
   }
 
   .tab-btn span { white-space: nowrap; }
-  .tab-btn:hover { color: var(--text-secondary); }
+  .tab-btn:hover { color: var(--text-secondary); transform: translateY(-1px); }
+  .tab-btn:active { transform: translateY(0) scale(0.96); }
   .tab-btn.active {
     color: var(--text-primary);
     background: var(--bg-elevated);
+    animation: tabActivate 0.24s var(--ease-spring) both;
+  }
+
+  @keyframes tabActivate {
+    from { transform: scale(0.96); }
+    to { transform: scale(1); }
   }
 
   /* 窗口控制按钮 */
@@ -308,13 +436,18 @@
     background: transparent;
     border: none;
     cursor: pointer;
-    transition: all 0.12s ease;
+    transition:
+      transform var(--duration-fast) var(--ease-spring),
+      color var(--duration-fast) ease,
+      background var(--duration-fast) ease;
   }
 
   .win-btn:hover {
     color: var(--text-secondary);
     background: var(--bg-elevated);
+    transform: translateY(-1px) scale(1.04);
   }
+  .win-btn:active { transform: translateY(0) scale(0.92); }
   .win-btn.active {
     color: var(--color-primary-light);
     background: rgba(99,102,241,0.12);
@@ -369,9 +502,20 @@
     background: var(--bg-elevated);
     border: 1px solid var(--border-card);
     cursor: pointer;
-    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    transition:
+      transform var(--duration-fast) var(--ease-spring),
+      background var(--duration-normal) var(--ease-out-soft),
+      border-color var(--duration-normal) var(--ease-out-soft),
+      box-shadow var(--duration-normal) var(--ease-out-soft);
     flex-shrink: 0;
   }
+
+  .toggle:hover {
+    transform: scale(1.04);
+    box-shadow: var(--shadow-btn);
+  }
+
+  .toggle:active { transform: scale(0.96); }
 
   .toggle.on {
     background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
@@ -388,7 +532,7 @@
     border-radius: 50%;
     background: white;
     box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: transform var(--duration-normal) var(--ease-spring);
   }
 
   .toggle.on::after {
@@ -405,6 +549,72 @@
     animation: pulse 2.5s infinite;
   }
 
+  .interactive-chip {
+    transition:
+      transform var(--duration-fast) var(--ease-spring),
+      background var(--duration-fast) ease,
+      border-color var(--duration-fast) ease,
+      color var(--duration-fast) ease,
+      box-shadow var(--duration-fast) ease;
+  }
+
+  .interactive-chip:hover {
+    transform: translateY(-1px) scale(1.03);
+    box-shadow: var(--shadow-btn);
+  }
+
+  .interactive-chip:active {
+    transform: translateY(0) scale(0.95);
+  }
+
+  .icon-badge {
+    animation: badgePop 0.34s var(--ease-spring) both;
+  }
+
+  @keyframes badgePop {
+    from { opacity: 0; transform: scale(0.3) rotate(-20deg); }
+    to { opacity: 1; transform: scale(1) rotate(0); }
+  }
+
+  .soft-float {
+    animation: softFloat 3.6s ease-in-out infinite;
+  }
+
+  @keyframes softFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+  }
+
+  .shimmer {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .shimmer::after {
+    content: '';
+    position: absolute;
+    inset: -40% -80%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+    transform: translateX(-60%) rotate(16deg);
+    animation: shimmerSweep 2.8s ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  @keyframes shimmerSweep {
+    0%, 55% { transform: translateX(-60%) rotate(16deg); opacity: 0; }
+    70% { opacity: 1; }
+    100% { transform: translateX(60%) rotate(16deg); opacity: 0; }
+  }
+
+  .content-fade {
+    animation: contentFade 0.28s var(--ease-out-soft) both;
+  }
+
+  @keyframes contentFade {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
   @keyframes pulse {
     0%, 100% { opacity: 1; transform: scale(1); }
     50% { opacity: 0.6; transform: scale(0.9); }
@@ -414,7 +624,9 @@
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
       animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
     }
   }
 }

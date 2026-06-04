@@ -17,7 +17,7 @@ const EmptyState: React.FC = () => {
     <div className="h-full flex flex-col items-center justify-center px-8 py-10">
       {/* 图标 */}
       <div className="relative mb-6 fade-in">
-        <div className="w-20 h-20 rounded-2xl flex items-center justify-center"
+        <div className="w-20 h-20 rounded-2xl flex items-center justify-center soft-float shimmer"
           style={{
             background: 'rgba(99,102,241,0.06)',
             border: '1px solid rgba(99,102,241,0.08)',
@@ -57,7 +57,7 @@ const EmptyState: React.FC = () => {
             { icon: Copy, label: '双击', desc: '快速复制' },
             { icon: Star, label: '收藏', desc: '收藏内容' },
           ].map((tip, i) => (
-            <div key={i} className="flex items-center gap-2 p-2 rounded-lg"
+            <div key={i} className="flex items-center gap-2 p-2 rounded-lg interactive-chip"
               style={{ background: 'var(--bg-surface)' }}>
               <div className="w-6 h-6 rounded-md flex items-center justify-center"
                 style={{ background: 'var(--bg-elevated)' }}>

@@ -5,7 +5,11 @@ import fs from 'fs'
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
 let clipboardWatcher: ReturnType<typeof setInterval> | null = null
+let clipboardWatcherRestartTimer: ReturnType<typeof setTimeout> | null = null
+let clipboardWatcherErrorCount = 0
 let lastClipboardContent = ''
+let lastClipboardImageHash = ''  // 用于图片去重
+let lastImageCheckAt = 0
 let isQuitting = false
 let isMaximized = false
 let savedBounds: { x: number; y: number; width: number; height: number } | null = null
@@ -17,8 +21,14 @@ let currentHotkey = ''
 // === Persistence ===
 const dataPath = path.join(app.getPath('userData'), 'clipmaster-data.json')
 const backupPath = `${dataPath}.bak`
+const imagesDir = path.join(app.getPath('userData'), 'images')  // 图片存储目录
 
-const CLIPBOARD_TYPES = ['text', 'link', 'email', 'color', 'number', 'code', 'long-text', 'json', 'markdown', 'file-path', 'phone'] as const
+// 确保图片目录存在
+if (!fs.existsSync(imagesDir)) {
+  fs.mkdirSync(imagesDir, { recursive: true })
+}
+
+const CLIPBOARD_TYPES = ['text', 'link', 'email', 'color', 'number', 'code', 'long-text', 'json', 'markdown', 'file-path', 'phone', 'image'] as const
 type ClipboardType = typeof CLIPBOARD_TYPES[number]
 
 interface ClipboardItem {
@@ -30,6 +40,8 @@ interface ClipboardItem {
   favorited: boolean
   copyCount: number
   firstTimestamp: number
+  imagePath?: string  // 图片路径
+  tags?: string[]  // 智能标签
 }
 
 const defaultSettings = {
@@ -104,6 +116,63 @@ function getClipboardContentType(text: string): ClipboardType {
   return 'text'
 }
 
+// 生成图片哈希用于去重
+function getImageHash(buffer: Buffer): string {
+  return require('crypto').createHash('md5').update(buffer).digest('hex').substring(0, 16)
+}
+
+function isImageHistoryItem(item: ClipboardItem | undefined): item is ClipboardItem & { imagePath: string } {
+  return item?.type === 'image' && typeof item.imagePath === 'string' && item.imagePath.length > 0
+}
+
+function safeDeleteImageFile(imagePath: string | undefined) {
+  if (!imagePath) return
+  try {
+    const resolvedImagesDir = path.resolve(imagesDir)
+    const resolvedImagePath = path.resolve(imagePath)
+    if (!resolvedImagePath.startsWith(resolvedImagesDir + path.sep)) return
+    if (clipboardHistory.some(item => item.imagePath === imagePath)) return
+    if (fs.existsSync(resolvedImagePath)) fs.unlinkSync(resolvedImagePath)
+  } catch (err) {
+    console.error('Failed to delete image file:', err)
+  }
+}
+
+function removeHistoryItems(shouldRemove: (item: ClipboardItem) => boolean) {
+  const removed: ClipboardItem[] = []
+  clipboardHistory = clipboardHistory.filter(item => {
+    if (shouldRemove(item)) {
+      removed.push(item)
+      return false
+    }
+    return true
+  })
+  removed.forEach(item => safeDeleteImageFile(item.imagePath))
+  return removed
+}
+
+// 保存剪贴板图片
+function saveClipboardImage(): { path: string; hash: string } | null {
+  try {
+    const image = clipboard.readImage()
+    if (image.isEmpty()) return null
+
+    const buffer = image.toPNG()
+    const hash = getImageHash(buffer)
+
+    // 检查是否重复
+    if (hash === lastClipboardImageHash) return null
+
+    const imagePath = path.join(imagesDir, `${hash}.png`)
+    if (!fs.existsSync(imagePath)) fs.writeFileSync(imagePath, buffer)
+    lastClipboardImageHash = hash
+    return { path: imagePath, hash }
+  } catch (err) {
+    console.error('Failed to save clipboard image:', err)
+    return null
+  }
+}
+
 function sanitizeHistoryItem(item: any): ClipboardItem | null {
   if (!item || typeof item.content !== 'string' || !item.content.trim()) return null
   const timestamp = Number(item.timestamp)
@@ -119,6 +188,8 @@ function sanitizeHistoryItem(item: any): ClipboardItem | null {
     favorited: Boolean(item.favorited),
     copyCount: Math.max(1, Number.isFinite(Number(item.copyCount)) ? Number(item.copyCount) : 1),
     firstTimestamp: Number.isFinite(Number(item.firstTimestamp)) ? Number(item.firstTimestamp) : safeTimestamp,
+    imagePath: typeof item.imagePath === 'string' && item.imagePath ? item.imagePath : undefined,
+    tags: Array.isArray(item.tags) ? item.tags.filter((tag: unknown) => typeof tag === 'string') : undefined,
   }
 }
 
@@ -160,7 +231,18 @@ function saveData() {
 
 function scheduleSave() {
   if (saveTimer) clearTimeout(saveTimer)
-  saveTimer = setTimeout(saveData, 1000)
+  saveTimer = setTimeout(() => {
+    saveTimer = null
+    saveData()
+  }, 1000)
+}
+
+function flushPendingSave() {
+  if (saveTimer) {
+    clearTimeout(saveTimer)
+    saveTimer = null
+    saveData()
+  }
 }
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
@@ -202,13 +284,19 @@ function applyRetentionRules() {
   const protectedItems = retainedByAge.filter(item => item.pinned || item.favorited)
   const normalItems = retainedByAge.filter(item => !item.pinned && !item.favorited)
   const maxNormal = Math.max(0, settings.maxHistory - protectedItems.length)
-  clipboardHistory = [...protectedItems, ...normalItems.slice(0, maxNormal)].sort((a, b) => {
+  const nextHistory = [...protectedItems, ...normalItems.slice(0, maxNormal)].sort((a, b) => {
     if (a.pinned && !b.pinned) return -1
     if (!a.pinned && b.pinned) return 1
     if (a.favorited && !b.favorited) return -1
     if (!a.favorited && b.favorited) return 1
     return b.timestamp - a.timestamp
   })
+  const nextIds = new Set(nextHistory.map(item => item.id))
+  const removedImages = clipboardHistory
+    .filter(item => !nextIds.has(item.id))
+    .map(item => item.imagePath)
+  clipboardHistory = nextHistory
+  removedImages.forEach(safeDeleteImageFile)
 }
 
 function getPrivacyState() {
@@ -309,7 +397,7 @@ function rebuildTrayMenu() {
     { label: '暂停记录 30 分钟', click: () => pauseMonitoring(30) },
     { type: 'separator' },
     { label: '清空历史', click: () => {
-      clipboardHistory = clipboardHistory.filter(item => item.pinned || item.favorited)
+      removeHistoryItems(item => !item.pinned && !item.favorited)
       mainWindow?.webContents.send('history-updated', clipboardHistory)
       scheduleSave()
     }},
@@ -321,7 +409,8 @@ function rebuildTrayMenu() {
     { type: 'separator' },
     { label: '退出', click: () => {
       isQuitting = true
-      saveData()
+      stopClipboardWatcher()
+      flushPendingSave()
       app.quit()
     }}
   ])
@@ -354,22 +443,71 @@ function toggleWindow() {
   }
 }
 
+function stopClipboardWatcher() {
+  if (clipboardWatcher) {
+    clearInterval(clipboardWatcher)
+    clipboardWatcher = null
+  }
+  if (clipboardWatcherRestartTimer) {
+    clearTimeout(clipboardWatcherRestartTimer)
+    clipboardWatcherRestartTimer = null
+  }
+}
+
+function scheduleClipboardWatcherRestart(delay = 5000) {
+  if (isQuitting || clipboardWatcherRestartTimer) return
+  if (clipboardWatcher) {
+    clearInterval(clipboardWatcher)
+    clipboardWatcher = null
+  }
+  clipboardWatcherRestartTimer = setTimeout(() => {
+    clipboardWatcherRestartTimer = null
+    if (!isQuitting) startClipboardWatcher()
+  }, delay)
+}
+
 function startClipboardWatcher() {
+  if (clipboardWatcher || isQuitting) return
   clipboardWatcher = setInterval(() => {
     try {
       if (pauseUntil > 0 && pauseUntil <= Date.now()) resumeMonitoring()
       if (pauseUntil > Date.now()) return
 
-      const currentContent = clipboard.readText()
+      // 错误计数器重置：如果连续成功，重置错误计数
+      let hasError = false
+
+      // 检查文本内容
+      let currentContent = ''
+      try {
+        currentContent = clipboard.readText()
+      } catch (readErr) {
+        console.error('Failed to read clipboard text:', readErr)
+        hasError = true
+      }
+
+      if (settings.ignoreSensitive && currentContent && currentContent !== lastClipboardContent && isSensitiveClipboardContent(currentContent)) {
+        lastClipboardContent = currentContent
+        protectedToday += 1
+        emitPrivacyState()
+        scheduleSave()
+        return
+      }
+
+      // 检查图片内容
+      let imageInfo: { path: string; hash: string } | null = null
+      const shouldCheckImage = Date.now() - lastImageCheckAt >= 1000
+      if (shouldCheckImage) {
+        lastImageCheckAt = Date.now()
+        try {
+          imageInfo = saveClipboardImage()
+        } catch (imgErr) {
+          console.error('Failed to save clipboard image:', imgErr)
+        }
+      }
+
+      // 处理文本内容
       if (currentContent && currentContent !== lastClipboardContent) {
         lastClipboardContent = currentContent
-
-        if (settings.ignoreSensitive && isSensitiveClipboardContent(currentContent)) {
-          protectedToday += 1
-          emitPrivacyState()
-          scheduleSave()
-          return
-        }
 
         const existingIndex = clipboardHistory.findIndex(item => item.content === currentContent)
         if (existingIndex !== -1) {
@@ -395,8 +533,54 @@ function startClipboardWatcher() {
         mainWindow?.webContents.send('history-updated', clipboardHistory)
         scheduleSave()
       }
+
+      // 处理图片内容
+      if (imageInfo) {
+        const existingIndex = clipboardHistory.findIndex(item => item.type === 'image' && item.content === `[图片] ${imageInfo.hash}`)
+        if (existingIndex !== -1) {
+          const existing = clipboardHistory.splice(existingIndex, 1)[0]
+          existing.timestamp = Date.now()
+          existing.copyCount = (existing.copyCount || 1) + 1
+          existing.imagePath = imageInfo.path
+          clipboardHistory.unshift(existing)
+        } else {
+          const now = Date.now()
+          clipboardHistory.unshift({
+            id: generateId(),
+            content: `[图片] ${imageInfo.hash}`,
+            type: 'image',
+            timestamp: now,
+            pinned: false,
+            favorited: false,
+            copyCount: 1,
+            firstTimestamp: now,
+            imagePath: imageInfo.path,
+          })
+        }
+        applyRetentionRules()
+        mainWindow?.webContents.send('history-updated', clipboardHistory)
+        scheduleSave()
+      }
+
+      // 错误处理
+      if (hasError) {
+        clipboardWatcherErrorCount++
+        if (clipboardWatcherErrorCount > 10) {
+          console.error('Clipboard watcher error count exceeded, restarting...')
+          clipboardWatcherErrorCount = 0
+          scheduleClipboardWatcherRestart()
+        }
+      } else {
+        clipboardWatcherErrorCount = 0
+      }
     } catch (err) {
       console.error('Clipboard watcher failed:', err)
+      clipboardWatcherErrorCount++
+      if (clipboardWatcherErrorCount > 10) {
+        console.error('Clipboard watcher critical error, restarting...')
+        clipboardWatcherErrorCount = 0
+        scheduleClipboardWatcherRestart()
+      }
     }
   }, 300)
 }
@@ -404,13 +588,29 @@ function startClipboardWatcher() {
 // IPC Handlers
 ipcMain.handle('get-history', () => clipboardHistory)
 
-ipcMain.handle('copy-to-clipboard', (_, content: string) => {
-  clipboard.writeText(content)
-  lastClipboardContent = content
+ipcMain.handle('copy-to-clipboard', (_, itemOrContent: ClipboardItem | string) => {
+  if (typeof itemOrContent === 'string') {
+    clipboard.writeText(itemOrContent)
+    lastClipboardContent = itemOrContent
+    return
+  }
+
+  if (isImageHistoryItem(itemOrContent) && fs.existsSync(itemOrContent.imagePath)) {
+    const image = nativeImage.createFromPath(itemOrContent.imagePath)
+    if (!image.isEmpty()) {
+      clipboard.writeImage(image)
+      lastClipboardImageHash = itemOrContent.content.replace(/^\[图片\]\s*/, '')
+      lastImageCheckAt = Date.now()
+      return
+    }
+  }
+
+  clipboard.writeText(itemOrContent.content)
+  lastClipboardContent = itemOrContent.content
 })
 
 ipcMain.handle('delete-item', (_, id: string) => {
-  clipboardHistory = clipboardHistory.filter(item => item.id !== id)
+  removeHistoryItems(item => item.id === id)
   mainWindow?.webContents.send('history-updated', clipboardHistory)
   scheduleSave()
   return clipboardHistory
@@ -439,7 +639,7 @@ ipcMain.handle('toggle-favorite', (_, id: string) => {
 })
 
 ipcMain.handle('clear-history', () => {
-  clipboardHistory = clipboardHistory.filter(item => item.pinned || item.favorited)
+  removeHistoryItems(item => !item.pinned && !item.favorited)
   mainWindow?.webContents.send('history-updated', clipboardHistory)
   scheduleSave()
   return clipboardHistory
@@ -518,8 +718,7 @@ app.on('activate', () => {
 
 app.on('before-quit', () => {
   isQuitting = true
-  if (saveTimer) clearTimeout(saveTimer)
-  saveData()
-  if (clipboardWatcher) clearInterval(clipboardWatcher)
+  flushPendingSave()
+  stopClipboardWatcher()
   globalShortcut.unregisterAll()
 })

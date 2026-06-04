@@ -58,39 +58,69 @@ function App() {
   }, [settings.theme])
 
   useEffect(() => {
-    let cleanups: (() => void)[] = []
+    let isMounted = true
+    const cleanups: (() => void)[] = []
+
+    const addCleanup = (cleanup: (() => void) | undefined) => {
+      if (!cleanup) return
+      if (isMounted) {
+        cleanups.push(cleanup)
+        return
+      }
+      try { cleanup() } catch (e) { console.error('Cleanup error:', e) }
+    }
 
     const init = async () => {
       try {
-        if (window.electronAPI) {
-          const [hist, s, privacy] = await Promise.all([
-            window.electronAPI.getHistory(),
-            window.electronAPI.getSettings(),
-            window.electronAPI.getPrivacyState(),
-          ])
-          setHistory(hist)
-          setSettings(s)
-          useClipboardStore.getState().setPrivacy(privacy)
+        if (!window.electronAPI) {
+          if (isMounted) setLoaded(true)
+          return
+        }
 
-          const c1 = window.electronAPI.onHistoryUpdated(setHistory)
-          const c2 = window.electronAPI.onSettingsUpdated(setSettings)
-          const cPrivacy = window.electronAPI.onPrivacyUpdated(useClipboardStore.getState().setPrivacy)
-          const c3 = window.electronAPI.onShowSettings(() => {
+        addCleanup(window.electronAPI.onHistoryUpdated((newHistory) => {
+          if (isMounted) setHistory(newHistory)
+        }))
+        addCleanup(window.electronAPI.onSettingsUpdated((newSettings) => {
+          if (isMounted) setSettings(newSettings)
+        }))
+        addCleanup(window.electronAPI.onPrivacyUpdated((state) => {
+          if (isMounted) useClipboardStore.getState().setPrivacy(state)
+        }))
+        addCleanup(window.electronAPI.onShowSettings(() => {
+          if (isMounted) {
             setShowSettings(true)
             setActiveTab('settings')
-          })
-          cleanups.push(c1, c2, cPrivacy, c3)
-        }
+          }
+        }))
+
+        const [hist, s, privacy] = await Promise.all([
+          window.electronAPI.getHistory(),
+          window.electronAPI.getSettings(),
+          window.electronAPI.getPrivacyState(),
+        ])
+
+        if (!isMounted) return
+
+        setHistory(hist)
+        setSettings(s)
+        useClipboardStore.getState().setPrivacy(privacy)
         setLoaded(true)
       } catch (err) {
         console.error('Failed to initialize:', err)
-        setError('加载失败，请重启应用')
-        setLoaded(true)
+        if (isMounted) {
+          setError('加载失败，请重启应用')
+          setLoaded(true)
+        }
       }
     }
     init()
 
-    return () => { cleanups.forEach(fn => fn()) }
+    return () => {
+      isMounted = false
+      cleanups.splice(0).forEach(fn => {
+        try { fn() } catch (e) { console.error('Cleanup error:', e) }
+      })
+    }
   }, [])
 
   const showSearch = activeTab !== 'settings' && activeTab !== 'stats'

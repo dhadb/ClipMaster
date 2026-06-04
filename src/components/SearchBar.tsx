@@ -39,7 +39,10 @@ const SearchBar: React.FC = () => {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'f') { e.preventDefault(); inputRef.current?.focus() }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f' && !e.altKey && !e.shiftKey) {
+        e.preventDefault()
+        inputRef.current?.focus()
+      }
       if (e.key === 'Escape') { onClear(); inputRef.current?.blur() }
     }
     window.addEventListener('keydown', onKey)

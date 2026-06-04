@@ -21,6 +21,7 @@ const TYPE_CFG: Record<string, { Icon: any; label: string; bar: string; cssVar: 
   markdown: { Icon: FileText, label: 'Markdown', bar: 'type-long-text', cssVar: 'var(--type-long-text)' },
   'file-path': { Icon: FileText, label: '路径', bar: 'type-text', cssVar: 'var(--type-text)' },
   phone: { Icon: Hash, label: '电话', bar: 'type-number', cssVar: 'var(--type-number)' },
+  image: { Icon: FileText, label: '图片', bar: 'type-long-text', cssVar: 'var(--type-long-text)' },
 }
 
 const ClipboardItemCard: React.FC<Props> = memo(({ item, isSelected, onSelect }) => {
@@ -63,7 +64,7 @@ const ClipboardItemCard: React.FC<Props> = memo(({ item, isSelected, onSelect })
       onDoubleClick={onDoubleClickCopy}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className={`glass-card rounded-xl overflow-hidden cursor-pointer h-full flex flex-col ${isSelected ? 'selected' : ''}`}
+      className={`glass-card rounded-xl overflow-hidden cursor-pointer flex flex-col ${isSelected ? 'selected' : ''}`}
       style={{ willChange: 'transform' }}
     >
       <div className={`type-bar ${cfg.bar} w-full`} style={{ height: 2 }} />

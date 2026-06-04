@@ -3,12 +3,14 @@ import { contextBridge, ipcRenderer } from 'electron'
 export interface ClipboardItem {
   id: string
   content: string
-  type: 'text' | 'link' | 'email' | 'color' | 'number' | 'code' | 'long-text' | 'json' | 'markdown' | 'file-path' | 'phone'
+  type: 'text' | 'link' | 'email' | 'color' | 'number' | 'code' | 'long-text' | 'json' | 'markdown' | 'file-path' | 'phone' | 'image'
   timestamp: number
   pinned: boolean
   favorited: boolean
   copyCount: number
   firstTimestamp: number
+  imagePath?: string
+  tags?: string[]
 }
 
 export interface Settings {
@@ -37,7 +39,7 @@ export interface PrivacyState {
 
 const electronAPI = {
   getHistory: (): Promise<ClipboardItem[]> => ipcRenderer.invoke('get-history'),
-  copyToClipboard: (content: string): Promise<void> => ipcRenderer.invoke('copy-to-clipboard', content),
+  copyToClipboard: (item: ClipboardItem | string): Promise<void> => ipcRenderer.invoke('copy-to-clipboard', item),
   deleteItem: (id: string): Promise<ClipboardItem[]> => ipcRenderer.invoke('delete-item', id),
   togglePin: (id: string): Promise<ClipboardItem[]> => ipcRenderer.invoke('toggle-pin', id),
   toggleFavorite: (id: string): Promise<ClipboardItem[]> => ipcRenderer.invoke('toggle-favorite', id),

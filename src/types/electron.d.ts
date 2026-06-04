@@ -2,7 +2,7 @@ import { ClipboardItem, Settings, PrivacyState } from '../store/clipboardStore'
 
 export interface ElectronAPI {
   getHistory: () => Promise<ClipboardItem[]>
-  copyToClipboard: (content: string) => Promise<void>
+  copyToClipboard: (item: ClipboardItem | string) => Promise<void>
   deleteItem: (id: string) => Promise<ClipboardItem[]>
   togglePin: (id: string) => Promise<ClipboardItem[]>
   toggleFavorite: (id: string) => Promise<ClipboardItem[]>

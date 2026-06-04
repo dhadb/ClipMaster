@@ -3,12 +3,14 @@ import { create } from 'zustand'
 export interface ClipboardItem {
   id: string
   content: string
-  type: 'text' | 'link' | 'email' | 'color' | 'number' | 'code' | 'long-text' | 'json' | 'markdown' | 'file-path' | 'phone'
+  type: 'text' | 'link' | 'email' | 'color' | 'number' | 'code' | 'long-text' | 'json' | 'markdown' | 'file-path' | 'phone' | 'image'
   timestamp: number
   pinned: boolean
   favorited: boolean
   copyCount: number
   firstTimestamp: number
+  imagePath?: string
+  tags?: string[]
 }
 
 export interface Settings {
@@ -191,7 +193,7 @@ export const useClipboardStore = create<ClipboardStore>((set, get) => ({
     if (!item || !window.electronAPI) return
     try {
       if (_copiedTimer) clearTimeout(_copiedTimer)
-      await window.electronAPI.copyToClipboard(item.content)
+      await window.electronAPI.copyToClipboard(item)
       if (settings.soundEnabled) {
         try {
           const audio = new Audio('data:audio/wav;base64,UklGRjQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YRAAAAAAAP//AAD//wAA//8AAP//AAA=')

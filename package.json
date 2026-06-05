@@ -6,12 +6,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/dhadb/-.git"
+    "url": "git+https://github.com/dhadb/ClipMaster.git"
   },
   "bugs": {
-    "url": "https://github.com/dhadb/-/issues"
+    "url": "https://github.com/dhadb/ClipMaster/issues"
   },
-  "homepage": "https://github.com/dhadb/-#readme",
+  "homepage": "https://github.com/dhadb/ClipMaster#readme",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",

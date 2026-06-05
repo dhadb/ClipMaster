@@ -2,8 +2,9 @@ import React, { useCallback, memo } from 'react'
 import { Copy, Pin, PinOff, Trash2, ExternalLink, Mail, Hash, Code, FileText, Type, Check, Heart } from 'lucide-react'
 import { useClipboardStore, ClipboardItem } from '../store/clipboardStore'
 import { formatDistanceToNow } from 'date-fns'
-import { zhCN } from 'date-fns/locale'
+import { enUS, zhCN } from 'date-fns/locale'
 import ImagePreview from './ImagePreview'
+import { useI18n } from '../i18n'
 
 interface Props {
   item: ClipboardItem
@@ -11,27 +12,27 @@ interface Props {
   onSelect: () => void
 }
 
-const TYPE_CFG: Record<string, { Icon: any; label: string; bar: string; cssVar: string }> = {
-  text: { Icon: Type, label: '文本', bar: 'type-text', cssVar: 'var(--type-text)' },
-  link: { Icon: ExternalLink, label: '链接', bar: 'type-link', cssVar: 'var(--type-link)' },
-  email: { Icon: Mail, label: '邮箱', bar: 'type-email', cssVar: 'var(--type-email)' },
-  color: { Icon: Hash, label: '颜色', bar: 'type-color', cssVar: 'var(--type-color)' },
-  number: { Icon: Hash, label: '数字', bar: 'type-number', cssVar: 'var(--type-number)' },
-  code: { Icon: Code, label: '代码', bar: 'type-code', cssVar: 'var(--type-code)' },
-  json: { Icon: Code, label: 'JSON', bar: 'type-code', cssVar: 'var(--type-code)' },
-  markdown: { Icon: FileText, label: 'Markdown', bar: 'type-long-text', cssVar: 'var(--type-long-text)' },
-  'long-text': { Icon: FileText, label: '长文本', bar: 'type-long-text', cssVar: 'var(--type-long-text)' },
-  'file-path': { Icon: FileText, label: '路径', bar: 'type-text', cssVar: 'var(--type-text)' },
-  phone: { Icon: Hash, label: '电话', bar: 'type-number', cssVar: 'var(--type-number)' },
-  image: { Icon: FileText, label: '图片', bar: 'type-long-text', cssVar: 'var(--type-long-text)' },
+const TYPE_CFG: Record<string, { Icon: any; bar: string; cssVar: string }> = {
+  text: { Icon: Type, bar: 'type-text', cssVar: 'var(--type-text)' },
+  link: { Icon: ExternalLink, bar: 'type-link', cssVar: 'var(--type-link)' },
+  email: { Icon: Mail, bar: 'type-email', cssVar: 'var(--type-email)' },
+  color: { Icon: Hash, bar: 'type-color', cssVar: 'var(--type-color)' },
+  number: { Icon: Hash, bar: 'type-number', cssVar: 'var(--type-number)' },
+  code: { Icon: Code, bar: 'type-code', cssVar: 'var(--type-code)' },
+  json: { Icon: Code, bar: 'type-code', cssVar: 'var(--type-code)' },
+  markdown: { Icon: FileText, bar: 'type-long-text', cssVar: 'var(--type-long-text)' },
+  'long-text': { Icon: FileText, bar: 'type-long-text', cssVar: 'var(--type-long-text)' },
+  'file-path': { Icon: FileText, bar: 'type-text', cssVar: 'var(--type-text)' },
+  phone: { Icon: Hash, bar: 'type-number', cssVar: 'var(--type-number)' },
+  image: { Icon: FileText, bar: 'type-long-text', cssVar: 'var(--type-long-text)' },
 }
 
 function isVerificationCode(content: string) {
   return /^\d{4,8}$/.test(content.trim())
 }
 
-function getPreviewText(item: ClipboardItem) {
-  if (item.type === 'image') return '图片内容 · 点击查看详情或直接复制'
+function getPreviewText(item: ClipboardItem, imageText: string) {
+  if (item.type === 'image') return imageText
   return item.content.length > 96 ? `${item.content.slice(0, 96)}...` : item.content
 }
 
@@ -45,12 +46,13 @@ const ClipboardItemCard: React.FC<Props> = memo(({ item, isSelected, onSelect })
   const fontSize = useClipboardStore(s => s.settings.fontSize)
   const showPreview = useClipboardStore(s => s.settings.showPreview)
   const copyOnSelect = useClipboardStore(s => s.settings.copyOnSelect)
+  const { t, typeLabel, language } = useI18n()
 
   const cfg = TYPE_CFG[item.type] || TYPE_CFG.text
   const isCopied = copiedId === item.id
-  const timeAgo = formatDistanceToNow(item.timestamp, { locale: zhCN, addSuffix: true })
+  const timeAgo = formatDistanceToNow(item.timestamp, { locale: language === 'zh-CN' ? zhCN : enUS, addSuffix: true })
   const isCode = isVerificationCode(item.content)
-  const preview = getPreviewText(item)
+  const preview = getPreviewText(item, t('item.imagePreview'))
 
   const onCopy = useCallback((e: React.MouseEvent) => { e.stopPropagation(); copyItem(item.id) }, [copyItem, item.id])
   const onOpenDetail = useCallback(() => {
@@ -68,9 +70,9 @@ const ClipboardItemCard: React.FC<Props> = memo(({ item, isSelected, onSelect })
   const typeColor = cfg.cssVar
   const typeBg = `color-mix(in srgb, ${cfg.cssVar} 8%, transparent)`
   const meta = [
-    isCode ? '验证码 · 临时保护' : null,
-    item.content.length > 0 ? `${item.content.length} 字符` : null,
-    (item.copyCount || 1) > 1 ? `复制 ${item.copyCount} 次` : null,
+    isCode ? t('item.verification') : null,
+    item.content.length > 0 ? t('item.chars', { count: item.content.length }) : null,
+    (item.copyCount || 1) > 1 ? t('item.copyCount', { count: item.copyCount }) : null,
   ].filter(Boolean).join(' · ')
 
   return (
@@ -108,7 +110,7 @@ const ClipboardItemCard: React.FC<Props> = memo(({ item, isSelected, onSelect })
               className="text-[10px] font-medium px-2 py-0.5 rounded-md flex-shrink-0"
               style={{ color: typeColor, background: typeBg }}
             >
-              {cfg.label}
+              {typeLabel(item.type)}
             </span>
             <span className="text-[10px] flex-shrink-0" style={{ color: 'var(--text-ghost)' }}>{timeAgo}</span>
             {meta && <span className="text-[10px] truncate" style={{ color: 'var(--text-ghost)', opacity: 0.75 }}>{meta}</span>}
@@ -131,17 +133,17 @@ const ClipboardItemCard: React.FC<Props> = memo(({ item, isSelected, onSelect })
         </div>
 
         <div className="card-actions flex items-center gap-0.5 flex-shrink-0">
-          <button onClick={onCopy} className="action-btn copy" title="复制">
+          <button onClick={onCopy} className="action-btn copy" title={t('item.copy')}>
             {isCopied ? <Check size={13} color="var(--color-success)" strokeWidth={3} /> : <Copy size={13} />}
           </button>
-          <button onClick={onPin} className={`action-btn pin ${item.pinned ? 'active' : ''}`} title={item.pinned ? '取消置顶' : '置顶'}>
+          <button onClick={onPin} className={`action-btn pin ${item.pinned ? 'active' : ''}`} title={item.pinned ? t('item.unpin') : t('item.pin')}>
             {item.pinned ? <PinOff size={13} /> : <Pin size={13} />}
           </button>
-          <button onClick={onFavorite} className={`action-btn ${item.favorited ? 'active' : ''}`} title={item.favorited ? '取消收藏' : '收藏'}
+          <button onClick={onFavorite} className={`action-btn ${item.favorited ? 'active' : ''}`} title={item.favorited ? t('item.unfavorite') : t('item.favorite')}
             style={item.favorited ? { color: '#f472b6', background: 'rgba(244,114,182,0.12)' } : undefined}>
             <Heart size={13} fill={item.favorited ? '#f472b6' : 'none'} />
           </button>
-          <button onClick={onDelete} className="action-btn delete" title="删除">
+          <button onClick={onDelete} className="action-btn delete" title={t('item.delete')}>
             <Trash2 size={13} />
           </button>
         </div>
@@ -153,7 +155,7 @@ const ClipboardItemCard: React.FC<Props> = memo(({ item, isSelected, onSelect })
           <div className="flex items-center gap-2 px-4 py-2 rounded-full"
             style={{ background: 'var(--color-success)', boxShadow: '0 4px 16px rgba(52,211,153,0.3)' }}>
             <Check size={15} color="white" strokeWidth={3} />
-            <span className="text-[13px] font-medium text-white">已复制</span>
+            <span className="text-[13px] font-medium text-white">{t('item.copied')}</span>
           </div>
         </div>
       )}

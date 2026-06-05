@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { Search, X, SlidersHorizontal, Star } from 'lucide-react'
 import { useClipboardStore } from '../store/clipboardStore'
+import { useI18n } from '../i18n'
 
 const SearchBar: React.FC = () => {
   const setSearchQuery = useClipboardStore(s => s.setSearchQuery)
@@ -11,6 +12,7 @@ const SearchBar: React.FC = () => {
   const setFilterType = useClipboardStore(s => s.setFilterType)
   const activeTab = useClipboardStore(s => s.activeTab)
   const setActiveTab = useClipboardStore(s => s.setActiveTab)
+  const { t } = useI18n()
 
   const [local, setLocal] = useState(searchQuery)
   const [focused, setFocused] = useState(false)
@@ -55,19 +57,19 @@ const SearchBar: React.FC = () => {
   }), [history])
 
   const filters = useMemo(() => [
-    { id: 'text', label: '文本', icon: 'T' },
-    { id: 'link', label: '链接', icon: '↗' },
-    { id: 'email', label: '邮箱', icon: '@' },
-    { id: 'color', label: '颜色', icon: '●' },
-    { id: 'number', label: '数字', icon: '#' },
-    { id: 'code', label: '代码', icon: '<>' },
-    { id: 'json', label: 'JSON', icon: '{}' },
+    { id: 'text', label: t('type.text'), icon: 'T' },
+    { id: 'link', label: t('type.link'), icon: '↗' },
+    { id: 'email', label: t('type.email'), icon: '@' },
+    { id: 'color', label: t('type.color'), icon: '●' },
+    { id: 'number', label: t('type.number'), icon: '#' },
+    { id: 'code', label: t('type.code'), icon: '<>' },
+    { id: 'json', label: t('type.json'), icon: '{}' },
     { id: 'markdown', label: 'MD', icon: 'M' },
-    { id: 'long-text', label: '长文', icon: '¶' },
-    { id: 'file-path', label: '路径', icon: '/' },
-    { id: 'phone', label: '电话', icon: '☎' },
-    { id: 'image', label: '图片', icon: '□' },
-  ], [])
+    { id: 'long-text', label: t('type.long-short'), icon: '¶' },
+    { id: 'file-path', label: t('type.file-path'), icon: '/' },
+    { id: 'phone', label: t('type.phone'), icon: '☎' },
+    { id: 'image', label: t('type.image'), icon: '□' },
+  ], [t])
 
   const onFilterClick = useCallback((id: string | null) => {
     setFilterType(filterType === id ? null : id)
@@ -86,7 +88,7 @@ const SearchBar: React.FC = () => {
           <input
             ref={inputRef}
             type="text"
-            placeholder="搜索剪贴板内容..."
+            placeholder={t('search.placeholder')}
             value={local}
             onChange={onChange}
             onFocus={() => setFocused(true)}
@@ -112,11 +114,11 @@ const SearchBar: React.FC = () => {
       {/* 状态栏 - 固定高度，始终显示 */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 4px', minHeight: '20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px', color: 'var(--text-ghost)', whiteSpace: 'nowrap' }}>
-          <span>{hasFilter ? '当前显示' : '共'}</span>
+          <span>{hasFilter ? t('search.current') : t('search.total')}</span>
           <span style={{ fontVariantNumeric: 'tabular-nums' }}>{resultCount}</span>
-          <span>条</span>
+          <span>{t('search.items')}</span>
           {hasFilter && resultCount !== history.length && (
-            <span style={{ opacity: 0.75 }}>/ 总计 {history.length}</span>
+            <span style={{ opacity: 0.75 }}>{t('search.totalCount', { count: history.length })}</span>
           )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap' }}>
@@ -135,14 +137,14 @@ const SearchBar: React.FC = () => {
               cursor: 'pointer',
               padding: 0,
             }}
-            title={activeTab === 'favorites' ? '返回历史' : '查看收藏'}
+            title={activeTab === 'favorites' ? t('search.backHistory') : t('search.viewFavorites')}
           >
             <Star size={10} fill={activeTab === 'favorites' ? '#fbbf24' : 'none'} strokeWidth={2} />
             <span style={{ fontVariantNumeric: 'tabular-nums' }}>{stats.favorited}</span>
           </button>
           <span style={{ fontSize: '10px', color: 'var(--text-ghost)', opacity: 0.6 }}>|</span>
           <span style={{ fontSize: '10px', fontVariantNumeric: 'tabular-nums', color: 'var(--text-ghost)', opacity: 0.75 }}>
-            今日 {stats.today}
+            {t('search.today', { count: stats.today })}
           </span>
         </div>
       </div>
@@ -157,7 +159,7 @@ const SearchBar: React.FC = () => {
               color: !filterType ? 'rgba(129,140,248,0.9)' : 'var(--text-tertiary)',
               border: `1px solid ${!filterType ? 'rgba(99,102,241,0.2)' : 'transparent'}`,
             }}>
-            全部
+            {t('search.all')}
           </button>
           {filters.map(f => (
             <button key={f.id} onClick={() => onFilterClick(f.id)}

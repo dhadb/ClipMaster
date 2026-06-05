@@ -19,6 +19,7 @@ export interface Settings {
   autoStart: boolean
   minimizeToTray: boolean
   theme: 'dark' | 'light' | 'auto'
+  language: 'system' | 'zh-CN' | 'en-US'
   opacity: number
   fontSize: number
   windowWidth: number

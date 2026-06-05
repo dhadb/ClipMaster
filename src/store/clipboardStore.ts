@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { LanguageSetting } from '../i18n'
 
 export interface ClipboardItem {
   id: string
@@ -19,6 +20,7 @@ export interface Settings {
   autoStart: boolean
   minimizeToTray: boolean
   theme: 'dark' | 'light' | 'auto'
+  language: LanguageSetting
   opacity: number
   fontSize: number
   windowWidth: number
@@ -48,6 +50,7 @@ const defaultSettings: Settings = {
   autoStart: true,
   minimizeToTray: true,
   theme: 'dark',
+  language: 'system',
   opacity: 0.98,
   fontSize: 14,
   windowWidth: 420,
@@ -69,6 +72,7 @@ function normalizeSettings(settings: Partial<Settings>): Settings {
   const merged = { ...defaultSettings, ...settings }
   return {
     ...merged,
+    language: merged.language === 'zh-CN' || merged.language === 'en-US' ? merged.language : 'system',
     ignoredPatterns: Array.isArray(merged.ignoredPatterns) ? merged.ignoredPatterns : [],
     opacity: Math.min(1, Math.max(0.7, merged.opacity)),
   }

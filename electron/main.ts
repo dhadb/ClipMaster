@@ -50,6 +50,7 @@ const defaultSettings = {
   autoStart: true,
   minimizeToTray: true,
   theme: 'dark' as 'dark' | 'light' | 'auto',
+  language: 'system' as 'system' | 'zh-CN' | 'en-US',
   opacity: 0.95,
   fontSize: 14,
   windowWidth: 420,
@@ -68,6 +69,30 @@ const defaultSettings = {
 }
 
 type Settings = typeof defaultSettings
+type ResolvedLanguage = 'zh-CN' | 'en-US'
+
+const trayTranslations: Record<ResolvedLanguage, Record<string, string>> = {
+  'zh-CN': {
+    tooltip: 'ClipMaster - 剪贴板管理器',
+    show: '显示 ClipMaster',
+    resume: '恢复记录',
+    pause5: '暂停记录 5 分钟',
+    pause30: '暂停记录 30 分钟',
+    clear: '清空历史',
+    settings: '设置',
+    quit: '退出',
+  },
+  'en-US': {
+    tooltip: 'ClipMaster - Clipboard Manager',
+    show: 'Show ClipMaster',
+    resume: 'Resume recording',
+    pause5: 'Pause recording for 5 minutes',
+    pause30: 'Pause recording for 30 minutes',
+    clear: 'Clear history',
+    settings: 'Settings',
+    quit: 'Quit',
+  },
+}
 
 interface AppData {
   history: ClipboardItem[]
@@ -91,6 +116,7 @@ function sanitizeSettings(input: Partial<Settings> | undefined): Settings {
     autoStart: Boolean(raw.autoStart),
     minimizeToTray: Boolean(raw.minimizeToTray),
     theme: raw.theme === 'light' || raw.theme === 'auto' ? raw.theme : 'dark',
+    language: raw.language === 'zh-CN' || raw.language === 'en-US' ? raw.language : 'system',
     opacity: clamp(raw.opacity, 0.7, 1, defaultSettings.opacity),
     fontSize: Math.round(clamp(raw.fontSize, 12, 18, defaultSettings.fontSize)),
     windowWidth: Math.round(clamp(raw.windowWidth, 350, 600, defaultSettings.windowWidth)),
@@ -109,6 +135,15 @@ function sanitizeSettings(input: Partial<Settings> | undefined): Settings {
     autoDeleteDays: Math.round(clamp(raw.autoDeleteDays, 0, 365, defaultSettings.autoDeleteDays)),
     verificationCodeTtlMinutes: Math.round(clamp(raw.verificationCodeTtlMinutes, 0, 1440, defaultSettings.verificationCodeTtlMinutes)),
   }
+}
+
+function getResolvedLanguage(): ResolvedLanguage {
+  if (settings.language === 'zh-CN' || settings.language === 'en-US') return settings.language
+  return app.getLocale().toLowerCase().startsWith('zh') ? 'zh-CN' : 'en-US'
+}
+
+function getTrayText(key: keyof typeof trayTranslations['zh-CN']) {
+  return trayTranslations[getResolvedLanguage()][key]
 }
 
 function getClipboardContentType(text: string): ClipboardType {
@@ -518,31 +553,31 @@ function createTray() {
   const icon = nativeImage.createFromPath(trayIconPath).resize({ width: 16, height: 16 })
   tray = new Tray(icon)
   rebuildTrayMenu()
-  tray.setToolTip('ClipMaster - 剪贴板管理器')
   tray.on('click', () => toggleWindow())
 }
 
 function rebuildTrayMenu() {
   if (!tray) return
   const paused = pauseUntil > Date.now()
+  tray.setToolTip(getTrayText('tooltip'))
   const contextMenu = Menu.buildFromTemplate([
-    { label: '显示 ClipMaster', click: () => toggleWindow() },
+    { label: getTrayText('show'), click: () => toggleWindow() },
     { type: 'separator' },
-    { label: paused ? '恢复记录' : '暂停记录 5 分钟', click: () => paused ? resumeMonitoring() : pauseMonitoring(5) },
-    { label: '暂停记录 30 分钟', click: () => pauseMonitoring(30) },
+    { label: paused ? getTrayText('resume') : getTrayText('pause5'), click: () => paused ? resumeMonitoring() : pauseMonitoring(5) },
+    { label: getTrayText('pause30'), click: () => pauseMonitoring(30) },
     { type: 'separator' },
-    { label: '清空历史', click: () => {
+    { label: getTrayText('clear'), click: () => {
       removeHistoryItems(item => !item.pinned && !item.favorited)
       mainWindow?.webContents.send('history-updated', clipboardHistory)
       scheduleSave()
     }},
     { type: 'separator' },
-    { label: '设置', click: () => {
+    { label: getTrayText('settings'), click: () => {
       mainWindow?.webContents.send('show-settings')
       showWindow()
     }},
     { type: 'separator' },
-    { label: '退出', click: () => {
+    { label: getTrayText('quit'), click: () => {
       isQuitting = true
       stopClipboardWatcher()
       flushPendingSave()
@@ -853,6 +888,7 @@ ipcMain.handle('update-settings', (_, newSettings: Partial<Settings>) => {
   settings = nextSettings
 
   if (oldSettings.autoStart !== settings.autoStart) applyAutoStart()
+  if (oldSettings.language !== settings.language) rebuildTrayMenu()
   if (oldSettings.maxHistory !== settings.maxHistory || oldSettings.autoDeleteDays !== settings.autoDeleteDays || oldSettings.verificationCodeTtlMinutes !== settings.verificationCodeTtlMinutes) {
     applyRetentionRules()
     mainWindow?.webContents.send('history-updated', clipboardHistory)

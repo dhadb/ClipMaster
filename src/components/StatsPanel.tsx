@@ -1,24 +1,26 @@
 import React, { useMemo, memo } from 'react'
 import { BarChart3, Clock, Type, Link, Code, Mail, Hash, FileText, Zap, Image as ImageIcon, Phone, FolderOpen } from 'lucide-react'
 import { useClipboardStore } from '../store/clipboardStore'
+import { useI18n } from '../i18n'
 
-const TYPE_MAP: Record<string, { Icon: any; cssVar: string; label: string }> = {
-  text: { Icon: Type, cssVar: 'var(--type-text)', label: '文本' },
-  link: { Icon: Link, cssVar: 'var(--type-link)', label: '链接' },
-  code: { Icon: Code, cssVar: 'var(--type-code)', label: '代码' },
-  email: { Icon: Mail, cssVar: 'var(--type-email)', label: '邮箱' },
-  color: { Icon: Hash, cssVar: 'var(--type-color)', label: '颜色' },
-  number: { Icon: Hash, cssVar: 'var(--type-number)', label: '数字' },
-  json: { Icon: Code, cssVar: 'var(--type-code)', label: 'JSON' },
-  markdown: { Icon: FileText, cssVar: 'var(--type-long-text)', label: 'Markdown' },
-  'long-text': { Icon: FileText, cssVar: 'var(--type-long-text)', label: '长文本' },
-  'file-path': { Icon: FolderOpen, cssVar: 'var(--type-text)', label: '路径' },
-  phone: { Icon: Phone, cssVar: 'var(--type-number)', label: '电话' },
-  image: { Icon: ImageIcon, cssVar: 'var(--type-long-text)', label: '图片' },
+const TYPE_MAP: Record<string, { Icon: any; cssVar: string }> = {
+  text: { Icon: Type, cssVar: 'var(--type-text)' },
+  link: { Icon: Link, cssVar: 'var(--type-link)' },
+  code: { Icon: Code, cssVar: 'var(--type-code)' },
+  email: { Icon: Mail, cssVar: 'var(--type-email)' },
+  color: { Icon: Hash, cssVar: 'var(--type-color)' },
+  number: { Icon: Hash, cssVar: 'var(--type-number)' },
+  json: { Icon: Code, cssVar: 'var(--type-code)' },
+  markdown: { Icon: FileText, cssVar: 'var(--type-long-text)' },
+  'long-text': { Icon: FileText, cssVar: 'var(--type-long-text)' },
+  'file-path': { Icon: FolderOpen, cssVar: 'var(--type-text)' },
+  phone: { Icon: Phone, cssVar: 'var(--type-number)' },
+  image: { Icon: ImageIcon, cssVar: 'var(--type-long-text)' },
 }
 
 const StatsPanel: React.FC = memo(() => {
   const history = useClipboardStore(s => s.history)
+  const { t, typeLabel } = useI18n()
 
   const stats = useMemo(() => {
     const now = new Date()
@@ -63,16 +65,16 @@ const StatsPanel: React.FC = memo(() => {
     <div className="h-full overflow-y-auto p-4 space-y-3">
       <div className="flex items-center gap-2 fade-in">
         <BarChart3 size={16} color="#6366f1" />
-        <h2 className="text-[15px] font-semibold" style={{ color: 'var(--text-primary)' }}>使用统计</h2>
+        <h2 className="text-[15px] font-semibold" style={{ color: 'var(--text-primary)' }}>{t('stats.title')}</h2>
       </div>
 
       {/* 主要统计 */}
       <div className="grid grid-cols-2 gap-2.5 fade-in" style={{ animationDelay: '50ms' }}>
         {[
-          { label: '总记录', value: stats.total, color: '#6366f1' },
-          { label: '已收藏', value: stats.favorited, color: '#fbbf24' },
-          { label: '今日', value: stats.today, color: '#34d399' },
-          { label: '本周', value: stats.week, color: '#818cf8' },
+          { label: t('stats.total'), value: stats.total, color: '#6366f1' },
+          { label: t('stats.favorited'), value: stats.favorited, color: '#fbbf24' },
+          { label: t('stats.today'), value: stats.today, color: '#34d399' },
+          { label: t('stats.week'), value: stats.week, color: '#818cf8' },
         ].map((s, i) => (
           <div key={i} className="glass-card rounded-xl p-3.5 slide-up" style={{ animationDelay: `${80 + i * 35}ms` }}>
             <p className="text-[10px] mb-1.5" style={{ color: 'var(--text-ghost)' }}>{s.label}</p>
@@ -82,21 +84,21 @@ const StatsPanel: React.FC = memo(() => {
       </div>
 
       {/* 文本统计 */}
-      <Card title="文本统计" icon={<Type size={13} color="#6366f1" />}>
+      <Card title={t('stats.textStats')} icon={<Type size={13} color="#6366f1" />}>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <p className="text-xl font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>{stats.totalChars.toLocaleString()}</p>
-            <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-ghost)' }}>总字符数</p>
+            <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-ghost)' }}>{t('stats.totalChars')}</p>
           </div>
           <div>
             <p className="text-xl font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>{stats.avgLen}</p>
-            <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-ghost)' }}>平均长度</p>
+            <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-ghost)' }}>{t('stats.avgLength')}</p>
           </div>
         </div>
       </Card>
 
       {/* 类型分布 */}
-      <Card title="类型分布" icon={<Zap size={13} color="#6366f1" />}>
+      <Card title={t('stats.typeDistribution')} icon={<Zap size={13} color="#6366f1" />}>
         <div className="space-y-2">
           {Object.entries(stats.typeCount).sort(([, a], [, b]) => b - a).map(([type, count]) => {
             const cfg = TYPE_MAP[type] || TYPE_MAP.text
@@ -104,7 +106,7 @@ const StatsPanel: React.FC = memo(() => {
             return (
               <div key={type} className="flex items-center gap-2.5">
                 <cfg.Icon size={13} color={cfg.cssVar} strokeWidth={2} />
-                <span className="text-[11px] w-10" style={{ color: 'var(--text-secondary)' }}>{cfg.label}</span>
+                <span className="text-[11px] w-10" style={{ color: 'var(--text-secondary)' }}>{typeLabel(type)}</span>
                 <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--bg-elevated)' }}>
                   <div className="h-full rounded-full" style={{
                     width: `${pct}%`,
@@ -123,10 +125,10 @@ const StatsPanel: React.FC = memo(() => {
       </Card>
 
       {/* 时段分布 */}
-      <Card title="时段分布" icon={<Clock size={13} color="#6366f1" />}>
+      <Card title={t('stats.hourDistribution')} icon={<Clock size={13} color="#6366f1" />}>
         <div className="flex justify-end mb-1">
           <span className="text-[10px]" style={{ color: 'var(--text-ghost)' }}>
-            {stats.peakHour >= 0 ? `高峰: ${stats.peakHour}:00` : '暂无数据'}
+            {stats.peakHour >= 0 ? t('stats.peak', { hour: stats.peakHour }) : t('stats.noData')}
           </span>
         </div>
         <div className="flex items-end gap-px h-14">

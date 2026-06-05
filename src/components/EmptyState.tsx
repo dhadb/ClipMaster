@@ -1,17 +1,19 @@
 import React from 'react'
 import { Clipboard, Search, Star, ArrowDown, Keyboard, Copy } from 'lucide-react'
 import { useClipboardStore } from '../store/clipboardStore'
+import { useI18n } from '../i18n'
 
 const EmptyState: React.FC = () => {
   const activeTab = useClipboardStore(s => s.activeTab)
   const searchQuery = useClipboardStore(s => s.searchQuery)
+  const { t } = useI18n()
 
   const isSearching = searchQuery.length > 0
   const isFavorites = activeTab === 'favorites'
 
   const MainIcon = isSearching ? Search : isFavorites ? Star : Clipboard
-  const title = isSearching ? '没有找到匹配项' : isFavorites ? '还没有收藏内容' : '剪贴板是空的'
-  const desc = isSearching ? '试试其他关键词' : isFavorites ? '点击图标添加收藏' : '复制任意内容，它们会自动出现'
+  const title = isSearching ? t('empty.noMatches') : isFavorites ? t('empty.noFavorites') : t('empty.emptyClipboard')
+  const desc = isSearching ? t('empty.tryOther') : isFavorites ? t('empty.favoriteHint') : t('empty.copyHint')
 
   return (
     <div className="h-full flex flex-col items-center justify-center px-8 py-10">
@@ -43,7 +45,7 @@ const EmptyState: React.FC = () => {
           }}>
           <div className="flex items-center gap-2 text-[12px]" style={{ color: 'var(--text-secondary)' }}>
             <ArrowDown size={13} color="#6366f1" />
-            <span>复制任意内容开始使用</span>
+            <span>{t('empty.start')}</span>
           </div>
         </div>
       )}
@@ -52,10 +54,10 @@ const EmptyState: React.FC = () => {
       {!isSearching && (
         <div className="mt-8 grid grid-cols-2 gap-2 w-full max-w-[280px] fade-in" style={{ animationDelay: '240ms' }}>
           {[
-            { icon: Keyboard, label: 'Ctrl+Shift+V', desc: '快速唤起' },
-            { icon: Search, label: 'Ctrl+F', desc: '搜索内容' },
-            { icon: Copy, label: '双击', desc: '快速复制' },
-            { icon: Star, label: '收藏', desc: '收藏内容' },
+            { icon: Keyboard, label: 'Ctrl+Shift+V', desc: t('empty.quickOpen') },
+            { icon: Search, label: 'Ctrl+F', desc: t('empty.searchContent') },
+            { icon: Copy, label: t('empty.doubleClick'), desc: t('empty.quickCopy') },
+            { icon: Star, label: t('tabs.favorites'), desc: t('empty.favoriteContent') },
           ].map((tip, i) => (
             <div key={i} className="flex items-center gap-2 p-2 rounded-lg interactive-chip"
               style={{ background: 'var(--bg-surface)' }}>

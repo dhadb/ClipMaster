@@ -9,6 +9,7 @@ import StatsPanel from './components/StatsPanel'
 import EmptyState from './components/EmptyState'
 import ShortcutHintBar from './components/ShortcutHintBar'
 import { useClipboardStore } from './store/clipboardStore'
+import { useI18n } from './i18n'
 
 function getResolvedTheme(theme: 'dark' | 'light' | 'auto'): 'dark' | 'light' {
   if (theme === 'auto') {
@@ -30,9 +31,10 @@ function App() {
   const setSettings = useClipboardStore(s => s.setSettings)
   const setShowSettings = useClipboardStore(s => s.setShowSettings)
   const setActiveTab = useClipboardStore(s => s.setActiveTab)
+  const { t } = useI18n()
 
   const [loaded, setLoaded] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState(false)
 
   // 立即应用主题，同步执行，避免闪烁
   const resolvedTheme = useMemo(() => getResolvedTheme(settings.theme), [settings.theme])
@@ -110,7 +112,7 @@ function App() {
       } catch (err) {
         console.error('Failed to initialize:', err)
         if (isMounted) {
-          setError('加载失败，请重启应用')
+          setError(true)
           setLoaded(true)
         }
       }
@@ -147,7 +149,7 @@ function App() {
               <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
             </svg>
           </div>
-          <span className="text-[12px]" style={{ color: 'var(--text-tertiary)' }}>加载中...</span>
+          <span className="text-[12px]" style={{ color: 'var(--text-tertiary)' }}>{t('app.loading')}</span>
         </div>
       </div>
     )
@@ -157,7 +159,7 @@ function App() {
     return (
       <div className="h-screen w-screen flex items-center justify-center" style={{ background: 'var(--bg-root)' }}>
         <div className="flex flex-col items-center gap-3">
-          <span className="text-[13px]" style={{ color: 'var(--color-danger)' }}>{error}</span>
+          <span className="text-[13px]" style={{ color: 'var(--color-danger)' }}>{t('app.loadFailed')}</span>
           <button onClick={() => window.location.reload()}
             className="text-[12px] px-4 py-2 rounded-lg interactive-chip"
             style={{
@@ -165,7 +167,7 @@ function App() {
               color: 'var(--text-secondary)',
               border: '1px solid var(--border-card)',
             }}>
-            重试
+            {t('app.retry')}
           </button>
         </div>
       </div>
@@ -187,18 +189,18 @@ function App() {
         style={{ borderTop: '1px solid var(--border-divider)' }}>
         <div className="flex items-center gap-2 text-[10px]" style={{ color: 'var(--text-tertiary)' }}>
           <div className="pulse-dot" style={privacy.paused ? { background: 'var(--color-warning)' } : undefined} />
-          <span>{privacy.paused ? '已暂停记录' : '监控中'}</span>
+          <span>{privacy.paused ? t('app.paused') : t('app.monitoring')}</span>
           <span style={{ color: 'var(--text-ghost)', opacity: 0.6 }}>·</span>
-          <span>{history.length} 条记录</span>
+          <span>{t('app.records', { count: history.length })}</span>
           <span style={{ color: 'var(--text-ghost)', opacity: 0.6 }}>·</span>
-          <span>今日保护 {privacy.protectedToday} 条</span>
+          <span>{t('app.protectedToday', { count: privacy.protectedToday })}</span>
         </div>
         <button
           onClick={() => privacy.paused ? resumeMonitoring() : pauseMonitoring(5)}
           className="text-[10px] px-2 py-1 rounded-md interactive-chip"
           style={{ color: privacy.paused ? 'var(--color-success)' : 'var(--text-tertiary)', background: 'var(--bg-surface)' }}
         >
-          {privacy.paused ? '恢复记录' : '暂停 5 分钟'}
+          {privacy.paused ? t('app.resume') : t('app.pause5')}
         </button>
       </div>
     </div>

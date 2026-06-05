@@ -1,11 +1,13 @@
 import React, { useState, useCallback, useEffect, memo } from 'react'
-import { Settings, Keyboard, Palette, Database, Bell, Monitor, Sun, Moon, Sliders, Info, Zap, Heart, Shield, Image as ImageIcon } from 'lucide-react'
+import { Settings, Keyboard, Palette, Database, Bell, Monitor, Sun, Moon, Sliders, Info, Zap, Heart, Shield, Image as ImageIcon, Globe2 } from 'lucide-react'
 import { useClipboardStore } from '../store/clipboardStore'
+import { useI18n } from '../i18n'
 
 const SettingsPanel: React.FC = memo(() => {
   const settings = useClipboardStore(s => s.settings)
   const setSettings = useClipboardStore(s => s.setSettings)
   const historyLen = useClipboardStore(s => s.history.length)
+  const { t } = useI18n()
   const [section, setSection] = useState('general')
   const [hotkeyDraft, setHotkeyDraft] = useState(settings.hotkey)
   const [hotkeyMessage, setHotkeyMessage] = useState('')
@@ -29,18 +31,18 @@ const SettingsPanel: React.FC = memo(() => {
           const requested = String(val)
           if (applied.hotkey !== requested) {
             setHotkeyDraft(applied.hotkey)
-            setHotkeyMessage('快捷键不可用，已保留原快捷键')
+            setHotkeyMessage(t('settings.hotkeyUnavailable'))
           } else {
-            setHotkeyMessage('快捷键已更新')
+            setHotkeyMessage(t('settings.hotkeyUpdated'))
           }
         }
       }
     } catch (err) {
       console.error('updateSettings failed:', err)
       setSettings(current)
-      if (key === 'hotkey') setHotkeyMessage('快捷键更新失败，已恢复原设置')
+      if (key === 'hotkey') setHotkeyMessage(t('settings.hotkeyFailed'))
     }
-  }, [setSettings])
+  }, [setSettings, t])
 
   const saveIgnoredPatterns = useCallback(() => {
     const patterns = ignoredDraft.split(/\r?\n/).map(v => v.trim()).filter(Boolean)
@@ -52,20 +54,20 @@ const SettingsPanel: React.FC = memo(() => {
       const result = await window.electronAPI?.cleanupImageCache()
       if (!result) return
       const mb = result.bytes / 1024 / 1024
-      setCacheMessage(`已清理 ${result.deleted} 个文件，释放 ${mb.toFixed(2)} MB`)
+      setCacheMessage(t('settings.cleanupDone', { count: result.deleted, size: mb.toFixed(2) }))
     } catch (err) {
       console.error('cleanupImageCache failed:', err)
-      setCacheMessage('清理失败，请稍后再试')
+      setCacheMessage(t('settings.cleanupFailed'))
     }
-  }, [])
+  }, [t])
 
   const sections = [
-    { id: 'general', label: '通用', Icon: Settings },
-    { id: 'appearance', label: '外观', Icon: Palette },
-    { id: 'hotkeys', label: '快捷键', Icon: Keyboard },
-    { id: 'storage', label: '存储', Icon: Database },
-    { id: 'notifications', label: '通知', Icon: Bell },
-    { id: 'about', label: '关于', Icon: Info },
+    { id: 'general', label: t('settings.general'), Icon: Settings },
+    { id: 'appearance', label: t('settings.appearance'), Icon: Palette },
+    { id: 'hotkeys', label: t('settings.hotkeys'), Icon: Keyboard },
+    { id: 'storage', label: t('settings.storage'), Icon: Database },
+    { id: 'notifications', label: t('settings.notifications'), Icon: Bell },
+    { id: 'about', label: t('settings.about'), Icon: Info },
   ]
 
   const Toggle: React.FC<{ on: boolean; set: (v: boolean) => void }> = ({ on, set }) => (
@@ -103,63 +105,63 @@ const SettingsPanel: React.FC = memo(() => {
       case 'general':
         return (
           <div className="space-y-4 slide-in-right">
-            <Card title="功能设置" icon={<Zap size={14} color="#6366f1" />}>
-              <Item label="开机自启动" desc="Windows 启动时自动运行"><Toggle on={settings.autoStart} set={v => update('autoStart', v)} /></Item>
+            <Card title={t('settings.feature')} icon={<Zap size={14} color="#6366f1" />}>
+              <Item label={t('settings.autoStart')} desc={t('settings.autoStartDesc')}><Toggle on={settings.autoStart} set={v => update('autoStart', v)} /></Item>
               <div className="h-px" style={{ background: 'var(--border-divider)' }} />
-              <Item label="最小化到托盘" desc="关闭窗口时继续在后台监控"><Toggle on={settings.minimizeToTray} set={v => update('minimizeToTray', v)} /></Item>
+              <Item label={t('settings.minimizeToTray')} desc={t('settings.minimizeToTrayDesc')}><Toggle on={settings.minimizeToTray} set={v => update('minimizeToTray', v)} /></Item>
               <div className="h-px" style={{ background: 'var(--border-divider)' }} />
-              <Item label="双击复制" desc="双击项目时自动复制"><Toggle on={settings.copyOnSelect} set={v => update('copyOnSelect', v)} /></Item>
+              <Item label={t('settings.copyOnSelect')} desc={t('settings.copyOnSelectDesc')}><Toggle on={settings.copyOnSelect} set={v => update('copyOnSelect', v)} /></Item>
               <div className="h-px" style={{ background: 'var(--border-divider)' }} />
-              <Item label="复制后隐藏窗口" desc="适合快速复制后回到原应用粘贴"><Toggle on={settings.hideAfterCopy} set={v => update('hideAfterCopy', v)} /></Item>
+              <Item label={t('settings.hideAfterCopy')} desc={t('settings.hideAfterCopyDesc')}><Toggle on={settings.hideAfterCopy} set={v => update('hideAfterCopy', v)} /></Item>
               <div className="h-px" style={{ background: 'var(--border-divider)' }} />
-              <Item label="敏感内容保护" desc="自动跳过密码、Token、私钥、银行卡等内容"><Toggle on={settings.ignoreSensitive} set={v => update('ignoreSensitive', v)} /></Item>
+              <Item label={t('settings.ignoreSensitive')} desc={t('settings.ignoreSensitiveDesc')}><Toggle on={settings.ignoreSensitive} set={v => update('ignoreSensitive', v)} /></Item>
               <div className="h-px" style={{ background: 'var(--border-divider)' }} />
-              <Item label="记录图片" desc="关闭后不再扫描图片剪贴板，可减少后台压力"><Toggle on={settings.recordImages} set={v => update('recordImages', v)} /></Item>
+              <Item label={t('settings.recordImages')} desc={t('settings.recordImagesDesc')}><Toggle on={settings.recordImages} set={v => update('recordImages', v)} /></Item>
               <div className="h-px" style={{ background: 'var(--border-divider)' }} />
-              <Item label="快捷键提示栏" desc="在列表底部显示常用快捷键"><Toggle on={settings.showShortcutHints} set={v => update('showShortcutHints', v)} /></Item>
+              <Item label={t('settings.shortcutHints')} desc={t('settings.shortcutHintsDesc')}><Toggle on={settings.showShortcutHints} set={v => update('showShortcutHints', v)} /></Item>
               <div className="h-px" style={{ background: 'var(--border-divider)' }} />
-              <Item label="悬停预览" desc="预留设置：用于控制未来的富预览展示"><Toggle on={settings.showPreview} set={v => update('showPreview', v)} /></Item>
+              <Item label={t('settings.showPreview')} desc={t('settings.showPreviewDesc')}><Toggle on={settings.showPreview} set={v => update('showPreview', v)} /></Item>
             </Card>
-            <Card title="忽略规则" icon={<Shield size={14} color="#34d399" />}>
+            <Card title={t('settings.ignoredRules')} icon={<Shield size={14} color="#34d399" />}>
               <div className="space-y-2">
                 <p className="text-[11px] leading-relaxed" style={{ color: 'var(--text-ghost)' }}>
-                  每行一条关键词或正则，匹配到的剪贴板内容不会进入历史。
+                  {t('settings.ignoredRulesDesc')}
                 </p>
                 <textarea
                   value={ignoredDraft}
                   onChange={e => setIgnoredDraft(e.target.value)}
                   onBlur={saveIgnoredPatterns}
-                  placeholder="password\n^https://bank\\.example"
+                  placeholder={t('settings.ignoredPlaceholder')}
                   className="w-full h-24 px-3 py-2 rounded-lg text-[12px] font-mono resize-none outline-none"
                   style={{ background: 'var(--bg-elevated)', color: 'var(--text-secondary)', border: '1px solid var(--border-card)' }}
                 />
                 <button onClick={saveIgnoredPatterns} className="px-3 py-1.5 rounded-lg text-[11px] interactive-chip"
                   style={{ background: 'var(--color-primary)', color: 'white' }}>
-                  保存忽略规则
+                  {t('settings.saveIgnored')}
                 </button>
               </div>
             </Card>
-            <Card title="历史记录" icon={<Database size={14} color="#6366f1" />}>
-              <Item label="最大保存数量"><span className="text-[13px] tabular-nums" style={{ color: 'var(--text-secondary)' }}>{settings.maxHistory} 条</span></Item>
+            <Card title={t('settings.history')} icon={<Database size={14} color="#6366f1" />}>
+              <Item label={t('settings.maxHistory')}><span className="text-[13px] tabular-nums" style={{ color: 'var(--text-secondary)' }}>{t('settings.countUnit', { count: settings.maxHistory })}</span></Item>
               <Slider value={settings.maxHistory} min={50} max={500} step={10} set={v => update('maxHistory', v)} />
               <div className="h-px" style={{ background: 'var(--border-divider)' }} />
-              <Item label="普通记录保留天数" desc="0 表示不过期"><span className="text-[13px] tabular-nums" style={{ color: 'var(--text-secondary)' }}>{settings.autoDeleteDays} 天</span></Item>
-              <Slider value={settings.autoDeleteDays} min={0} max={365} step={1} set={v => update('autoDeleteDays', v)} unit="天" />
+              <Item label={t('settings.retentionDays')} desc={t('settings.zeroNever')}><span className="text-[13px] tabular-nums" style={{ color: 'var(--text-secondary)' }}>{t('settings.daysUnit', { count: settings.autoDeleteDays })}</span></Item>
+              <Slider value={settings.autoDeleteDays} min={0} max={365} step={1} set={v => update('autoDeleteDays', v)} unit={t('settings.daysUnit', { count: '' }).trim()} />
               <div className="h-px" style={{ background: 'var(--border-divider)' }} />
-              <Item label="验证码保留时间" desc="0 表示不过期"><span className="text-[13px] tabular-nums" style={{ color: 'var(--text-secondary)' }}>{settings.verificationCodeTtlMinutes} 分钟</span></Item>
-              <Slider value={settings.verificationCodeTtlMinutes} min={0} max={1440} step={5} set={v => update('verificationCodeTtlMinutes', v)} unit="分" />
+              <Item label={t('settings.verificationTtl')} desc={t('settings.zeroNever')}><span className="text-[13px] tabular-nums" style={{ color: 'var(--text-secondary)' }}>{t('settings.minutesUnit', { count: settings.verificationCodeTtlMinutes })}</span></Item>
+              <Slider value={settings.verificationCodeTtlMinutes} min={0} max={1440} step={5} set={v => update('verificationCodeTtlMinutes', v)} unit={t('settings.minutesUnit', { count: '' }).trim()} />
             </Card>
           </div>
         )
       case 'appearance':
         return (
           <div className="space-y-4 slide-in-right">
-            <Card title="主题风格" icon={<Palette size={14} color="#6366f1" />}>
+            <Card title={t('settings.themeStyle')} icon={<Palette size={14} color="#6366f1" />}>
               <div className="grid grid-cols-3 gap-2.5">
                 {[
-                  { id: 'dark', label: '深色', Icon: Moon, grad: 'linear-gradient(135deg, #27272a, #18181b)' },
-                  { id: 'light', label: '浅色', Icon: Sun, grad: 'linear-gradient(135deg, #e4e4e7, #fafafa)' },
-                  { id: 'auto', label: '跟随系统', Icon: Monitor, grad: 'linear-gradient(135deg, #6366f1, #a78bfa)' },
+                  { id: 'dark', label: t('settings.dark'), Icon: Moon, grad: 'linear-gradient(135deg, #27272a, #18181b)' },
+                  { id: 'light', label: t('settings.light'), Icon: Sun, grad: 'linear-gradient(135deg, #e4e4e7, #fafafa)' },
+                  { id: 'auto', label: t('settings.autoTheme'), Icon: Monitor, grad: 'linear-gradient(135deg, #6366f1, #a78bfa)' },
                 ].map(t => (
                   <button key={t.id} onClick={() => update('theme', t.id as any)}
                     className="flex flex-col items-center gap-2 p-3.5 rounded-xl interactive-chip"
@@ -178,13 +180,33 @@ const SettingsPanel: React.FC = memo(() => {
                 ))}
               </div>
             </Card>
-            <Card title="界面调整" icon={<Sliders size={14} color="#6366f1" />}>
-              <Item label="列表密度" desc="调整剪贴板条目的显示高度">
+            <Card title={t('settings.language')} icon={<Globe2 size={14} color="#34d399" />}>
+              <Item label={t('settings.language')} desc={t('settings.languageDesc')}>
+                <div className="grid gap-1 rounded-lg p-1 min-w-[118px]" style={{ background: 'var(--bg-surface)' }}>
+                  {[
+                    { id: 'system', label: t('settings.languageSystem') },
+                    { id: 'zh-CN', label: t('settings.languageZh') },
+                    { id: 'en-US', label: t('settings.languageEn') },
+                  ].map(lang => (
+                    <button key={lang.id} onClick={() => update('language', lang.id as any)}
+                      className="px-2 py-1 rounded-md text-[11px] interactive-chip text-left"
+                      style={{
+                        color: settings.language === lang.id ? 'white' : 'var(--text-tertiary)',
+                        background: settings.language === lang.id ? 'var(--color-primary)' : 'transparent',
+                      }}>
+                      {lang.label}
+                    </button>
+                  ))}
+                </div>
+              </Item>
+            </Card>
+            <Card title={t('settings.interface')} icon={<Sliders size={14} color="#6366f1" />}>
+              <Item label={t('settings.listDensity')} desc={t('settings.listDensityDesc')}>
                 <div className="flex gap-1 rounded-lg p-1" style={{ background: 'var(--bg-surface)' }}>
                   {[
-                    { id: 'compact', label: '紧凑' },
-                    { id: 'normal', label: '标准' },
-                    { id: 'comfortable', label: '舒适' },
+                    { id: 'compact', label: t('settings.compact') },
+                    { id: 'normal', label: t('settings.normal') },
+                    { id: 'comfortable', label: t('settings.comfortable') },
                   ].map(d => (
                     <button key={d.id} onClick={() => update('listDensity', d.id as any)}
                       className="px-2 py-1 rounded-md text-[11px] interactive-chip"
@@ -198,16 +220,16 @@ const SettingsPanel: React.FC = memo(() => {
                 </div>
               </Item>
               <div className="h-px" style={{ background: 'var(--border-divider)' }} />
-              <Item label="窗口透明度"><span className="text-[13px] tabular-nums" style={{ color: 'var(--text-secondary)' }}>{Math.round(settings.opacity * 100)}%</span></Item>
+              <Item label={t('settings.opacity')}><span className="text-[13px] tabular-nums" style={{ color: 'var(--text-secondary)' }}>{Math.round(settings.opacity * 100)}%</span></Item>
               <Slider value={settings.opacity} min={0.7} max={1} step={0.05} set={v => update('opacity', v)} />
               <div className="h-px" style={{ background: 'var(--border-divider)' }} />
-              <Item label="字体大小"><span className="text-[13px] tabular-nums" style={{ color: 'var(--text-secondary)' }}>{settings.fontSize}px</span></Item>
+              <Item label={t('settings.fontSize')}><span className="text-[13px] tabular-nums" style={{ color: 'var(--text-secondary)' }}>{settings.fontSize}px</span></Item>
               <Slider value={settings.fontSize} min={12} max={18} step={1} set={v => update('fontSize', v)} unit="px" />
               <div className="h-px" style={{ background: 'var(--border-divider)' }} />
-              <Item label="窗口宽度"><span className="text-[13px] tabular-nums" style={{ color: 'var(--text-secondary)' }}>{settings.windowWidth}px</span></Item>
+              <Item label={t('settings.windowWidth')}><span className="text-[13px] tabular-nums" style={{ color: 'var(--text-secondary)' }}>{settings.windowWidth}px</span></Item>
               <Slider value={settings.windowWidth} min={350} max={600} step={10} set={v => update('windowWidth', v)} unit="px" />
               <div className="h-px" style={{ background: 'var(--border-divider)' }} />
-              <Item label="窗口高度"><span className="text-[13px] tabular-nums" style={{ color: 'var(--text-secondary)' }}>{settings.windowHeight}px</span></Item>
+              <Item label={t('settings.windowHeight')}><span className="text-[13px] tabular-nums" style={{ color: 'var(--text-secondary)' }}>{settings.windowHeight}px</span></Item>
               <Slider value={settings.windowHeight} min={400} max={800} step={10} set={v => update('windowHeight', v)} unit="px" />
             </Card>
           </div>
@@ -215,8 +237,8 @@ const SettingsPanel: React.FC = memo(() => {
       case 'hotkeys':
         return (
           <div className="space-y-4 slide-in-right">
-            <Card title="全局快捷键" icon={<Keyboard size={14} color="#6366f1" />}>
-              <Item label="显示/隐藏窗口" desc="例如 CommandOrControl+Shift+V">
+            <Card title={t('settings.globalHotkey')} icon={<Keyboard size={14} color="#6366f1" />}>
+              <Item label={t('settings.showHideWindow')} desc={t('settings.hotkeyExample')}>
                 <input
                   value={hotkeyDraft}
                   onChange={e => setHotkeyDraft(e.target.value)}
@@ -227,19 +249,19 @@ const SettingsPanel: React.FC = memo(() => {
                 />
               </Item>
               {hotkeyMessage && (
-                <p className="text-[11px] px-1" style={{ color: hotkeyMessage.includes('不可用') || hotkeyMessage.includes('失败') ? 'var(--color-warning)' : 'var(--color-success)' }}>
+                <p className="text-[11px] px-1" style={{ color: hotkeyMessage === t('settings.hotkeyUnavailable') || hotkeyMessage === t('settings.hotkeyFailed') ? 'var(--color-warning)' : 'var(--color-success)' }}>
                   {hotkeyMessage}
                 </p>
               )}
             </Card>
-            <Card title="快捷键说明" icon={<Keyboard size={14} color="#6366f1" />}>
+            <Card title={t('settings.hotkeyHelp')} icon={<Keyboard size={14} color="#6366f1" />}>
               {[
-                { keys: settings.hotkey.split('+'), desc: '显示/隐藏窗口', global: true },
-                { keys: ['Ctrl', 'F'], desc: '聚焦搜索框', global: false },
-                { keys: ['↑', '↓'], desc: '上下导航', global: false },
-                { keys: ['Enter'], desc: '复制选中项', global: false },
-                { keys: ['Esc'], desc: '清空搜索', global: false },
-                { keys: ['Delete'], desc: '删除选中项', global: false },
+                { keys: settings.hotkey.split('+'), desc: t('settings.showHideWindow'), global: true },
+                { keys: ['Ctrl', 'F'], desc: t('settings.focusSearch'), global: false },
+                { keys: ['↑', '↓'], desc: t('settings.moveSelection'), global: false },
+                { keys: ['Enter'], desc: t('settings.copySelection'), global: false },
+                { keys: ['Esc'], desc: t('settings.clearSearch'), global: false },
+                { keys: ['Delete'], desc: t('settings.deleteSelection'), global: false },
               ].map((h, i) => (
                 <div key={i} className="flex items-center justify-between p-3 rounded-xl"
                   style={{ background: 'var(--bg-surface)' }}>
@@ -248,7 +270,7 @@ const SettingsPanel: React.FC = memo(() => {
                     {h.global && (
                       <span className="text-[9px] px-1.5 py-0.5 rounded-md font-medium"
                         style={{ color: '#6366f1', background: 'rgba(99,102,241,0.08)' }}>
-                        全局
+                        {t('settings.global')}
                       </span>
                     )}
                   </div>
@@ -276,36 +298,36 @@ const SettingsPanel: React.FC = memo(() => {
       case 'storage':
         return (
           <div className="space-y-4 slide-in-right">
-            <Card title="存储概览" icon={<Database size={14} color="#6366f1" />}>
+            <Card title={t('settings.storageOverview')} icon={<Database size={14} color="#6366f1" />}>
               <div className="grid grid-cols-2 gap-3">
                 <div className="p-4 rounded-xl"
                   style={{ background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.08)' }}>
                   <p className="text-2xl font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>{historyLen}</p>
-                  <p className="text-[11px] mt-1" style={{ color: 'var(--text-tertiary)' }}>当前记录</p>
+                  <p className="text-[11px] mt-1" style={{ color: 'var(--text-tertiary)' }}>{t('settings.currentRecords')}</p>
                 </div>
                 <div className="p-4 rounded-xl"
                   style={{ background: 'rgba(52,211,153,0.05)', border: '1px solid rgba(52,211,153,0.08)' }}>
                   <p className="text-2xl font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>
                     {useClipboardStore.getState().history.filter(h => h.favorited).length}
                   </p>
-                  <p className="text-[11px] mt-1" style={{ color: 'var(--text-tertiary)' }}>收藏数量</p>
+                  <p className="text-[11px] mt-1" style={{ color: 'var(--text-tertiary)' }}>{t('settings.favoriteCount')}</p>
                 </div>
               </div>
             </Card>
-            <Card title="图片缓存" icon={<ImageIcon size={14} color="#34d399" />}>
-              <Item label="图片记录" desc="当前历史中保存的图片条目">
+            <Card title={t('settings.imageCache')} icon={<ImageIcon size={14} color="#34d399" />}>
+              <Item label={t('settings.imageRecords')} desc={t('settings.imageRecordsDesc')}>
                 <span className="text-[13px] tabular-nums" style={{ color: 'var(--text-secondary)' }}>
-                  {useClipboardStore.getState().history.filter(h => h.type === 'image').length} 条
+                  {t('settings.countUnit', { count: useClipboardStore.getState().history.filter(h => h.type === 'image').length })}
                 </span>
               </Item>
               <div className="h-px" style={{ background: 'var(--border-divider)' }} />
               <div className="flex items-center justify-between gap-3">
                 <p className="text-[11px] leading-relaxed" style={{ color: 'var(--text-ghost)' }}>
-                  删除历史后可清理不再被引用的图片文件。
+                  {t('settings.cleanupDesc')}
                 </p>
                 <button onClick={cleanupCache} className="px-3 py-1.5 rounded-lg text-[11px] interactive-chip flex-shrink-0"
                   style={{ background: 'var(--bg-elevated)', color: 'var(--text-secondary)', border: '1px solid var(--border-card)' }}>
-                  清理缓存
+                  {t('settings.cleanup')}
                 </button>
               </div>
               {cacheMessage && <p className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>{cacheMessage}</p>}
@@ -315,8 +337,8 @@ const SettingsPanel: React.FC = memo(() => {
       case 'notifications':
         return (
           <div className="space-y-4 slide-in-right">
-            <Card title="通知设置" icon={<Bell size={14} color="#6366f1" />}>
-              <Item label="复制提示音" desc="复制内容时播放提示音"><Toggle on={settings.soundEnabled} set={v => update('soundEnabled', v)} /></Item>
+            <Card title={t('settings.notification')} icon={<Bell size={14} color="#6366f1" />}>
+              <Item label={t('settings.copySound')} desc={t('settings.copySoundDesc')}><Toggle on={settings.soundEnabled} set={v => update('soundEnabled', v)} /></Item>
             </Card>
           </div>
         )
@@ -337,11 +359,11 @@ const SettingsPanel: React.FC = memo(() => {
               </div>
               <div>
                 <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>ClipMaster</h2>
-                <p className="text-[13px] mt-1" style={{ color: 'var(--text-tertiary)' }}>现代化剪贴板管理器</p>
+                <p className="text-[13px] mt-1" style={{ color: 'var(--text-tertiary)' }}>{t('settings.aboutSubtitle')}</p>
                 <p className="text-[11px] mt-2 font-mono" style={{ color: 'var(--text-ghost)' }}>v1.0.0</p>
               </div>
             </div>
-            <Card title="技术栈" icon={<Heart size={14} color="#f472b6" />}>
+            <Card title={t('settings.techStack')} icon={<Heart size={14} color="#f472b6" />}>
               <div className="grid grid-cols-2 gap-2">
                 {['Electron', 'React', 'TypeScript', 'Vite', 'Tailwind CSS', 'Zustand', 'Lucide', 'date-fns'].map(t => (
                   <div key={t} className="flex items-center gap-2 p-2 rounded-lg interactive-chip"
@@ -366,7 +388,7 @@ const SettingsPanel: React.FC = memo(() => {
         <div className="mb-3 px-2.5">
           <p className="text-[9px] uppercase tracking-widest font-semibold"
             style={{ color: 'var(--text-ghost)' }}>
-            设置
+            {t('settings.sidebar')}
           </p>
         </div>
         {sections.map(s => {

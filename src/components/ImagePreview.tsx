@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { Image as ImageIcon } from 'lucide-react'
+import { useI18n } from '../i18n'
 
 interface Props {
   imagePath?: string
@@ -9,6 +10,7 @@ interface Props {
 const imageDataUrlCache = new Map<string, string>()
 
 const ImagePreview: React.FC<Props> = ({ imagePath, size = 'thumb' }) => {
+  const { t } = useI18n()
   const [src, setSrc] = useState<string | null>(null)
   const [info, setInfo] = useState<{ bytes: number; width: number; height: number } | null>(null)
   const [failed, setFailed] = useState(false)
@@ -63,7 +65,7 @@ const ImagePreview: React.FC<Props> = ({ imagePath, size = 'thumb' }) => {
           onError={onError}
           className={isDetail ? 'max-h-[36vh] w-full object-contain rounded-xl' : 'w-12 h-12 object-cover rounded-lg flex-shrink-0'}
           style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-card)' }}
-          alt="剪贴板图片预览"
+          alt={t('image.alt')}
         />
         {isDetail && meta && <div className="text-[10px] text-center" style={{ color: 'var(--text-ghost)' }}>{meta}</div>}
       </div>
@@ -76,7 +78,7 @@ const ImagePreview: React.FC<Props> = ({ imagePath, size = 'thumb' }) => {
       style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-card)', color: 'var(--text-ghost)' }}
     >
       <ImageIcon size={isDetail ? 28 : 18} />
-      {isDetail && <span className="text-[11px]">图片预览不可用</span>}
+      {isDetail && <span className="text-[11px]">{t('image.unavailable')}</span>}
     </div>
   )
 }

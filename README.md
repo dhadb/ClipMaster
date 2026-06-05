@@ -21,9 +21,13 @@
   <img src="https://img.shields.io/badge/version-1.0.0-blue.svg" alt="Version">
   <img src="https://img.shields.io/badge/platform-Windows-green.svg" alt="Platform">
   <img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="License">
-  <img src="https://img.shields.io/badge/electron-27-blue.svg" alt="Electron">
+  <img src="https://img.shields.io/badge/electron-42-blue.svg" alt="Electron">
   <img src="https://img.shields.io/badge/react-18-blue.svg" alt="React">
   <img src="https://img.shields.io/badge/typescript-5-blue.svg" alt="TypeScript">
+</p>
+
+<p align="center">
+  <img src="docs/screenshot.png" width="760" alt="ClipMaster 应用截图">
 </p>
 
 ---
@@ -36,7 +40,7 @@
 |------|------|
 | **实时监控** | 自动捕获剪贴板内容变化，毫秒级响应 |
 | **历史记录** | 保存最多 500 条剪贴板历史，支持持久化存储 |
-| **智能分类** | 自动识别 7 种内容类型（文本/链接/邮箱/代码/颜色/数字/长文本） |
+| **智能分类** | 自动识别文本、链接、邮箱、代码、颜色、JSON、Markdown、图片等内容类型 |
 | **快速搜索** | 模糊搜索历史内容，120ms 防抖优化 |
 | **类型筛选** | 按内容类型快速过滤，精准定位 |
 | **收藏管理** | 置顶重要内容，清空历史时保留收藏 |

@@ -26,6 +26,13 @@ jobs:
       - name: Build app
         run: npm run build -- --publish never
 
+      - name: Generate SHA256 checksums
+        shell: powershell
+        run: |
+          Get-FileHash -Algorithm SHA256 release/*.exe |
+            ForEach-Object { "$($_.Hash)  $([System.IO.Path]::GetFileName($_.Path))" } |
+            Set-Content -Encoding ascii release/checksums.sha256
+
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
@@ -33,3 +40,4 @@ jobs:
           path: |
             release/*.exe
             release/*.blockmap
+            release/checksums.sha256

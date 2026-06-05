@@ -28,9 +28,17 @@ jobs:
       - name: Build installer
         run: npm run build -- --publish never
 
+      - name: Generate SHA256 checksums
+        shell: powershell
+        run: |
+          Get-FileHash -Algorithm SHA256 release/*.exe |
+            ForEach-Object { "$($_.Hash)  $([System.IO.Path]::GetFileName($_.Path))" } |
+            Set-Content -Encoding ascii release/checksums.sha256
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             release/*.exe
             release/*.blockmap
+            release/checksums.sha256

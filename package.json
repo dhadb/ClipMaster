@@ -1,9 +1,20 @@
 {
   "name": "clipmaster",
   "version": "1.0.0",
-  "description": "Modern Windows Clipboard Manager",
+  "description": "Local-first Windows clipboard manager with search, favorites, privacy filters, and image history.",
   "author": "ClipMaster Team",
   "license": "MIT",
+  "keywords": [
+    "clipboard-manager",
+    "windows",
+    "electron",
+    "react",
+    "typescript",
+    "productivity",
+    "privacy",
+    "local-first",
+    "clipboard-history"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/dhadb/ClipMaster.git"

@@ -3,6 +3,8 @@ import { Settings, Keyboard, Palette, Database, Bell, Monitor, Sun, Moon, Slider
 import { useClipboardStore } from '../store/clipboardStore'
 import { useI18n } from '../i18n'
 
+const appIconUrl = './icon.png'
+
 const SettingsPanel: React.FC = memo(() => {
   const settings = useClipboardStore(s => s.settings)
   const setSettings = useClipboardStore(s => s.setSettings)
@@ -346,16 +348,11 @@ const SettingsPanel: React.FC = memo(() => {
         return (
           <div className="space-y-4 slide-in-right">
             <div className="glass-card rounded-xl p-6 text-center space-y-4">
-              <div className="w-16 h-16 mx-auto rounded-2xl flex items-center justify-center shimmer soft-float"
+              <div className="w-16 h-16 mx-auto rounded-2xl flex items-center justify-center shimmer soft-float overflow-hidden"
                 style={{
-                  background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
                   boxShadow: '0 8px 24px rgba(99,102,241,0.25)',
                 }}>
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-                  <rect x="8" y="2" width="8" height="4" rx="1" />
-                  <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
-                  <path d="M9 14l2 2 4-4" />
-                </svg>
+                <img src={appIconUrl} alt="" className="w-16 h-16 rounded-2xl" draggable={false} />
               </div>
               <div>
                 <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>ClipMaster</h2>

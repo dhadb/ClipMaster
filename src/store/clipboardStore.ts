@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { LanguageSetting } from '../i18n'
 import { matchesClipboardQuery, normalizeTags } from '../utils/clipboard'
+import { isThemeSetting, type ThemeSetting } from '../theme'
 
 export interface ClipboardItem {
   id: string
@@ -20,7 +21,7 @@ export interface Settings {
   hotkey: string
   autoStart: boolean
   minimizeToTray: boolean
-  theme: 'dark' | 'light' | 'auto'
+  theme: ThemeSetting
   language: LanguageSetting
   opacity: number
   fontSize: number
@@ -37,6 +38,8 @@ export interface Settings {
   hideAfterCopy: boolean
   autoDeleteDays: number
   verificationCodeTtlMinutes: number
+  autoCheckUpdates: boolean
+  onboardingCompleted: boolean
 }
 
 export interface PrivacyState {
@@ -51,6 +54,16 @@ export interface ClipboardItemDraft {
   pinned?: boolean
   favorited?: boolean
 }
+
+export interface UpdateInfo {
+  currentVersion: string
+  latestVersion: string
+  hasUpdate: boolean
+  releaseUrl: string
+  publishedAt: string | null
+}
+
+export type UpdateStatus = 'idle' | 'checking' | 'available' | 'current' | 'error'
 
 type ActiveTab = 'history' | 'favorites' | 'stats' | 'settings'
 
@@ -76,12 +89,15 @@ const defaultSettings: Settings = {
   hideAfterCopy: false,
   autoDeleteDays: 30,
   verificationCodeTtlMinutes: 10,
+  autoCheckUpdates: true,
+  onboardingCompleted: false,
 }
 
 function normalizeSettings(settings: Partial<Settings>): Settings {
   const merged = { ...defaultSettings, ...settings }
   return {
     ...merged,
+    theme: isThemeSetting(merged.theme) ? merged.theme : 'dark',
     language: merged.language === 'zh-CN' || merged.language === 'en-US' ? merged.language : 'system',
     ignoredPatterns: Array.isArray(merged.ignoredPatterns) ? merged.ignoredPatterns : [],
     opacity: Math.min(1, Math.max(0.7, merged.opacity)),
@@ -107,6 +123,10 @@ interface ClipboardStore {
   privacy: PrivacyState
   showSettings: boolean
   quickAddOpen: boolean
+  appVersion: string
+  updateInfo: UpdateInfo | null
+  updateStatus: UpdateStatus
+  updateDismissed: boolean
   activeTab: ActiveTab
   copiedId: string | null
   detailItemId: string | null
@@ -120,6 +140,10 @@ interface ClipboardStore {
   setPrivacy: (privacy: PrivacyState) => void
   setShowSettings: (show: boolean) => void
   setQuickAddOpen: (open: boolean) => void
+  setAppVersion: (version: string) => void
+  updateSettings: (patch: Partial<Settings>) => Promise<Settings>
+  checkForUpdates: (force?: boolean) => Promise<UpdateInfo | null>
+  dismissUpdate: () => void
   setActiveTab: (tab: ActiveTab) => void
   setDetailItemId: (id: string | null) => void
   setFilterType: (type: string | null) => void
@@ -145,6 +169,10 @@ export const useClipboardStore = create<ClipboardStore>((set, get) => ({
   privacy: { paused: false, pauseUntil: 0, protectedToday: 0 },
   showSettings: false,
   quickAddOpen: false,
+  appVersion: '',
+  updateInfo: null,
+  updateStatus: 'idle',
+  updateDismissed: false,
   activeTab: 'history',
   copiedId: null,
   detailItemId: null,
@@ -166,6 +194,36 @@ export const useClipboardStore = create<ClipboardStore>((set, get) => ({
   setPrivacy: (privacy) => set({ privacy }),
   setShowSettings: (showSettings) => set({ showSettings }),
   setQuickAddOpen: (quickAddOpen) => set({ quickAddOpen }),
+  setAppVersion: (appVersion) => set({ appVersion }),
+  updateSettings: async (patch) => {
+    const previous = get().settings
+    const optimistic = normalizeSettings({ ...previous, ...patch })
+    set({ settings: optimistic })
+    try {
+      if (!window.electronAPI) return optimistic
+      const applied = await window.electronAPI.updateSettings(patch)
+      const normalized = normalizeSettings(applied)
+      set({ settings: normalized })
+      return normalized
+    } catch (err) {
+      set({ settings: previous })
+      throw err
+    }
+  },
+  checkForUpdates: async (force = false) => {
+    if (!window.electronAPI) return null
+    set({ updateStatus: 'checking' })
+    try {
+      const updateInfo = await window.electronAPI.checkForUpdates(force)
+      set({ updateInfo, appVersion: updateInfo.currentVersion, updateStatus: updateInfo.hasUpdate ? 'available' : 'current', updateDismissed: false })
+      return updateInfo
+    } catch (err) {
+      console.error('checkForUpdates failed:', err)
+      set({ updateStatus: 'error' })
+      return null
+    }
+  },
+  dismissUpdate: () => set({ updateDismissed: true }),
   setDetailItemId: (detailItemId) => set({ detailItemId }),
 
   setActiveTab: (activeTab) => {

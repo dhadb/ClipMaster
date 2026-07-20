@@ -1,7 +1,9 @@
-import { app, BrowserWindow, Tray, Menu, clipboard, globalShortcut, nativeImage, ipcMain, screen, shell } from 'electron'
+import { app, BrowserWindow, Tray, Menu, clipboard, globalShortcut, nativeImage, ipcMain, screen, shell, net } from 'electron'
 import path from 'path'
 import fs from 'fs'
 import { normalizeTags } from '../src/utils/clipboard'
+import { compareVersions } from '../src/utils/version'
+import { isThemeSetting, type ThemeSetting } from '../src/theme'
 
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
@@ -50,7 +52,7 @@ const defaultSettings = {
   hotkey: 'CommandOrControl+Shift+V',
   autoStart: true,
   minimizeToTray: true,
-  theme: 'dark' as 'dark' | 'light' | 'auto',
+  theme: 'dark' as ThemeSetting,
   language: 'system' as 'system' | 'zh-CN' | 'en-US',
   opacity: 0.95,
   fontSize: 14,
@@ -67,6 +69,8 @@ const defaultSettings = {
   hideAfterCopy: false,
   autoDeleteDays: 30,
   verificationCodeTtlMinutes: 10,
+  autoCheckUpdates: true,
+  onboardingCompleted: false,
 }
 
 type Settings = typeof defaultSettings
@@ -116,7 +120,7 @@ function sanitizeSettings(input: Partial<Settings> | undefined): Settings {
     hotkey: typeof raw.hotkey === 'string' && raw.hotkey.trim() ? raw.hotkey.trim() : defaultSettings.hotkey,
     autoStart: Boolean(raw.autoStart),
     minimizeToTray: Boolean(raw.minimizeToTray),
-    theme: raw.theme === 'light' || raw.theme === 'auto' ? raw.theme : 'dark',
+    theme: isThemeSetting(raw.theme) ? raw.theme : 'dark',
     language: raw.language === 'zh-CN' || raw.language === 'en-US' ? raw.language : 'system',
     opacity: clamp(raw.opacity, 0.7, 1, defaultSettings.opacity),
     fontSize: Math.round(clamp(raw.fontSize, 12, 18, defaultSettings.fontSize)),
@@ -135,6 +139,8 @@ function sanitizeSettings(input: Partial<Settings> | undefined): Settings {
     hideAfterCopy: Boolean(raw.hideAfterCopy),
     autoDeleteDays: Math.round(clamp(raw.autoDeleteDays, 0, 365, defaultSettings.autoDeleteDays)),
     verificationCodeTtlMinutes: Math.round(clamp(raw.verificationCodeTtlMinutes, 0, 1440, defaultSettings.verificationCodeTtlMinutes)),
+    autoCheckUpdates: raw.autoCheckUpdates !== false,
+    onboardingCompleted: Boolean(raw.onboardingCompleted),
   }
 }
 
@@ -352,6 +358,7 @@ function loadData() {
       const data: Partial<AppData> = JSON.parse(raw)
       clipboardHistory = Array.isArray(data.history) ? data.history.map(sanitizeHistoryItem).filter(Boolean) as ClipboardItem[] : []
       settings = sanitizeSettings(data.settings)
+      if (data.settings && typeof data.settings.onboardingCompleted !== 'boolean') settings.onboardingCompleted = true
       protectedToday = Number.isFinite(Number(data.protectedToday)) ? Number(data.protectedToday) : 0
       applyRetentionRules()
     }
@@ -362,6 +369,7 @@ function loadData() {
         const backup = JSON.parse(fs.readFileSync(backupPath, 'utf-8')) as Partial<AppData>
         clipboardHistory = Array.isArray(backup.history) ? backup.history.map(sanitizeHistoryItem).filter(Boolean) as ClipboardItem[] : []
         settings = sanitizeSettings(backup.settings)
+        if (backup.settings && typeof backup.settings.onboardingCompleted !== 'boolean') settings.onboardingCompleted = true
       }
     } catch (backupErr) {
       console.error('Failed to load backup data:', backupErr)
@@ -780,6 +788,48 @@ ipcMain.handle('show-file-in-folder', async (_, filePath: string) => {
   return true
 })
 ipcMain.handle('get-history', () => clipboardHistory)
+ipcMain.handle('get-app-version', () => app.getVersion())
+
+interface UpdateInfo {
+  currentVersion: string
+  latestVersion: string
+  hasUpdate: boolean
+  releaseUrl: string
+  publishedAt: string | null
+}
+
+let updateCache: { checkedAt: number; info: UpdateInfo } | null = null
+
+ipcMain.handle('check-for-updates', async (_, force = false): Promise<UpdateInfo> => {
+  if (!force && updateCache && Date.now() - updateCache.checkedAt < 10 * 60 * 1000) return updateCache.info
+
+  const currentVersion = app.getVersion()
+  const response = await net.fetch('https://api.github.com/repos/dhadb/ClipMaster/releases/latest', {
+    signal: AbortSignal.timeout(10_000),
+    headers: {
+      Accept: 'application/vnd.github+json',
+      'User-Agent': `ClipMaster/${currentVersion}`,
+      'X-GitHub-Api-Version': '2022-11-28',
+    },
+  })
+  if (!response.ok) throw new Error(`Update request failed with status ${response.status}`)
+
+  const payload = await response.json() as { tag_name?: unknown; html_url?: unknown; published_at?: unknown }
+  const latestVersion = typeof payload.tag_name === 'string' ? payload.tag_name.replace(/^v/i, '') : ''
+  if (!latestVersion) throw new Error('Update response did not include a version')
+  const releaseUrl = typeof payload.html_url === 'string' && /^https:\/\/github\.com\/dhadb\/ClipMaster\/releases\//i.test(payload.html_url)
+    ? payload.html_url
+    : 'https://github.com/dhadb/ClipMaster/releases/latest'
+  const info: UpdateInfo = {
+    currentVersion,
+    latestVersion,
+    hasUpdate: compareVersions(latestVersion, currentVersion) > 0,
+    releaseUrl,
+    publishedAt: typeof payload.published_at === 'string' ? payload.published_at : null,
+  }
+  updateCache = { checkedAt: Date.now(), info }
+  return info
+})
 
 ipcMain.handle('create-item', (_, draft: { content?: unknown; tags?: unknown; pinned?: unknown; favorited?: unknown }) => {
   const content = typeof draft?.content === 'string' ? draft.content : ''
@@ -921,10 +971,13 @@ ipcMain.handle('import-history', (_, payload: any, mode: 'merge' | 'replace' = '
     clipboardHistory = dedupeHistory([...imported, ...clipboardHistory])
   }
 
-  const importedSettings = sanitizeSettings(payload?.settings)
   if (payload?.settings && typeof payload.settings === 'object') {
     const oldSettings = settings
-    const nextSettings = { ...importedSettings, hotkey: oldSettings.hotkey }
+    const nextSettings = {
+      ...sanitizeSettings({ ...settings, ...payload.settings }),
+      hotkey: oldSettings.hotkey,
+      onboardingCompleted: oldSettings.onboardingCompleted,
+    }
     settings = nextSettings
     applyAutoStart()
     mainWindow?.webContents.send('settings-updated', settings)

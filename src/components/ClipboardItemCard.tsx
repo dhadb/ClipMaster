@@ -115,7 +115,7 @@ const ClipboardItemCard: React.FC<Props> = memo(({ item, isSelected, onSelect })
             <span className="text-[10px] flex-shrink-0" style={{ color: 'var(--text-ghost)' }}>{timeAgo}</span>
             {meta && <span className="text-[10px] truncate" style={{ color: 'var(--text-ghost)', opacity: 0.75 }}>{meta}</span>}
             {item.tags?.[0] && (
-              <span className="text-[9px] truncate px-1.5 py-0.5 rounded flex-shrink" style={{ color: 'var(--color-primary-light)', background: 'rgba(99,102,241,0.1)' }}>
+              <span className="text-[9px] truncate px-1.5 py-0.5 rounded flex-shrink" style={{ color: 'var(--color-primary-light)', background: 'color-mix(in srgb, var(--color-primary) 10%, transparent)' }}>
                 #{item.tags[0]}{item.tags.length > 1 ? ` +${item.tags.length - 1}` : ''}
               </span>
             )}
@@ -158,7 +158,7 @@ const ClipboardItemCard: React.FC<Props> = memo(({ item, isSelected, onSelect })
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none copied-overlay"
           style={{ background: 'color-mix(in srgb, var(--color-success) 8%, transparent)', borderRadius: 12 }}>
           <div className="flex items-center gap-2 px-4 py-2 rounded-full"
-            style={{ background: 'var(--color-success)', boxShadow: '0 4px 16px rgba(52,211,153,0.3)' }}>
+            style={{ background: 'var(--color-success)', boxShadow: '0 4px 16px color-mix(in srgb, var(--color-success) 30%, transparent)' }}>
             <Check size={15} color="white" strokeWidth={3} />
             <span className="text-[13px] font-medium text-white">{t('item.copied')}</span>
           </div>

@@ -23,7 +23,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.1.0-blue.svg" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.2.0-blue.svg" alt="Version">
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-green.svg" alt="Platform">
   <img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="License">
   <img src="https://img.shields.io/badge/privacy-local--first-brightgreen.svg" alt="Local first">
@@ -40,20 +40,21 @@
 - **Fast recovery**: Search and filter copied text, links, code snippets, colors, JSON, Markdown, and images.
 - **Privacy guardrails**: High-risk content such as passwords, tokens, private keys, and card numbers is skipped by default.
 - **Keyboard friendly**: Open the app globally with `Ctrl + Shift + V`, then search, select, and copy quickly.
+- **Easy to start**: A first-run guide covers the core workflow, and Help lets you replay it or check for updates.
 
 ## Quick Start
 
 1. Open [Releases](https://github.com/dhadb/ClipMaster/releases/latest).
-2. Download `ClipMaster-Setup-1.1.0.exe`, or choose `ClipMaster-Portable-1.1.0.exe`.
+2. Download `ClipMaster-Setup-1.2.0.exe`, or choose `ClipMaster-Portable-1.2.0.exe`.
 3. Run the installer, or launch the portable build directly.
-4. Copy anything and press `Ctrl + Shift + V` to open ClipMaster.
+4. Follow the first-run guide, then copy anything and press `Ctrl + Shift + V` to open ClipMaster.
 
 ## Verify the Installer
 
 Release assets include `checksums.sha256`. After downloading the installer, verify it in PowerShell:
 
 ```powershell
-Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-1.1.0.exe"
+Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-1.2.0.exe"
 ```
 
 Compare the SHA256 output with `checksums.sha256`. If it does not match, do not run the installer and report it in [Issues](https://github.com/dhadb/ClipMaster/issues).
@@ -72,6 +73,9 @@ Windows may show a SmartScreen warning for unsigned open-source installers. Down
 | Tags | Organize any entry with tags preserved across import and export |
 | Favorites | Pin important clipboard items |
 | Stats | View type distribution and usage patterns |
+| First-run guide | Learn global access, search, tags, and local privacy in three steps |
+| Theme system | Dark, light, graphite, forest, rose, coast, high contrast, and system themes |
+| Update checks | Check GitHub Releases at startup or manually without automatic downloads or installs |
 | Export | Export history as JSON |
 | Local privacy | No upload, sync, or clipboard analytics |
 

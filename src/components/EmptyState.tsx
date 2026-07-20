@@ -21,8 +21,8 @@ const EmptyState: React.FC = () => {
       <div className="relative mb-6 fade-in">
         <div className="w-20 h-20 rounded-2xl flex items-center justify-center soft-float shimmer"
           style={{
-            background: 'rgba(99,102,241,0.06)',
-            border: '1px solid rgba(99,102,241,0.08)',
+            background: 'color-mix(in srgb, var(--color-primary) 6%, transparent)',
+            border: '1px solid color-mix(in srgb, var(--color-primary) 8%, transparent)',
           }}>
           <MainIcon size={30} color={isFavorites ? 'var(--color-warning)' : 'var(--color-primary)'} strokeWidth={1.5}
             style={{ opacity: 0.5 }} />
@@ -44,7 +44,7 @@ const EmptyState: React.FC = () => {
             animationDelay: '160ms',
           }}>
           <div className="flex items-center gap-2 text-[12px]" style={{ color: 'var(--text-secondary)' }}>
-            <ArrowDown size={13} color="#6366f1" />
+            <ArrowDown size={13} color="var(--color-primary-light)" />
             <span>{t('empty.start')}</span>
           </div>
         </div>

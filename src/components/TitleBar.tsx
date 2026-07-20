@@ -46,9 +46,9 @@ const TitleBar: React.FC = memo(() => {
           </span>
           <span className="text-[8px] px-1.5 py-0.5 rounded-md font-semibold tracking-wider uppercase"
             style={{
-              color: 'rgba(99,102,241,0.7)',
-              background: 'rgba(99,102,241,0.08)',
-              border: '1px solid rgba(99,102,241,0.1)',
+              color: 'var(--color-primary-light)',
+              background: 'color-mix(in srgb, var(--color-primary) 8%, transparent)',
+              border: '1px solid color-mix(in srgb, var(--color-primary) 10%, transparent)',
             }}>
             Pro
           </span>

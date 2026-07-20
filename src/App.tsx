@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState, useMemo } from 'react'
+import React, { useEffect, useState, useMemo, useRef } from 'react'
 import TitleBar from './components/TitleBar'
 import SearchBar from './components/SearchBar'
 import TabBar from './components/TabBar'
@@ -9,15 +9,12 @@ import StatsPanel from './components/StatsPanel'
 import EmptyState from './components/EmptyState'
 import ShortcutHintBar from './components/ShortcutHintBar'
 import QuickAddDialog from './components/QuickAddDialog'
+import OnboardingDialog from './components/OnboardingDialog'
+import UpdateBanner from './components/UpdateBanner'
+import { Clipboard } from 'lucide-react'
 import { useClipboardStore } from './store/clipboardStore'
 import { useI18n } from './i18n'
-
-function getResolvedTheme(theme: 'dark' | 'light' | 'auto'): 'dark' | 'light' {
-  if (theme === 'auto') {
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-  }
-  return theme
-}
+import { resolveTheme } from './theme'
 
 function App() {
   const activeTab = useClipboardStore(s => s.activeTab)
@@ -33,13 +30,16 @@ function App() {
   const setShowSettings = useClipboardStore(s => s.setShowSettings)
   const setActiveTab = useClipboardStore(s => s.setActiveTab)
   const setQuickAddOpen = useClipboardStore(s => s.setQuickAddOpen)
+  const setAppVersion = useClipboardStore(s => s.setAppVersion)
+  const checkForUpdates = useClipboardStore(s => s.checkForUpdates)
   const { t } = useI18n()
 
   const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState(false)
+  const checkedForUpdates = useRef(false)
 
   // 立即应用主题，同步执行，避免闪烁
-  const resolvedTheme = useMemo(() => getResolvedTheme(settings.theme), [settings.theme])
+  const resolvedTheme = useMemo(() => resolveTheme(settings.theme, window.matchMedia('(prefers-color-scheme: dark)').matches), [settings.theme])
 
   // 使用 useLayoutEffect 同步设置主题属性，在浏览器绘制前完成
   React.useLayoutEffect(() => {
@@ -56,8 +56,7 @@ function App() {
     if (settings.theme !== 'auto') return
     const mq = window.matchMedia('(prefers-color-scheme: dark)')
     const handler = () => {
-      const t = mq.matches ? 'dark' : 'light'
-      document.documentElement.setAttribute('data-theme', t)
+      document.documentElement.setAttribute('data-theme', resolveTheme('auto', mq.matches))
     }
     mq.addEventListener('change', handler)
     return () => mq.removeEventListener('change', handler)
@@ -99,10 +98,11 @@ function App() {
           }
         }))
 
-        const [hist, s, privacy] = await Promise.all([
+        const [hist, s, privacy, version] = await Promise.all([
           window.electronAPI.getHistory(),
           window.electronAPI.getSettings(),
           window.electronAPI.getPrivacyState(),
+          window.electronAPI.getAppVersion(),
         ])
 
         if (!isMounted) return
@@ -110,6 +110,7 @@ function App() {
         setHistory(hist)
         setSettings(s)
         useClipboardStore.getState().setPrivacy(privacy)
+        setAppVersion(version)
         setLoaded(true)
       } catch (err) {
         console.error('Failed to initialize:', err)
@@ -128,6 +129,12 @@ function App() {
       })
     }
   }, [])
+
+  useEffect(() => {
+    if (!loaded || !settings.autoCheckUpdates || checkedForUpdates.current) return
+    checkedForUpdates.current = true
+    void checkForUpdates()
+  }, [checkForUpdates, loaded, settings.autoCheckUpdates])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -153,14 +160,13 @@ function App() {
     return (
       <div className="h-screen w-screen flex items-center justify-center" style={{ background: 'var(--bg-root)' }}>
         <div className="flex flex-col items-center gap-4 fade-in">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center shimmer soft-float"
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center shimmer soft-float"
             style={{
-              background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
-              boxShadow: '0 4px 16px rgba(99,102,241,0.25)',
+              color: 'white',
+              background: 'var(--color-primary)',
+              boxShadow: '0 4px 16px color-mix(in srgb, var(--color-primary) 28%, transparent)',
             }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
-              <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
-            </svg>
+            <Clipboard size={20} strokeWidth={2.5} />
           </div>
           <span className="text-[12px]" style={{ color: 'var(--text-tertiary)' }}>{t('app.loading')}</span>
         </div>
@@ -193,12 +199,14 @@ function App() {
       style={{ opacity: settings.opacity, transform: 'translateZ(0)' }}
     >
       <TitleBar />
+      <UpdateBanner />
       {showSearch && <SearchBar />}
       <TabBar />
       <div key={`${activeTab}-${showSettings ? 'settings' : 'content'}`} className="flex-1 overflow-hidden content-fade">{content}</div>
       {showSearch && settings.showShortcutHints && filteredHistory.length > 0 && <ShortcutHintBar />}
       <ClipboardDetail />
       <QuickAddDialog />
+      <OnboardingDialog />
       <div className="px-4 py-1.5 flex items-center justify-between"
         style={{ borderTop: '1px solid var(--border-divider)' }}>
         <div className="flex items-center gap-2 text-[10px]" style={{ color: 'var(--text-tertiary)' }}>

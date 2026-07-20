@@ -64,16 +64,16 @@ const StatsPanel: React.FC = memo(() => {
   return (
     <div className="h-full overflow-y-auto p-4 space-y-3">
       <div className="flex items-center gap-2 fade-in">
-        <BarChart3 size={16} color="#6366f1" />
+        <BarChart3 size={16} color="var(--color-primary-light)" />
         <h2 className="text-[15px] font-semibold" style={{ color: 'var(--text-primary)' }}>{t('stats.title')}</h2>
       </div>
 
       {/* 主要统计 */}
       <div className="grid grid-cols-2 gap-2.5 fade-in" style={{ animationDelay: '50ms' }}>
         {[
-          { label: t('stats.total'), value: stats.total, color: '#6366f1' },
+          { label: t('stats.total'), value: stats.total, color: 'var(--color-primary-light)' },
           { label: t('stats.favorited'), value: stats.favorited, color: '#fbbf24' },
-          { label: t('stats.today'), value: stats.today, color: '#34d399' },
+          { label: t('stats.today'), value: stats.today, color: 'var(--color-success)' },
           { label: t('stats.week'), value: stats.week, color: '#818cf8' },
         ].map((s, i) => (
           <div key={i} className="glass-card rounded-xl p-3.5 slide-up" style={{ animationDelay: `${80 + i * 35}ms` }}>
@@ -84,7 +84,7 @@ const StatsPanel: React.FC = memo(() => {
       </div>
 
       {/* 文本统计 */}
-      <Card title={t('stats.textStats')} icon={<Type size={13} color="#6366f1" />}>
+      <Card title={t('stats.textStats')} icon={<Type size={13} color="var(--color-primary-light)" />}>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <p className="text-xl font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>{stats.totalChars.toLocaleString()}</p>
@@ -98,7 +98,7 @@ const StatsPanel: React.FC = memo(() => {
       </Card>
 
       {/* 类型分布 */}
-      <Card title={t('stats.typeDistribution')} icon={<Zap size={13} color="#6366f1" />}>
+      <Card title={t('stats.typeDistribution')} icon={<Zap size={13} color="var(--color-primary-light)" />}>
         <div className="space-y-2">
           {Object.entries(stats.typeCount).sort(([, a], [, b]) => b - a).map(([type, count]) => {
             const cfg = TYPE_MAP[type] || TYPE_MAP.text
@@ -125,7 +125,7 @@ const StatsPanel: React.FC = memo(() => {
       </Card>
 
       {/* 时段分布 */}
-      <Card title={t('stats.hourDistribution')} icon={<Clock size={13} color="#6366f1" />}>
+      <Card title={t('stats.hourDistribution')} icon={<Clock size={13} color="var(--color-primary-light)" />}>
         <div className="flex justify-end mb-1">
           <span className="text-[10px]" style={{ color: 'var(--text-ghost)' }}>
             {stats.peakHour >= 0 ? t('stats.peak', { hour: stats.peakHour }) : t('stats.noData')}

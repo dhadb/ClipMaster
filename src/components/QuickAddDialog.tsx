@@ -67,7 +67,7 @@ const QuickAddDialog: React.FC = () => {
       >
         <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid var(--border-divider)' }}>
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ color: 'var(--color-primary-light)', background: 'rgba(99,102,241,0.12)' }}>
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ color: 'var(--color-primary-light)', background: 'color-mix(in srgb, var(--color-primary) 12%, transparent)' }}>
               <FilePlus2 size={15} />
             </div>
             <div>
@@ -99,7 +99,7 @@ const QuickAddDialog: React.FC = () => {
 
           <div className="grid grid-cols-2 gap-2">
             <label className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 cursor-pointer" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-card)' }}>
-              <input type="checkbox" checked={favorited} onChange={event => setFavorited(event.target.checked)} className="accent-indigo-500" />
+              <input type="checkbox" checked={favorited} onChange={event => setFavorited(event.target.checked)} style={{ accentColor: 'var(--color-primary)' }} />
               <Heart size={13} color={favorited ? '#f472b6' : 'var(--text-tertiary)'} fill={favorited ? '#f472b6' : 'none'} />
               <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>{t('quickAdd.favorite')}</span>
             </label>

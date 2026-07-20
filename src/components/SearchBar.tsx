@@ -159,9 +159,9 @@ const SearchBar: React.FC = () => {
           <button onClick={() => onFilterClick(null)}
             className="flex-shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-medium interactive-chip"
             style={{
-              background: !filterType ? 'rgba(99,102,241,0.12)' : 'transparent',
+              background: !filterType ? 'color-mix(in srgb, var(--color-primary) 12%, transparent)' : 'transparent',
               color: !filterType ? 'rgba(129,140,248,0.9)' : 'var(--text-tertiary)',
-              border: `1px solid ${!filterType ? 'rgba(99,102,241,0.2)' : 'transparent'}`,
+              border: `1px solid ${!filterType ? 'color-mix(in srgb, var(--color-primary) 20%, transparent)' : 'transparent'}`,
             }}>
             {t('search.all')}
           </button>
@@ -169,9 +169,9 @@ const SearchBar: React.FC = () => {
             <button key={f.id} onClick={() => onFilterClick(f.id)}
               className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium interactive-chip"
               style={{
-                background: filterType === f.id ? 'rgba(99,102,241,0.12)' : 'transparent',
+                background: filterType === f.id ? 'color-mix(in srgb, var(--color-primary) 12%, transparent)' : 'transparent',
                 color: filterType === f.id ? 'rgba(129,140,248,0.9)' : 'var(--text-tertiary)',
-                border: `1px solid ${filterType === f.id ? 'rgba(99,102,241,0.2)' : 'transparent'}`,
+                border: `1px solid ${filterType === f.id ? 'color-mix(in srgb, var(--color-primary) 20%, transparent)' : 'transparent'}`,
               }}>
               <span className="text-[10px] opacity-60">{f.icon}</span>
               <span>{f.label}</span>

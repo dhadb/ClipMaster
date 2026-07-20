@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { ThemeSetting } from '../src/theme'
 
 export interface ClipboardItem {
   id: string
@@ -18,7 +19,7 @@ export interface Settings {
   hotkey: string
   autoStart: boolean
   minimizeToTray: boolean
-  theme: 'dark' | 'light' | 'auto'
+  theme: ThemeSetting
   language: 'system' | 'zh-CN' | 'en-US'
   opacity: number
   fontSize: number
@@ -35,6 +36,8 @@ export interface Settings {
   hideAfterCopy: boolean
   autoDeleteDays: number
   verificationCodeTtlMinutes: number
+  autoCheckUpdates: boolean
+  onboardingCompleted: boolean
 }
 
 export interface PrivacyState {
@@ -50,6 +53,14 @@ export interface ClipboardItemDraft {
   favorited?: boolean
 }
 
+export interface UpdateInfo {
+  currentVersion: string
+  latestVersion: string
+  hasUpdate: boolean
+  releaseUrl: string
+  publishedAt: string | null
+}
+
 const electronAPI = {
   getImageDataUrl: (imagePath?: string): Promise<string | null> => ipcRenderer.invoke('get-image-data-url', imagePath),
   getImageInfo: (imagePath?: string): Promise<{ bytes: number; width: number; height: number } | null> => ipcRenderer.invoke('get-image-info', imagePath),
@@ -57,6 +68,8 @@ const electronAPI = {
   openExternalUrl: (url: string): Promise<boolean> => ipcRenderer.invoke('open-external-url', url),
   showFileInFolder: (filePath: string): Promise<boolean> => ipcRenderer.invoke('show-file-in-folder', filePath),
   getHistory: (): Promise<ClipboardItem[]> => ipcRenderer.invoke('get-history'),
+  getAppVersion: (): Promise<string> => ipcRenderer.invoke('get-app-version'),
+  checkForUpdates: (force = false): Promise<UpdateInfo> => ipcRenderer.invoke('check-for-updates', force),
   copyToClipboard: (item: ClipboardItem | string): Promise<ClipboardItem[]> => ipcRenderer.invoke('copy-to-clipboard', item),
   createItem: (draft: ClipboardItemDraft): Promise<{ history: ClipboardItem[]; itemId: string | null; created: boolean }> => ipcRenderer.invoke('create-item', draft),
   updateItemTags: (id: string, tags: string[]): Promise<ClipboardItem[]> => ipcRenderer.invoke('update-item-tags', id, tags),

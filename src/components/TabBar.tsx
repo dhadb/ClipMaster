@@ -19,7 +19,7 @@ const TabBar: React.FC = memo(() => {
   const tabs = useMemo(() => [
     { id: 'history' as const, label: t('tabs.history'), Icon: Clock, count: history.length, activeColor: '#818cf8' },
     { id: 'favorites' as const, label: t('tabs.favorites'), Icon: Star, count: pinnedCount, activeColor: '#fbbf24' },
-    { id: 'stats' as const, label: t('tabs.stats'), Icon: BarChart3, count: null, activeColor: '#34d399' },
+    { id: 'stats' as const, label: t('tabs.stats'), Icon: BarChart3, count: null, activeColor: 'var(--color-success)' },
   ], [history.length, pinnedCount, t])
 
   const onClick = useCallback((id: string) => {
@@ -88,7 +88,7 @@ const TabBar: React.FC = memo(() => {
               {t.count !== null && (
                 <span className="text-[10px] px-1.5 py-0.5 rounded-md font-medium"
                   style={{
-                    background: active ? 'rgba(99,102,241,0.12)' : 'transparent',
+                    background: active ? 'color-mix(in srgb, var(--color-primary) 12%, transparent)' : 'transparent',
                     color: active ? 'rgba(129,140,248,0.8)' : 'var(--text-ghost)',
                   }}>
                   {t.count}

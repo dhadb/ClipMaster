@@ -23,7 +23,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.1.0-blue.svg" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.2.0-blue.svg" alt="Version">
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-green.svg" alt="Platform">
   <img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="License">
   <img src="https://img.shields.io/badge/privacy-local--first-brightgreen.svg" alt="Local first">
@@ -40,22 +40,23 @@
 - **快速找回**：复制过的文本、链接、代码、颜色、JSON、Markdown 和图片都可以搜索和筛选。
 - **隐私保护**：默认跳过疑似密码、Token、私钥、银行卡号等高风险内容。
 - **键盘友好**：使用 `Ctrl + Shift + V` 全局唤起，搜索、选择、复制都可以快速完成。
+- **开箱即用**：首次启动引导会介绍核心操作，帮助页可随时重新打开引导并检查更新。
 
 ## 快速开始
 
 ### 安装使用
 
 1. 打开 [Releases](https://github.com/dhadb/ClipMaster/releases/latest)。
-2. 下载 `ClipMaster-Setup-1.1.0.exe`，或选择 `ClipMaster-Portable-1.1.0.exe` 免安装版。
+2. 下载 `ClipMaster-Setup-1.2.0.exe`，或选择 `ClipMaster-Portable-1.2.0.exe` 免安装版。
 3. 运行安装包并按向导安装；便携版可直接运行。
-4. 复制任意内容，按 `Ctrl + Shift + V` 打开 ClipMaster。
+4. 按首次启动引导完成设置，然后复制任意内容并按 `Ctrl + Shift + V` 打开 ClipMaster。
 
 ### 校验安装包
 
 Release 页面会附带 `checksums.sha256`。下载后可以在 PowerShell 中校验：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-1.1.0.exe"
+Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-1.2.0.exe"
 ```
 
 将输出的 SHA256 与 `checksums.sha256` 中的值对比。如果不一致，请不要运行安装包，并在 [Issues](https://github.com/dhadb/ClipMaster/issues) 中反馈。
@@ -74,6 +75,9 @@ Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-1.1.0.exe"
 | 标签整理 | 为任意记录添加标签，标签随导入导出完整保留 |
 | 收藏管理 | 收藏重要内容，清空历史时保留收藏 |
 | 使用统计 | 查看类型分布、时段高峰等数据 |
+| 首次启动引导 | 用三步介绍全局唤起、搜索标签与本地隐私机制 |
+| 主题系统 | 深色、浅色、石墨、森林、玫瑰、海岸、高对比度及跟随系统 |
+| 更新检查 | 启动后检查 GitHub Releases，也可在帮助页手动检查，不会自动下载或安装 |
 | 数据导出 | 将历史记录导出为 JSON 文件 |
 | 本地隐私 | 不上传、不同步、不分析剪贴板内容 |
 
@@ -138,7 +142,7 @@ npm run build -- --publish never
 - [ ] 增加更多隐私规则开关
 - [x] 支持自定义快捷键
 - [x] 增加便携版下载
-- [ ] 增加自动更新或更新提示
+- [x] 增加安全的更新检查与下载提示
 - [ ] 为安装包增加代码签名
 
 ## 反馈

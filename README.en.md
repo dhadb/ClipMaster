@@ -44,7 +44,7 @@
 ## Quick Start
 
 1. Open [Releases](https://github.com/dhadb/ClipMaster/releases/latest).
-2. Download `ClipMaster Setup 1.1.0.exe`, or choose the portable build.
+2. Download `ClipMaster-Setup-1.1.0.exe`, or choose `ClipMaster-Portable-1.1.0.exe`.
 3. Run the installer, or launch the portable build directly.
 4. Copy anything and press `Ctrl + Shift + V` to open ClipMaster.
 
@@ -53,7 +53,7 @@
 Release assets include `checksums.sha256`. After downloading the installer, verify it in PowerShell:
 
 ```powershell
-Get-FileHash -Algorithm SHA256 ".\ClipMaster Setup 1.1.0.exe"
+Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-1.1.0.exe"
 ```
 
 Compare the SHA256 output with `checksums.sha256`. If it does not match, do not run the installer and report it in [Issues](https://github.com/dhadb/ClipMaster/issues).

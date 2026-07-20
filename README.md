@@ -46,7 +46,7 @@
 ### 安装使用
 
 1. 打开 [Releases](https://github.com/dhadb/ClipMaster/releases/latest)。
-2. 下载 `ClipMaster Setup 1.1.0.exe`，或选择免安装的便携版。
+2. 下载 `ClipMaster-Setup-1.1.0.exe`，或选择 `ClipMaster-Portable-1.1.0.exe` 免安装版。
 3. 运行安装包并按向导安装；便携版可直接运行。
 4. 复制任意内容，按 `Ctrl + Shift + V` 打开 ClipMaster。
 
@@ -55,7 +55,7 @@
 Release 页面会附带 `checksums.sha256`。下载后可以在 PowerShell 中校验：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 ".\ClipMaster Setup 1.1.0.exe"
+Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-1.1.0.exe"
 ```
 
 将输出的 SHA256 与 `checksums.sha256` 中的值对比。如果不一致，请不要运行安装包，并在 [Issues](https://github.com/dhadb/ClipMaster/issues) 中反馈。

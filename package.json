@@ -54,6 +54,7 @@
       "icon": "public/icon.ico"
     },
     "nsis": {
+      "artifactName": "${productName}-Setup-${version}.${ext}",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
@@ -62,6 +63,9 @@
       "uninstallerIcon": "public/icon.ico",
       "installerHeaderIcon": "public/icon.ico",
       "license": null
+    },
+    "portable": {
+      "artifactName": "${productName}-Portable-${version}.${ext}"
     }
   },
   "dependencies": {

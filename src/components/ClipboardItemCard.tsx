@@ -114,6 +114,11 @@ const ClipboardItemCard: React.FC<Props> = memo(({ item, isSelected, onSelect })
             </span>
             <span className="text-[10px] flex-shrink-0" style={{ color: 'var(--text-ghost)' }}>{timeAgo}</span>
             {meta && <span className="text-[10px] truncate" style={{ color: 'var(--text-ghost)', opacity: 0.75 }}>{meta}</span>}
+            {item.tags?.[0] && (
+              <span className="text-[9px] truncate px-1.5 py-0.5 rounded flex-shrink" style={{ color: 'var(--color-primary-light)', background: 'rgba(99,102,241,0.1)' }}>
+                #{item.tags[0]}{item.tags.length > 1 ? ` +${item.tags.length - 1}` : ''}
+              </span>
+            )}
           </div>
 
           <p

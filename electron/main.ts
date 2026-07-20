@@ -1,6 +1,7 @@
 import { app, BrowserWindow, Tray, Menu, clipboard, globalShortcut, nativeImage, ipcMain, screen, shell } from 'electron'
 import path from 'path'
 import fs from 'fs'
+import { normalizeTags } from '../src/utils/clipboard'
 
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
@@ -306,7 +307,7 @@ function sanitizeHistoryItem(item: any): ClipboardItem | null {
     copyCount: Math.max(1, Number.isFinite(Number(item.copyCount)) ? Number(item.copyCount) : 1),
     firstTimestamp: Number.isFinite(Number(item.firstTimestamp)) ? Number(item.firstTimestamp) : safeTimestamp,
     imagePath: typeof item.imagePath === 'string' && item.imagePath ? item.imagePath : undefined,
-    tags: Array.isArray(item.tags) ? item.tags.filter((tag: unknown) => typeof tag === 'string') : undefined,
+    tags: normalizeTags(item.tags),
   }
 }
 
@@ -328,6 +329,7 @@ function dedupeHistory(items: ClipboardItem[]) {
     existing.copyCount = Math.max(existing.copyCount || 1, item.copyCount || 1)
     existing.firstTimestamp = Math.min(existing.firstTimestamp || existing.timestamp, item.firstTimestamp || item.timestamp)
     if (!existing.imagePath && item.imagePath) existing.imagePath = item.imagePath
+    existing.tags = normalizeTags([...(existing.tags || []), ...(item.tags || [])])
   }
   return Array.from(byContent.values()).sort((a, b) => b.timestamp - a.timestamp)
 }
@@ -779,6 +781,54 @@ ipcMain.handle('show-file-in-folder', async (_, filePath: string) => {
 })
 ipcMain.handle('get-history', () => clipboardHistory)
 
+ipcMain.handle('create-item', (_, draft: { content?: unknown; tags?: unknown; pinned?: unknown; favorited?: unknown }) => {
+  const content = typeof draft?.content === 'string' ? draft.content : ''
+  if (!content.trim()) return { history: clipboardHistory, itemId: null, created: false }
+  if (Buffer.byteLength(content, 'utf8') > 2 * 1024 * 1024) throw new Error('Clipboard item is too large')
+
+  const tags = normalizeTags(draft.tags)
+  const existingIndex = clipboardHistory.findIndex(item => item.type !== 'image' && item.content === content)
+  let item: ClipboardItem
+  let created = false
+
+  if (existingIndex >= 0) {
+    item = clipboardHistory.splice(existingIndex, 1)[0]
+    item.timestamp = Date.now()
+    item.tags = normalizeTags([...(item.tags || []), ...tags])
+    item.pinned = item.pinned || Boolean(draft.pinned)
+    item.favorited = item.favorited || Boolean(draft.favorited)
+  } else {
+    const now = Date.now()
+    item = {
+      id: generateId(),
+      content,
+      type: getClipboardContentType(content),
+      timestamp: now,
+      firstTimestamp: now,
+      copyCount: 1,
+      pinned: Boolean(draft.pinned),
+      favorited: Boolean(draft.favorited),
+      tags,
+    }
+    created = true
+  }
+
+  clipboardHistory.unshift(item)
+  applyRetentionRules()
+  mainWindow?.webContents.send('history-updated', clipboardHistory)
+  scheduleSave()
+  return { history: clipboardHistory, itemId: item.id, created }
+})
+
+ipcMain.handle('update-item-tags', (_, id: string, tags: unknown) => {
+  const item = clipboardHistory.find(item => item.id === id)
+  if (!item) return clipboardHistory
+  item.tags = normalizeTags(tags)
+  mainWindow?.webContents.send('history-updated', clipboardHistory)
+  scheduleSave()
+  return clipboardHistory
+})
+
 ipcMain.handle('copy-to-clipboard', (_, itemOrContent: ClipboardItem | string) => {
   const finishCopy = () => {
     if (settings.hideAfterCopy) mainWindow?.hide()
@@ -788,23 +838,34 @@ ipcMain.handle('copy-to-clipboard', (_, itemOrContent: ClipboardItem | string) =
     clipboard.writeText(itemOrContent)
     lastClipboardContent = itemOrContent
     finishCopy()
-    return
+    return clipboardHistory
   }
 
-  if (isImageHistoryItem(itemOrContent) && fs.existsSync(itemOrContent.imagePath)) {
-    const image = nativeImage.createFromPath(itemOrContent.imagePath)
+  const historyItem = clipboardHistory.find(item => item.id === itemOrContent.id)
+  const item = historyItem || itemOrContent
+
+  if (isImageHistoryItem(item) && fs.existsSync(item.imagePath)) {
+    const image = nativeImage.createFromPath(item.imagePath)
     if (!image.isEmpty()) {
       clipboard.writeImage(image)
-      lastClipboardImageHash = itemOrContent.content.replace(/^\[图片\]\s*/, '')
+      lastClipboardImageHash = item.content.replace(/^\[图片\]\s*/, '')
       lastImageCheckAt = Date.now()
-      finishCopy()
-      return
+    } else {
+      clipboard.writeText(item.content)
+      lastClipboardContent = item.content
     }
+  } else {
+    clipboard.writeText(item.content)
+    lastClipboardContent = item.content
   }
 
-  clipboard.writeText(itemOrContent.content)
-  lastClipboardContent = itemOrContent.content
+  if (historyItem) {
+    historyItem.copyCount = Math.max(0, historyItem.copyCount || 0) + 1
+    scheduleSave()
+    mainWindow?.webContents.send('history-updated', clipboardHistory)
+  }
   finishCopy()
+  return clipboardHistory
 })
 
 ipcMain.handle('delete-item', (_, id: string) => {

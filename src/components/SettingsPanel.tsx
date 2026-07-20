@@ -260,6 +260,7 @@ const SettingsPanel: React.FC = memo(() => {
               {[
                 { keys: settings.hotkey.split('+'), desc: t('settings.showHideWindow'), global: true },
                 { keys: ['Ctrl', 'F'], desc: t('settings.focusSearch'), global: false },
+                { keys: ['Ctrl', 'N'], desc: t('settings.newSnippet'), global: false },
                 { keys: ['↑', '↓'], desc: t('settings.moveSelection'), global: false },
                 { keys: ['Enter'], desc: t('settings.copySelection'), global: false },
                 { keys: ['Esc'], desc: t('settings.clearSearch'), global: false },

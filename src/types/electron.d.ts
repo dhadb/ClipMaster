@@ -1,11 +1,20 @@
 import { ClipboardItem, Settings, PrivacyState } from '../store/clipboardStore'
 
+export interface ClipboardItemDraft {
+  content: string
+  tags?: string[]
+  pinned?: boolean
+  favorited?: boolean
+}
+
 export interface ElectronAPI {
   getImageDataUrl: (imagePath?: string) => Promise<string | null>
   openExternalUrl: (url: string) => Promise<boolean>
   showFileInFolder: (filePath: string) => Promise<boolean>
   getHistory: () => Promise<ClipboardItem[]>
-  copyToClipboard: (item: ClipboardItem | string) => Promise<void>
+  copyToClipboard: (item: ClipboardItem | string) => Promise<ClipboardItem[]>
+  createItem: (draft: ClipboardItemDraft) => Promise<{ history: ClipboardItem[]; itemId: string | null; created: boolean }>
+  updateItemTags: (id: string, tags: string[]) => Promise<ClipboardItem[]>
   deleteItem: (id: string) => Promise<ClipboardItem[]>
   togglePin: (id: string) => Promise<ClipboardItem[]>
   toggleFavorite: (id: string) => Promise<ClipboardItem[]>

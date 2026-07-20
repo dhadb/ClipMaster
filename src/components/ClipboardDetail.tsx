@@ -3,6 +3,7 @@ import { Copy, X, Pin, PinOff, Trash2, Heart, Check, ExternalLink, Mail, Hash, C
 import { formatDistanceToNow } from 'date-fns'
 import { enUS, zhCN } from 'date-fns/locale'
 import ImagePreview from './ImagePreview'
+import TagInput from './TagInput'
 import { useClipboardStore, ClipboardItem } from '../store/clipboardStore'
 import { useI18n } from '../i18n'
 
@@ -77,6 +78,7 @@ const ClipboardDetail: React.FC = () => {
   const deleteItem = useClipboardStore(s => s.deleteItem)
   const togglePin = useClipboardStore(s => s.togglePin)
   const toggleFavorite = useClipboardStore(s => s.toggleFavorite)
+  const updateItemTags = useClipboardStore(s => s.updateItemTags)
   const setDetailItemId = useClipboardStore(s => s.setDetailItemId)
   const { t, typeLabel, language } = useI18n()
   const [copiedHint, setCopiedHint] = useState<string | null>(null)
@@ -171,6 +173,11 @@ const ClipboardDetail: React.FC = () => {
           <DetailMeta label={t('detail.copies')} value={t('detail.copyTimes', { count: item.copyCount || 1 })} />
           <DetailMeta label={t('detail.firstRecorded')} value={createdAgo} />
           <DetailMeta label={t('detail.status')} value={`${item.pinned ? t('detail.pinned') : t('detail.unpinned')} · ${item.favorited ? t('detail.favorited') : t('detail.unfavorited')}`} />
+        </div>
+
+        <div className="mb-3 rounded-lg px-3 py-2.5 slide-up" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-card)' }}>
+          <div className="text-[10px] mb-2" style={{ color: 'var(--text-ghost)' }}>{t('tags.label')}</div>
+          <TagInput value={item.tags || []} onChange={tags => updateItemTags(item.id, tags)} compact />
         </div>
 
         {isCode && (

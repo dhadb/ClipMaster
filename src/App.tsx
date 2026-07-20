@@ -8,6 +8,7 @@ import SettingsPanel from './components/SettingsPanel'
 import StatsPanel from './components/StatsPanel'
 import EmptyState from './components/EmptyState'
 import ShortcutHintBar from './components/ShortcutHintBar'
+import QuickAddDialog from './components/QuickAddDialog'
 import { useClipboardStore } from './store/clipboardStore'
 import { useI18n } from './i18n'
 
@@ -31,6 +32,7 @@ function App() {
   const setSettings = useClipboardStore(s => s.setSettings)
   const setShowSettings = useClipboardStore(s => s.setShowSettings)
   const setActiveTab = useClipboardStore(s => s.setActiveTab)
+  const setQuickAddOpen = useClipboardStore(s => s.setQuickAddOpen)
   const { t } = useI18n()
 
   const [loaded, setLoaded] = useState(false)
@@ -127,6 +129,17 @@ function App() {
     }
   }, [])
 
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'n') {
+        event.preventDefault()
+        setQuickAddOpen(true)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [setQuickAddOpen])
+
   const showSearch = activeTab !== 'settings' && activeTab !== 'stats'
 
   const content = useMemo(() => {
@@ -185,6 +198,7 @@ function App() {
       <div key={`${activeTab}-${showSettings ? 'settings' : 'content'}`} className="flex-1 overflow-hidden content-fade">{content}</div>
       {showSearch && settings.showShortcutHints && filteredHistory.length > 0 && <ShortcutHintBar />}
       <ClipboardDetail />
+      <QuickAddDialog />
       <div className="px-4 py-1.5 flex items-center justify-between"
         style={{ borderTop: '1px solid var(--border-divider)' }}>
         <div className="flex items-center gap-2 text-[10px]" style={{ color: 'var(--text-tertiary)' }}>

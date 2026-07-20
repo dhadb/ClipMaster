@@ -23,7 +23,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.0.0-blue.svg" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.1.0-blue.svg" alt="Version">
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-green.svg" alt="Platform">
   <img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="License">
   <img src="https://img.shields.io/badge/privacy-local--first-brightgreen.svg" alt="Local first">
@@ -46,8 +46,8 @@
 ### 安装使用
 
 1. 打开 [Releases](https://github.com/dhadb/ClipMaster/releases/latest)。
-2. 下载 `ClipMaster Setup 1.0.0.exe`。
-3. 运行安装包并按向导安装。
+2. 下载 `ClipMaster Setup 1.1.0.exe`，或选择免安装的便携版。
+3. 运行安装包并按向导安装；便携版可直接运行。
 4. 复制任意内容，按 `Ctrl + Shift + V` 打开 ClipMaster。
 
 ### 校验安装包
@@ -55,7 +55,7 @@
 Release 页面会附带 `checksums.sha256`。下载后可以在 PowerShell 中校验：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 ".\ClipMaster Setup 1.0.0.exe"
+Get-FileHash -Algorithm SHA256 ".\ClipMaster Setup 1.1.0.exe"
 ```
 
 将输出的 SHA256 与 `checksums.sha256` 中的值对比。如果不一致，请不要运行安装包，并在 [Issues](https://github.com/dhadb/ClipMaster/issues) 中反馈。
@@ -69,7 +69,9 @@ Get-FileHash -Algorithm SHA256 ".\ClipMaster Setup 1.0.0.exe"
 | 实时监控 | 自动捕获剪贴板内容变化 |
 | 历史记录 | 最多保存 500 条历史，支持持久化存储 |
 | 智能分类 | 自动识别文本、链接、邮箱、代码、颜色、JSON、Markdown、图片等类型 |
-| 快速搜索 | 模糊搜索历史内容，支持类型筛选 |
+| 快速搜索 | 搜索历史内容和 `#标签`，支持类型筛选与 `type:` 查询 |
+| 常用片段 | 手动保存常用文本、命令或回复，可直接收藏和置顶 |
+| 标签整理 | 为任意记录添加标签，标签随导入导出完整保留 |
 | 收藏管理 | 收藏重要内容，清空历史时保留收藏 |
 | 使用统计 | 查看类型分布、时段高峰等数据 |
 | 数据导出 | 将历史记录导出为 JSON 文件 |
@@ -81,6 +83,7 @@ Get-FileHash -Algorithm SHA256 ".\ClipMaster Setup 1.0.0.exe"
 | --- | --- | --- |
 | `Ctrl + Shift + V` | 显示 / 隐藏窗口 | 全局 |
 | `Ctrl + F` | 聚焦搜索框 | 应用内 |
+| `Ctrl + N` | 新建常用片段 | 应用内 |
 | `↑` / `↓` | 上下选择 | 应用内 |
 | `Enter` | 复制选中内容 | 应用内 |
 | `Delete` | 删除选中内容 | 应用内 |
@@ -133,8 +136,8 @@ npm run build -- --publish never
 ## 路线图
 
 - [ ] 增加更多隐私规则开关
-- [ ] 支持自定义快捷键
-- [ ] 增加便携版下载
+- [x] 支持自定义快捷键
+- [x] 增加便携版下载
 - [ ] 增加自动更新或更新提示
 - [ ] 为安装包增加代码签名
 

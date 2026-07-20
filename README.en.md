@@ -23,7 +23,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.0.0-blue.svg" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.1.0-blue.svg" alt="Version">
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-green.svg" alt="Platform">
   <img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="License">
   <img src="https://img.shields.io/badge/privacy-local--first-brightgreen.svg" alt="Local first">
@@ -44,8 +44,8 @@
 ## Quick Start
 
 1. Open [Releases](https://github.com/dhadb/ClipMaster/releases/latest).
-2. Download `ClipMaster Setup 1.0.0.exe`.
-3. Run the installer.
+2. Download `ClipMaster Setup 1.1.0.exe`, or choose the portable build.
+3. Run the installer, or launch the portable build directly.
 4. Copy anything and press `Ctrl + Shift + V` to open ClipMaster.
 
 ## Verify the Installer
@@ -53,7 +53,7 @@
 Release assets include `checksums.sha256`. After downloading the installer, verify it in PowerShell:
 
 ```powershell
-Get-FileHash -Algorithm SHA256 ".\ClipMaster Setup 1.0.0.exe"
+Get-FileHash -Algorithm SHA256 ".\ClipMaster Setup 1.1.0.exe"
 ```
 
 Compare the SHA256 output with `checksums.sha256`. If it does not match, do not run the installer and report it in [Issues](https://github.com/dhadb/ClipMaster/issues).
@@ -67,7 +67,9 @@ Windows may show a SmartScreen warning for unsigned open-source installers. Down
 | Live monitoring | Captures clipboard changes automatically |
 | History | Stores up to 500 clipboard entries |
 | Smart categories | Detects text, links, emails, code, colors, JSON, Markdown, images, and more |
-| Search | Fuzzy search with type filters |
+| Search | Search content and `#tags` with type filters and `type:` queries |
+| Reusable snippets | Save frequently used text, commands, and replies manually |
+| Tags | Organize any entry with tags preserved across import and export |
 | Favorites | Pin important clipboard items |
 | Stats | View type distribution and usage patterns |
 | Export | Export history as JSON |
@@ -79,6 +81,7 @@ Windows may show a SmartScreen warning for unsigned open-source installers. Down
 | --- | --- | --- |
 | `Ctrl + Shift + V` | Show / hide window | Global |
 | `Ctrl + F` | Focus search | In app |
+| `Ctrl + N` | Create a reusable snippet | In app |
 | `↑` / `↓` | Move selection | In app |
 | `Enter` | Copy selected item | In app |
 | `Delete` | Delete selected item | In app |

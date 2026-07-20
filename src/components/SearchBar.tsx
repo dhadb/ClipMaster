@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { Search, X, SlidersHorizontal, Star } from 'lucide-react'
+import { Search, X, SlidersHorizontal, Star, Plus } from 'lucide-react'
 import { useClipboardStore } from '../store/clipboardStore'
 import { useI18n } from '../i18n'
 
@@ -12,13 +12,14 @@ const SearchBar: React.FC = () => {
   const setFilterType = useClipboardStore(s => s.setFilterType)
   const activeTab = useClipboardStore(s => s.activeTab)
   const setActiveTab = useClipboardStore(s => s.setActiveTab)
+  const setQuickAddOpen = useClipboardStore(s => s.setQuickAddOpen)
   const { t } = useI18n()
 
   const [local, setLocal] = useState(searchQuery)
   const [focused, setFocused] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
-  const timerRef = useRef<any>(null)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => { setLocal(searchQuery) }, [searchQuery])
 
@@ -102,6 +103,9 @@ const SearchBar: React.FC = () => {
                 <X size={13} />
               </button>
             )}
+            <button onClick={() => setQuickAddOpen(true)} className="action-btn" style={{ width: 28, height: 28 }} title={t('search.addSnippet')}>
+              <Plus size={14} />
+            </button>
             <button onClick={() => setShowFilters(v => !v)}
               className={`action-btn ${showFilters ? 'expand' : ''}`}
               style={{ width: 28, height: 28 }}>
@@ -180,4 +184,3 @@ const SearchBar: React.FC = () => {
 }
 
 export default React.memo(SearchBar)
-

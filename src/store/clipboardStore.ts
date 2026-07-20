@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { LanguageSetting } from '../i18n'
+import { matchesClipboardQuery, normalizeTags } from '../utils/clipboard'
 
 export interface ClipboardItem {
   id: string
@@ -44,6 +45,15 @@ export interface PrivacyState {
   protectedToday: number
 }
 
+export interface ClipboardItemDraft {
+  content: string
+  tags?: string[]
+  pinned?: boolean
+  favorited?: boolean
+}
+
+type ActiveTab = 'history' | 'favorites' | 'stats' | 'settings'
+
 const defaultSettings: Settings = {
   maxHistory: 200,
   hotkey: 'CommandOrControl+Shift+V',
@@ -78,15 +88,13 @@ function normalizeSettings(settings: Partial<Settings>): Settings {
   }
 }
 
-function filterHistory(history: ClipboardItem[], activeTab: string, searchQuery: string): ClipboardItem[] {
+function filterHistory(history: ClipboardItem[], activeTab: ActiveTab, searchQuery: string, filterType: string | null): ClipboardItem[] {
   let filtered = history
   if (activeTab === 'favorites') {
     filtered = filtered.filter(item => item.favorited)
   }
-  if (searchQuery) {
-    const q = searchQuery.toLowerCase()
-    filtered = filtered.filter(item => item.content.toLowerCase().includes(q))
-  }
+  if (searchQuery) filtered = filtered.filter(item => matchesClipboardQuery(item, searchQuery))
+  if (filterType) filtered = filtered.filter(item => item.type === filterType)
   return filtered
 }
 
@@ -98,11 +106,12 @@ interface ClipboardStore {
   settings: Settings
   privacy: PrivacyState
   showSettings: boolean
-  activeTab: 'history' | 'favorites' | 'stats' | 'settings'
+  quickAddOpen: boolean
+  activeTab: ActiveTab
   copiedId: string | null
   detailItemId: string | null
   filterType: string | null
-  _copiedTimer: any
+  _copiedTimer: ReturnType<typeof setTimeout> | null
 
   setHistory: (history: ClipboardItem[]) => void
   setSearchQuery: (query: string) => void
@@ -110,9 +119,12 @@ interface ClipboardStore {
   setSettings: (settings: Settings) => void
   setPrivacy: (privacy: PrivacyState) => void
   setShowSettings: (show: boolean) => void
-  setActiveTab: (tab: 'history' | 'favorites' | 'stats' | 'settings') => void
+  setQuickAddOpen: (open: boolean) => void
+  setActiveTab: (tab: ActiveTab) => void
   setDetailItemId: (id: string | null) => void
   setFilterType: (type: string | null) => void
+  addItem: (draft: ClipboardItemDraft) => Promise<{ itemId: string | null; created: boolean }>
+  updateItemTags: (id: string, tags: string[]) => Promise<void>
   deleteItem: (id: string) => Promise<void>
   togglePin: (id: string) => Promise<void>
   toggleFavorite: (id: string) => Promise<void>
@@ -132,6 +144,7 @@ export const useClipboardStore = create<ClipboardStore>((set, get) => ({
   settings: defaultSettings,
   privacy: { paused: false, pauseUntil: 0, protectedToday: 0 },
   showSettings: false,
+  quickAddOpen: false,
   activeTab: 'history',
   copiedId: null,
   detailItemId: null,
@@ -140,44 +153,52 @@ export const useClipboardStore = create<ClipboardStore>((set, get) => ({
 
   setHistory: (history) => {
     const { searchQuery, activeTab, filterType } = get()
-    let filtered = filterHistory(history, activeTab, searchQuery)
-    if (filterType) {
-      filtered = filtered.filter(item => item.type === filterType)
-    }
-    set({ history, filteredHistory: filtered })
+    set({ history, filteredHistory: filterHistory(history, activeTab, searchQuery, filterType) })
   },
 
   setSearchQuery: (searchQuery) => {
     const { history, activeTab, filterType } = get()
-    let filtered = filterHistory(history, activeTab, searchQuery)
-    if (filterType) {
-      filtered = filtered.filter(item => item.type === filterType)
-    }
-    set({ searchQuery, filteredHistory: filtered })
+    set({ searchQuery, filteredHistory: filterHistory(history, activeTab, searchQuery, filterType) })
   },
 
   setSelectedId: (selectedId) => set({ selectedId }),
   setSettings: (settings) => set({ settings: normalizeSettings(settings) }),
   setPrivacy: (privacy) => set({ privacy }),
   setShowSettings: (showSettings) => set({ showSettings }),
+  setQuickAddOpen: (quickAddOpen) => set({ quickAddOpen }),
   setDetailItemId: (detailItemId) => set({ detailItemId }),
 
   setActiveTab: (activeTab) => {
     const { history, searchQuery, filterType } = get()
-    let filtered = filterHistory(history, activeTab, searchQuery)
-    if (filterType) {
-      filtered = filtered.filter(item => item.type === filterType)
-    }
-    set({ activeTab, showSettings: activeTab === 'settings', filteredHistory: filtered })
+    set({ activeTab, showSettings: activeTab === 'settings', filteredHistory: filterHistory(history, activeTab, searchQuery, filterType) })
   },
 
   setFilterType: (filterType) => {
     const { history, searchQuery, activeTab } = get()
-    let filtered = filterHistory(history, activeTab, searchQuery)
-    if (filterType) {
-      filtered = filtered.filter(item => item.type === filterType)
+    set({ filterType, filteredHistory: filterHistory(history, activeTab, searchQuery, filterType) })
+  },
+
+  addItem: async (draft) => {
+    if (!window.electronAPI) return { itemId: null, created: false }
+    const result = await window.electronAPI.createItem({ ...draft, tags: normalizeTags(draft.tags) })
+    set({ activeTab: 'history', showSettings: false, searchQuery: '', filterType: null })
+    get().setHistory(result.history)
+    set({ quickAddOpen: false, detailItemId: result.itemId, selectedId: result.itemId })
+    return { itemId: result.itemId, created: result.created }
+  },
+
+  updateItemTags: async (id, tags) => {
+    const normalized = normalizeTags(tags)
+    const previous = get().history
+    get().setHistory(previous.map(item => item.id === id ? { ...item, tags: normalized } : item))
+    try {
+      if (!window.electronAPI) return
+      const history = await window.electronAPI.updateItemTags(id, normalized)
+      get().setHistory(history)
+    } catch (err) {
+      get().setHistory(previous)
+      console.error('updateItemTags failed:', err)
     }
-    set({ filterType, filteredHistory: filtered })
   },
 
   deleteItem: async (id) => {
@@ -243,7 +264,8 @@ export const useClipboardStore = create<ClipboardStore>((set, get) => ({
     if (!item || !window.electronAPI) return
     try {
       if (_copiedTimer) clearTimeout(_copiedTimer)
-      await window.electronAPI.copyToClipboard(item)
+      const updatedHistory = await window.electronAPI.copyToClipboard(item)
+      get().setHistory(updatedHistory)
       if (settings.soundEnabled) {
         try {
           const audio = new Audio('data:audio/wav;base64,UklGRjQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YRAAAAAAAP//AAD//wAA//8AAP//AAA=')

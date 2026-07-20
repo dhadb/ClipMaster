@@ -43,6 +43,13 @@ export interface PrivacyState {
   protectedToday: number
 }
 
+export interface ClipboardItemDraft {
+  content: string
+  tags?: string[]
+  pinned?: boolean
+  favorited?: boolean
+}
+
 const electronAPI = {
   getImageDataUrl: (imagePath?: string): Promise<string | null> => ipcRenderer.invoke('get-image-data-url', imagePath),
   getImageInfo: (imagePath?: string): Promise<{ bytes: number; width: number; height: number } | null> => ipcRenderer.invoke('get-image-info', imagePath),
@@ -50,7 +57,9 @@ const electronAPI = {
   openExternalUrl: (url: string): Promise<boolean> => ipcRenderer.invoke('open-external-url', url),
   showFileInFolder: (filePath: string): Promise<boolean> => ipcRenderer.invoke('show-file-in-folder', filePath),
   getHistory: (): Promise<ClipboardItem[]> => ipcRenderer.invoke('get-history'),
-  copyToClipboard: (item: ClipboardItem | string): Promise<void> => ipcRenderer.invoke('copy-to-clipboard', item),
+  copyToClipboard: (item: ClipboardItem | string): Promise<ClipboardItem[]> => ipcRenderer.invoke('copy-to-clipboard', item),
+  createItem: (draft: ClipboardItemDraft): Promise<{ history: ClipboardItem[]; itemId: string | null; created: boolean }> => ipcRenderer.invoke('create-item', draft),
+  updateItemTags: (id: string, tags: string[]): Promise<ClipboardItem[]> => ipcRenderer.invoke('update-item-tags', id, tags),
   deleteItem: (id: string): Promise<ClipboardItem[]> => ipcRenderer.invoke('delete-item', id),
   togglePin: (id: string): Promise<ClipboardItem[]> => ipcRenderer.invoke('toggle-pin', id),
   toggleFavorite: (id: string): Promise<ClipboardItem[]> => ipcRenderer.invoke('toggle-favorite', id),

@@ -89,6 +89,8 @@ Windows may show a SmartScreen warning for unsigned open-source installers. Down
 
 ## Development
 
+Requires Node.js 22.12 or newer.
+
 ```bash
 git clone https://github.com/dhadb/ClipMaster.git
 cd ClipMaster

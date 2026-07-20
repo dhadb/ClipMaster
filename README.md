@@ -103,7 +103,7 @@ ClipMaster 不包含云端服务，不会上传、同步或分析你的剪贴板
 
 ### 环境要求
 
-- Node.js 18+
+- Node.js 22.12+
 - Git
 - Windows 10/11
 

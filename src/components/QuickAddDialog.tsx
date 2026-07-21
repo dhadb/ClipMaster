@@ -62,7 +62,7 @@ const QuickAddDialog: React.FC = () => {
     <div className="absolute inset-0 z-[60] flex items-center justify-center p-4 detail-backdrop" style={{ background: 'color-mix(in srgb, var(--bg-root) 76%, transparent)', backdropFilter: 'blur(10px)' }}>
       <form
         onSubmit={event => { event.preventDefault(); void submit() }}
-        className="w-full max-w-md rounded-xl overflow-hidden detail-panel"
+        className="w-full max-w-md rounded-lg overflow-hidden detail-panel"
         style={{ background: 'var(--bg-app)', border: '1px solid var(--border-card)', boxShadow: 'var(--shadow-app)' }}
       >
         <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid var(--border-divider)' }}>

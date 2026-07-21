@@ -1,6 +1,25 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { Search, X, SlidersHorizontal, Star, Plus } from 'lucide-react'
-import { useClipboardStore } from '../store/clipboardStore'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  AtSign,
+  Braces,
+  CalendarDays,
+  Clock3,
+  Code2,
+  FileImage,
+  FileText,
+  Hash,
+  Link2,
+  ListFilter,
+  MapPin,
+  Phone,
+  Plus,
+  Search,
+  SlidersHorizontal,
+  Sparkles,
+  Type,
+  X,
+} from 'lucide-react'
+import { useClipboardStore, type SortMode, type TimeFilter } from '../store/clipboardStore'
 import { useI18n } from '../i18n'
 
 const SearchBar: React.FC = () => {
@@ -10,8 +29,11 @@ const SearchBar: React.FC = () => {
   const filteredLen = useClipboardStore(s => s.filteredHistory.length)
   const filterType = useClipboardStore(s => s.filterType)
   const setFilterType = useClipboardStore(s => s.setFilterType)
-  const activeTab = useClipboardStore(s => s.activeTab)
-  const setActiveTab = useClipboardStore(s => s.setActiveTab)
+  const sortMode = useClipboardStore(s => s.sortMode)
+  const setSortMode = useClipboardStore(s => s.setSortMode)
+  const timeFilter = useClipboardStore(s => s.timeFilter)
+  const setTimeFilter = useClipboardStore(s => s.setTimeFilter)
+  const resetFilters = useClipboardStore(s => s.resetFilters)
   const setQuickAddOpen = useClipboardStore(s => s.setQuickAddOpen)
   const { t } = useI18n()
 
@@ -22,16 +44,13 @@ const SearchBar: React.FC = () => {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => { setLocal(searchQuery) }, [searchQuery])
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current) }, [])
 
-  useEffect(() => {
-    return () => { if (timerRef.current) clearTimeout(timerRef.current) }
-  }, [])
-
-  const onChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const v = e.target.value
-    setLocal(v)
+  const onChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const value = event.target.value
+    setLocal(value)
     if (timerRef.current) clearTimeout(timerRef.current)
-    timerRef.current = setTimeout(() => setSearchQuery(v), 120)
+    timerRef.current = setTimeout(() => setSearchQuery(value), 100)
   }, [setSearchQuery])
 
   const onClear = useCallback(() => {
@@ -41,142 +60,101 @@ const SearchBar: React.FC = () => {
   }, [setSearchQuery])
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f' && !e.altKey && !e.shiftKey) {
-        e.preventDefault()
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f' && !event.altKey && !event.shiftKey) {
+        event.preventDefault()
         inputRef.current?.focus()
       }
-      if (e.key === 'Escape') { onClear(); inputRef.current?.blur() }
+      if (event.key === 'Escape' && document.activeElement === inputRef.current) {
+        onClear()
+        inputRef.current?.blur()
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onClear])
 
-  const stats = useMemo(() => ({
-    favorited: history.filter(h => h.favorited).length,
-    today: history.filter(h => new Date(h.timestamp).toDateString() === new Date().toDateString()).length,
-  }), [history])
-
   const filters = useMemo(() => [
-    { id: 'text', label: t('type.text'), icon: 'T' },
-    { id: 'link', label: t('type.link'), icon: '↗' },
-    { id: 'email', label: t('type.email'), icon: '@' },
-    { id: 'color', label: t('type.color'), icon: '●' },
-    { id: 'number', label: t('type.number'), icon: '#' },
-    { id: 'code', label: t('type.code'), icon: '<>' },
-    { id: 'json', label: t('type.json'), icon: '{}' },
-    { id: 'markdown', label: 'MD', icon: 'M' },
-    { id: 'long-text', label: t('type.long-short'), icon: '¶' },
-    { id: 'file-path', label: t('type.file-path'), icon: '/' },
-    { id: 'phone', label: t('type.phone'), icon: '☎' },
-    { id: 'image', label: t('type.image'), icon: '□' },
+    { id: 'text', label: t('type.text'), Icon: Type },
+    { id: 'link', label: t('type.link'), Icon: Link2 },
+    { id: 'email', label: t('type.email'), Icon: AtSign },
+    { id: 'color', label: t('type.color'), Icon: Sparkles },
+    { id: 'number', label: t('type.number'), Icon: Hash },
+    { id: 'code', label: t('type.code'), Icon: Code2 },
+    { id: 'json', label: t('type.json'), Icon: Braces },
+    { id: 'markdown', label: t('type.markdown'), Icon: FileText },
+    { id: 'file-path', label: t('type.file-path'), Icon: MapPin },
+    { id: 'phone', label: t('type.phone'), Icon: Phone },
+    { id: 'image', label: t('type.image'), Icon: FileImage },
   ], [t])
 
-  const onFilterClick = useCallback((id: string | null) => {
-    setFilterType(filterType === id ? null : id)
-  }, [filterType, setFilterType])
+  const sortOptions: Array<{ id: SortMode; label: string }> = [
+    { id: 'newest', label: t('search.sortNewest') },
+    { id: 'oldest', label: t('search.sortOldest') },
+    { id: 'most-used', label: t('search.sortUsed') },
+  ]
+  const timeOptions: Array<{ id: TimeFilter; label: string; Icon: typeof Clock3 }> = [
+    { id: 'all', label: t('search.timeAll'), Icon: Clock3 },
+    { id: 'today', label: t('search.timeToday'), Icon: CalendarDays },
+    { id: 'week', label: t('search.timeWeek'), Icon: CalendarDays },
+  ]
 
-  const resultCount = local || filterType || activeTab === 'favorites' ? filteredLen : history.length
-  const hasFilter = Boolean(local || filterType || activeTab === 'favorites')
+  const hasFilter = Boolean(local || filterType || timeFilter !== 'all')
+  const activeFilterCount = Number(Boolean(filterType)) + Number(timeFilter !== 'all') + Number(sortMode !== 'newest')
 
   return (
-    <div style={{ padding: '8px 12px' }}>
-      {/* 搜索框 */}
-      <div className="search-input rounded-xl overflow-hidden">
-        <div className="flex items-center px-3 py-2">
-          <Search size={15} color={focused ? 'var(--color-primary)' : 'var(--text-placeholder)'}
-            style={{ transition: 'color 0.15s', flexShrink: 0 }} />
+    <div className="px-3 pb-2 pt-2">
+      <div className={`search-input overflow-hidden rounded-lg ${focused ? 'is-focused' : ''}`}>
+        <div className="flex h-10 items-center px-3">
+          <Search size={15} color={focused ? 'var(--color-primary)' : 'var(--text-placeholder)'} className="flex-shrink-0" />
           <input
             ref={inputRef}
-            type="text"
+            type="search"
             placeholder={t('search.placeholder')}
             value={local}
             onChange={onChange}
             onFocus={() => setFocused(true)}
-            onBlur={() => setTimeout(() => setFocused(false), 150)}
-            className="flex-1 bg-transparent border-none outline-none text-[13px] ml-2.5"
+            onBlur={() => setFocused(false)}
+            className="ml-2.5 min-w-0 flex-1 border-none bg-transparent text-[13px] outline-none"
             style={{ color: 'var(--text-primary)' }}
           />
-          <div className="flex items-center gap-0.5 flex-shrink-0">
-            {local && (
-              <button onClick={onClear} className="action-btn scale-in" style={{ width: 28, height: 28 }}>
-                <X size={13} />
-              </button>
-            )}
-            <button onClick={() => setQuickAddOpen(true)} className="action-btn" style={{ width: 28, height: 28 }} title={t('search.addSnippet')}>
-              <Plus size={14} />
-            </button>
-            <button onClick={() => setShowFilters(v => !v)}
-              className={`action-btn ${showFilters ? 'expand' : ''}`}
-              style={{ width: 28, height: 28 }}>
+          <div className="flex flex-shrink-0 items-center gap-0.5">
+            {local && <button onClick={onClear} className="action-btn scale-in" title={t('search.clear')}><X size={13} /></button>}
+            <button onClick={() => setQuickAddOpen(true)} className="action-btn" title={t('search.addSnippet')}><Plus size={14} /></button>
+            <button onClick={() => setShowFilters(value => !value)} className={`action-btn ${showFilters || activeFilterCount ? 'active' : ''}`} title={t('search.filters')}>
               <SlidersHorizontal size={13} />
+              {activeFilterCount > 0 && <span className="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full" style={{ background: 'var(--color-primary-light)' }} />}
             </button>
           </div>
         </div>
       </div>
 
-      {/* 状态栏 - 固定高度，始终显示 */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 4px', minHeight: '20px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px', color: 'var(--text-ghost)', whiteSpace: 'nowrap' }}>
-          <span>{hasFilter ? t('search.current') : t('search.total')}</span>
-          <span style={{ fontVariantNumeric: 'tabular-nums' }}>{resultCount}</span>
-          <span>{t('search.items')}</span>
-          {hasFilter && resultCount !== history.length && (
-            <span style={{ opacity: 0.75 }}>{t('search.totalCount', { count: history.length })}</span>
-          )}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap' }}>
-          <button
-            onClick={() => setActiveTab(activeTab === 'favorites' ? 'history' : 'favorites')}
-            className="interactive-chip"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '2px',
-              fontSize: '10px',
-              color: activeTab === 'favorites' ? '#fbbf24' : 'var(--text-ghost)',
-              opacity: activeTab === 'favorites' ? 1 : 0.75,
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: 0,
-            }}
-            title={activeTab === 'favorites' ? t('search.backHistory') : t('search.viewFavorites')}
-          >
-            <Star size={10} fill={activeTab === 'favorites' ? '#fbbf24' : 'none'} strokeWidth={2} />
-            <span style={{ fontVariantNumeric: 'tabular-nums' }}>{stats.favorited}</span>
-          </button>
-          <span style={{ fontSize: '10px', color: 'var(--text-ghost)', opacity: 0.6 }}>|</span>
-          <span style={{ fontSize: '10px', fontVariantNumeric: 'tabular-nums', color: 'var(--text-ghost)', opacity: 0.75 }}>
-            {t('search.today', { count: stats.today })}
-          </span>
-        </div>
+      <div className="flex min-h-7 items-center justify-between px-1 pt-1.5 text-[10px]" style={{ color: 'var(--text-ghost)' }}>
+        <span>{hasFilter ? t('search.resultSummary', { count: filteredLen, total: history.length }) : t('search.totalSummary', { count: history.length })}</span>
+        {hasFilter && <button onClick={() => { resetFilters(); setLocal('') }} className="inline-flex items-center gap-1 rounded px-1.5 py-1 interactive-chip" style={{ color: 'var(--color-primary-light)' }}><X size={10} />{t('search.reset')}</button>}
       </div>
 
-      {/* 筛选器 */}
       {showFilters && (
-        <div className="flex items-center gap-1 px-0.5 overflow-x-auto fade-in" style={{ scrollbarWidth: 'none', marginTop: '6px' }}>
-          <button onClick={() => onFilterClick(null)}
-            className="flex-shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-medium interactive-chip"
-            style={{
-              background: !filterType ? 'color-mix(in srgb, var(--color-primary) 12%, transparent)' : 'transparent',
-              color: !filterType ? 'rgba(129,140,248,0.9)' : 'var(--text-tertiary)',
-              border: `1px solid ${!filterType ? 'color-mix(in srgb, var(--color-primary) 20%, transparent)' : 'transparent'}`,
-            }}>
-            {t('search.all')}
-          </button>
-          {filters.map(f => (
-            <button key={f.id} onClick={() => onFilterClick(f.id)}
-              className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium interactive-chip"
-              style={{
-                background: filterType === f.id ? 'color-mix(in srgb, var(--color-primary) 12%, transparent)' : 'transparent',
-                color: filterType === f.id ? 'rgba(129,140,248,0.9)' : 'var(--text-tertiary)',
-                border: `1px solid ${filterType === f.id ? 'color-mix(in srgb, var(--color-primary) 20%, transparent)' : 'transparent'}`,
-              }}>
-              <span className="text-[10px] opacity-60">{f.icon}</span>
-              <span>{f.label}</span>
-            </button>
-          ))}
+        <div className="filter-panel mt-1 space-y-2 rounded-lg p-2.5 fade-in" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-card)' }}>
+          <div className="flex items-center gap-2">
+            <ListFilter size={12} color="var(--text-ghost)" />
+            <div className="flex min-w-0 flex-1 gap-1 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+              <button onClick={() => setFilterType(null)} className={`filter-chip ${!filterType ? 'active' : ''}`}>{t('search.all')}</button>
+              {filters.map(({ id, label, Icon }) => (
+                <button key={id} onClick={() => setFilterType(filterType === id ? null : id)} className={`filter-chip ${filterType === id ? 'active' : ''}`} title={label}>
+                  <Icon size={11} /><span>{label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="segmented-control">
+              {timeOptions.map(({ id, label }) => <button key={id} onClick={() => setTimeFilter(id)} className={timeFilter === id ? 'active' : ''}>{label}</button>)}
+            </div>
+            <div className="segmented-control">
+              {sortOptions.map(({ id, label }) => <button key={id} onClick={() => setSortMode(id)} className={sortMode === id ? 'active' : ''}>{label}</button>)}
+            </div>
+          </div>
         </div>
       )}
     </div>

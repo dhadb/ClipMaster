@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useCallback, useMemo, useState } from 'react'
 import ClipboardItemCard from './ClipboardItemCard'
 import { useClipboardStore } from '../store/clipboardStore'
+import { useI18n } from '../i18n'
 
 const ITEM_H = 84
 const OVERSCAN = 5
@@ -10,6 +11,14 @@ const ClipboardList: React.FC = () => {
   const selectedId = useClipboardStore(s => s.selectedId)
   const setSelectedId = useClipboardStore(s => s.setSelectedId)
   const copyItem = useClipboardStore(s => s.copyItem)
+  const selectionMode = useClipboardStore(s => s.selectionMode)
+  const selectedIds = useClipboardStore(s => s.selectedIds)
+  const setSelectionMode = useClipboardStore(s => s.setSelectionMode)
+  const toggleSelection = useClipboardStore(s => s.toggleSelection)
+  const selectAllFiltered = useClipboardStore(s => s.selectAllFiltered)
+  const deleteItems = useClipboardStore(s => s.deleteItems)
+  const notify = useClipboardStore(s => s.notify)
+  const { t } = useI18n()
   const containerRef = useRef<HTMLDivElement>(null)
   const [range, setRange] = useState({ start: 0, end: 24 })
 
@@ -69,6 +78,18 @@ const ClipboardList: React.FC = () => {
       )
       if (isEditing) return
 
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a' && selectionMode) {
+        e.preventDefault()
+        selectAllFiltered()
+        return
+      }
+
+      if (e.key === 'Escape' && selectionMode) {
+        e.preventDefault()
+        setSelectionMode(false)
+        return
+      }
+
       if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && filteredHistory.length === 0) {
         e.preventDefault()
         setSelectedId(null)
@@ -86,17 +107,19 @@ const ClipboardList: React.FC = () => {
         const prev = idx > 0 ? idx - 1 : filteredHistory.length - 1
         setSelectedId(filteredHistory[prev]?.id || null)
         scrollToIndex(prev)
-      } else if (e.key === 'Enter' && selectedId) {
+      } else if (e.key === 'Enter' && selectedId && !selectionMode) {
         e.preventDefault()
         copyItem(selectedId)
-      } else if (e.key === 'Delete' && selectedId) {
+      } else if (e.key === 'Delete' && selectedId && !selectionMode) {
         e.preventDefault()
-        useClipboardStore.getState().deleteItem(selectedId)
+        void deleteItems([selectedId]).then(count => {
+          if (count > 0) notify(t('toast.deleted', { count }), 'success', 'undo-delete')
+        })
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [filteredHistory, selectedId, setSelectedId, copyItem, scrollToIndex])
+  }, [copyItem, deleteItems, filteredHistory, notify, scrollToIndex, selectAllFiltered, selectedId, selectionMode, setSelectedId, setSelectionMode, t])
 
   useEffect(() => {
     if (filteredHistory.length === 0) {
@@ -144,6 +167,9 @@ const ClipboardList: React.FC = () => {
                 item={item}
                 isSelected={selectedId === item.id}
                 onSelect={() => setSelectedId(item.id)}
+                selectionMode={selectionMode}
+                isChecked={selectedIds.includes(item.id)}
+                onToggleSelection={() => toggleSelection(item.id)}
               />
             </div>
           )

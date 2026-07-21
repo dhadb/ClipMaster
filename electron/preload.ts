@@ -1,5 +1,6 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import type { ThemeSetting } from '../src/theme'
+import type { AccentSetting } from '../src/personalization'
 
 export interface ClipboardItem {
   id: string
@@ -20,13 +21,13 @@ export interface Settings {
   autoStart: boolean
   minimizeToTray: boolean
   theme: ThemeSetting
+  accentColor: AccentSetting
   language: 'system' | 'zh-CN' | 'en-US'
   opacity: number
   fontSize: number
   windowWidth: number
   windowHeight: number
   showPreview: boolean
-  showShortcutHints: boolean
   listDensity: 'compact' | 'normal' | 'comfortable'
   copyOnSelect: boolean
   recordImages: boolean
@@ -37,7 +38,6 @@ export interface Settings {
   autoDeleteDays: number
   verificationCodeTtlMinutes: number
   autoCheckUpdates: boolean
-  onboardingCompleted: boolean
 }
 
 export interface PrivacyState {
@@ -51,6 +51,11 @@ export interface ClipboardItemDraft {
   tags?: string[]
   pinned?: boolean
   favorited?: boolean
+}
+
+export interface DeleteItemsResult {
+  history: ClipboardItem[]
+  deleted: ClipboardItem[]
 }
 
 export interface UpdateInfo {
@@ -73,7 +78,11 @@ const electronAPI = {
   copyToClipboard: (item: ClipboardItem | string): Promise<ClipboardItem[]> => ipcRenderer.invoke('copy-to-clipboard', item),
   createItem: (draft: ClipboardItemDraft): Promise<{ history: ClipboardItem[]; itemId: string | null; created: boolean }> => ipcRenderer.invoke('create-item', draft),
   updateItemTags: (id: string, tags: string[]): Promise<ClipboardItem[]> => ipcRenderer.invoke('update-item-tags', id, tags),
+  updateItem: (id: string, patch: { content?: string; tags?: string[] }): Promise<ClipboardItem[]> => ipcRenderer.invoke('update-item', id, patch),
   deleteItem: (id: string): Promise<ClipboardItem[]> => ipcRenderer.invoke('delete-item', id),
+  deleteItems: (ids: string[]): Promise<DeleteItemsResult> => ipcRenderer.invoke('delete-items', ids),
+  restoreItems: (items: ClipboardItem[]): Promise<ClipboardItem[]> => ipcRenderer.invoke('restore-items', items),
+  batchUpdateItems: (ids: string[], patch: { pinned?: boolean; favorited?: boolean; addTags?: string[] }): Promise<ClipboardItem[]> => ipcRenderer.invoke('batch-update-items', ids, patch),
   togglePin: (id: string): Promise<ClipboardItem[]> => ipcRenderer.invoke('toggle-pin', id),
   toggleFavorite: (id: string): Promise<ClipboardItem[]> => ipcRenderer.invoke('toggle-favorite', id),
   clearHistory: (): Promise<ClipboardItem[]> => ipcRenderer.invoke('clear-history'),
@@ -88,17 +97,17 @@ const electronAPI = {
   closeWindow: (): Promise<void> => ipcRenderer.invoke('close-window'),
   toggleMaximize: (): Promise<void> => ipcRenderer.invoke('toggle-maximize'),
   onHistoryUpdated: (callback: (history: ClipboardItem[]) => void) => {
-    const handler = (_: any, history: ClipboardItem[]) => callback(history)
+    const handler = (_event: IpcRendererEvent, history: ClipboardItem[]) => callback(history)
     ipcRenderer.on('history-updated', handler)
     return () => { ipcRenderer.removeListener('history-updated', handler) }
   },
   onSettingsUpdated: (callback: (settings: Settings) => void) => {
-    const handler = (_: any, settings: Settings) => callback(settings)
+    const handler = (_event: IpcRendererEvent, settings: Settings) => callback(settings)
     ipcRenderer.on('settings-updated', handler)
     return () => { ipcRenderer.removeListener('settings-updated', handler) }
   },
   onPrivacyUpdated: (callback: (state: PrivacyState) => void) => {
-    const handler = (_: any, state: PrivacyState) => callback(state)
+    const handler = (_event: IpcRendererEvent, state: PrivacyState) => callback(state)
     ipcRenderer.on('privacy-updated', handler)
     return () => { ipcRenderer.removeListener('privacy-updated', handler) }
   },

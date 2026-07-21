@@ -1,5 +1,6 @@
 import React, { useCallback, memo } from 'react'
-import { Copy, Pin, PinOff, Trash2, ExternalLink, Mail, Hash, Code, FileText, Type, Check, Heart } from 'lucide-react'
+import { Copy, Pin, PinOff, Trash2, ExternalLink, Mail, Hash, Code, FileText, Type, Check, Heart, Circle, CheckCircle2 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { useClipboardStore, ClipboardItem } from '../store/clipboardStore'
 import { formatDistanceToNow } from 'date-fns'
 import { enUS, zhCN } from 'date-fns/locale'
@@ -10,9 +11,12 @@ interface Props {
   item: ClipboardItem
   isSelected: boolean
   onSelect: () => void
+  selectionMode: boolean
+  isChecked: boolean
+  onToggleSelection: () => void
 }
 
-const TYPE_CFG: Record<string, { Icon: any; bar: string; cssVar: string }> = {
+const TYPE_CFG: Record<string, { Icon: LucideIcon; bar: string; cssVar: string }> = {
   text: { Icon: Type, bar: 'type-text', cssVar: 'var(--type-text)' },
   link: { Icon: ExternalLink, bar: 'type-link', cssVar: 'var(--type-link)' },
   email: { Icon: Mail, bar: 'type-email', cssVar: 'var(--type-email)' },
@@ -36,9 +40,9 @@ function getPreviewText(item: ClipboardItem, imageText: string) {
   return item.content.length > 96 ? `${item.content.slice(0, 96)}...` : item.content
 }
 
-const ClipboardItemCard: React.FC<Props> = memo(({ item, isSelected, onSelect }) => {
+const ClipboardItemCard: React.FC<Props> = memo(({ item, isSelected, onSelect, selectionMode, isChecked, onToggleSelection }) => {
   const copyItem = useClipboardStore(s => s.copyItem)
-  const deleteItem = useClipboardStore(s => s.deleteItem)
+  const deleteItems = useClipboardStore(s => s.deleteItems)
   const togglePin = useClipboardStore(s => s.togglePin)
   const toggleFavorite = useClipboardStore(s => s.toggleFavorite)
   const setDetailItemId = useClipboardStore(s => s.setDetailItemId)
@@ -46,6 +50,7 @@ const ClipboardItemCard: React.FC<Props> = memo(({ item, isSelected, onSelect })
   const fontSize = useClipboardStore(s => s.settings.fontSize)
   const showPreview = useClipboardStore(s => s.settings.showPreview)
   const copyOnSelect = useClipboardStore(s => s.settings.copyOnSelect)
+  const notify = useClipboardStore(s => s.notify)
   const { t, typeLabel, language } = useI18n()
 
   const cfg = TYPE_CFG[item.type] || TYPE_CFG.text
@@ -55,15 +60,25 @@ const ClipboardItemCard: React.FC<Props> = memo(({ item, isSelected, onSelect })
   const preview = getPreviewText(item, t('item.imagePreview'))
 
   const onCopy = useCallback((e: React.MouseEvent) => { e.stopPropagation(); copyItem(item.id) }, [copyItem, item.id])
-  const onOpenDetail = useCallback(() => {
+  const onOpenDetail = useCallback((event: React.MouseEvent) => {
+    if (selectionMode || event.ctrlKey || event.metaKey) {
+      if (!selectionMode) useClipboardStore.getState().setSelectionMode(true)
+      onToggleSelection()
+      return
+    }
     onSelect()
     setDetailItemId(item.id)
-  }, [item.id, onSelect, setDetailItemId])
+  }, [item.id, onSelect, onToggleSelection, selectionMode, setDetailItemId])
   const onDoubleClickCopy = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
-    if (copyOnSelect) copyItem(item.id)
-  }, [copyOnSelect, copyItem, item.id])
-  const onDelete = useCallback((e: React.MouseEvent) => { e.stopPropagation(); deleteItem(item.id) }, [deleteItem, item.id])
+    if (copyOnSelect && !selectionMode) copyItem(item.id)
+  }, [copyOnSelect, copyItem, item.id, selectionMode])
+  const onDelete = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    void deleteItems([item.id]).then(count => {
+      if (count > 0) notify(t('toast.deleted', { count }), 'success', 'undo-delete')
+    })
+  }, [deleteItems, item.id, notify, t])
   const onPin = useCallback((e: React.MouseEvent) => { e.stopPropagation(); togglePin(item.id) }, [togglePin, item.id])
   const onFavorite = useCallback((e: React.MouseEvent) => { e.stopPropagation(); toggleFavorite(item.id) }, [toggleFavorite, item.id])
 
@@ -79,11 +94,15 @@ const ClipboardItemCard: React.FC<Props> = memo(({ item, isSelected, onSelect })
     <div
       onClick={onOpenDetail}
       onDoubleClick={onDoubleClickCopy}
-      className={`glass-card clipboard-card rounded-xl overflow-hidden cursor-pointer flex flex-col ${isSelected ? 'selected' : ''} ${isCode ? 'verification-card' : ''}`}
+      className={`glass-card clipboard-card rounded-lg overflow-hidden cursor-pointer flex flex-col ${isSelected ? 'selected' : ''} ${isChecked ? 'checked' : ''} ${isCode ? 'verification-card' : ''}`}
     >
       <div className={`type-bar ${cfg.bar} w-full`} style={{ height: 2 }} />
       <div className="flex-1 flex items-start gap-2.5 p-2.5 overflow-hidden">
-        <div
+        {selectionMode ? (
+          <button onClick={event => { event.stopPropagation(); onToggleSelection() }} className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md" style={{ color: isChecked ? 'var(--color-primary-light)' : 'var(--text-ghost)', background: isChecked ? 'color-mix(in srgb, var(--color-primary) 12%, transparent)' : 'var(--bg-surface)' }} title={t('tabs.select')}>
+            {isChecked ? <CheckCircle2 size={16} strokeWidth={2.5} /> : <Circle size={16} />}
+          </button>
+        ) : <div
           className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center relative"
           style={{ background: typeBg }}
         >
@@ -100,7 +119,7 @@ const ClipboardItemCard: React.FC<Props> = memo(({ item, isSelected, onSelect })
               <Heart size={7} color="white" strokeWidth={3} fill="white" />
             </div>
           )}
-        </div>
+        </div>}
 
         {item.type === 'image' && <ImagePreview imagePath={item.imagePath} />}
 
@@ -122,7 +141,7 @@ const ClipboardItemCard: React.FC<Props> = memo(({ item, isSelected, onSelect })
           </div>
 
           <p
-            className={`text-[13px] leading-snug break-all ${showPreview ? 'line-clamp-2' : 'line-clamp-1'} ${isCode ? 'tracking-[0.22em] font-semibold' : ''}`}
+            className={`text-[13px] leading-snug break-all ${showPreview ? 'line-clamp-2' : 'line-clamp-1'} ${isCode ? 'font-mono font-semibold' : ''}`}
             style={{ color: isCode ? 'var(--color-warning)' : 'var(--text-secondary)', fontSize: isCode ? fontSize + 2 : fontSize - 2 }}
           >
             {preview}
@@ -137,7 +156,7 @@ const ClipboardItemCard: React.FC<Props> = memo(({ item, isSelected, onSelect })
           )}
         </div>
 
-        <div className="card-actions flex items-center gap-0.5 flex-shrink-0">
+        {!selectionMode && <div className="card-actions flex items-center gap-0.5 flex-shrink-0">
           <button onClick={onCopy} className="action-btn copy" title={t('item.copy')}>
             {isCopied ? <Check size={13} color="var(--color-success)" strokeWidth={3} /> : <Copy size={13} />}
           </button>
@@ -151,7 +170,7 @@ const ClipboardItemCard: React.FC<Props> = memo(({ item, isSelected, onSelect })
           <button onClick={onDelete} className="action-btn delete" title={t('item.delete')}>
             <Trash2 size={13} />
           </button>
-        </div>
+        </div>}
       </div>
 
       {isCopied && (

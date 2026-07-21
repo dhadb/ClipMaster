@@ -582,6 +582,7 @@
 
   /* 动作按钮 */
   .action-btn {
+    position: relative;
     width: 28px;
     height: 28px;
     display: flex;
@@ -633,7 +634,7 @@
       transform var(--duration-fast) var(--ease-spring),
       color var(--duration-fast) ease,
       background var(--duration-fast) ease;
-    letter-spacing: 0.01em;
+    letter-spacing: 0;
     white-space: nowrap;
     flex-shrink: 0;
   }
@@ -787,7 +788,7 @@
   }
 
   .interactive-chip:hover {
-    transform: translateY(-1px) scale(1.03);
+    transform: translateY(-1px) scale(1.01);
     box-shadow: var(--shadow-btn);
   }
 
@@ -856,5 +857,159 @@
       transition-duration: 0.01ms !important;
       scroll-behavior: auto !important;
     }
+  }
+}
+
+/* Product workspace primitives */
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-primary) 70%, transparent);
+  outline-offset: 2px;
+}
+
+.glass-card.checked {
+  background: color-mix(in srgb, var(--color-primary) 9%, var(--bg-card));
+  border-color: color-mix(in srgb, var(--color-primary) 35%, var(--border-card));
+}
+
+.filter-chip {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 9px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: 10px;
+  white-space: nowrap;
+  transition: color 140ms ease, background 140ms ease, border-color 140ms ease;
+}
+
+.filter-chip:hover {
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+}
+
+.filter-chip.active {
+  color: var(--color-primary-light);
+  background: color-mix(in srgb, var(--color-primary) 11%, transparent);
+  border-color: color-mix(in srgb, var(--color-primary) 24%, transparent);
+}
+
+.segmented-control {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2px;
+  padding: 2px;
+  border-radius: 6px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-card);
+}
+
+.segmented-control button {
+  min-width: 0;
+  height: 25px;
+  overflow: hidden;
+  padding: 0 4px;
+  border-radius: 4px;
+  color: var(--text-ghost);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 140ms ease, background 140ms ease, box-shadow 140ms ease;
+}
+
+.segmented-control button.active {
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-btn);
+}
+
+.tab-count {
+  min-width: 18px;
+  padding: 1px 5px;
+  border-radius: 5px;
+  color: var(--text-ghost);
+  background: var(--bg-surface);
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.tab-btn.active .tab-count {
+  color: var(--color-primary-light);
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+}
+
+.menu-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 9px;
+  border-radius: 5px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  text-align: left;
+  transition: color 120ms ease, background 120ms ease;
+}
+
+.menu-item:hover {
+  color: var(--text-primary);
+  background: var(--bg-surface);
+}
+
+.menu-item.danger {
+  color: var(--color-danger);
+}
+
+@media (max-width: 440px) {
+  .tab-btn {
+    gap: 4px;
+    padding: 7px 8px;
+    font-size: 11px;
+  }
+
+  .filter-panel .grid-cols-2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .card-actions {
+    width: 60px;
+  }
+
+  .clipboard-card .card-actions .pin,
+  .clipboard-card .card-actions button:nth-child(3) {
+    display: none;
+  }
+
+  .settings-layout {
+    flex-direction: column;
+  }
+
+  .settings-sidebar {
+    display: flex;
+    width: 100%;
+    gap: 2px;
+    overflow-x: auto;
+    border-right: 0 !important;
+    border-bottom: 1px solid var(--border-divider);
+  }
+
+  .settings-sidebar > div:first-child {
+    display: none;
+  }
+
+  .settings-sidebar button {
+    width: auto !important;
+    flex-shrink: 0;
+  }
+
+  .settings-content {
+    padding: 12px;
   }
 }

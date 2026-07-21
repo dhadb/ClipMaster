@@ -4,6 +4,7 @@ import fs from 'fs'
 import { normalizeTags } from '../src/utils/clipboard'
 import { compareVersions } from '../src/utils/version'
 import { isThemeSetting, type ThemeSetting } from '../src/theme'
+import { isAccentSetting, type AccentSetting } from '../src/personalization'
 
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
@@ -20,6 +21,7 @@ let saveTimer: ReturnType<typeof setTimeout> | null = null
 let pauseUntil = 0
 let protectedToday = 0
 let currentHotkey = ''
+const pendingImageDeletes = new Map<string, ReturnType<typeof setTimeout>>()
 
 // === Persistence ===
 const dataPath = path.join(app.getPath('userData'), 'clipmaster-data.json')
@@ -53,13 +55,13 @@ const defaultSettings = {
   autoStart: true,
   minimizeToTray: true,
   theme: 'dark' as ThemeSetting,
+  accentColor: 'theme' as AccentSetting,
   language: 'system' as 'system' | 'zh-CN' | 'en-US',
   opacity: 0.95,
   fontSize: 14,
   windowWidth: 420,
   windowHeight: 600,
   showPreview: true,
-  showShortcutHints: true,
   listDensity: 'normal' as 'compact' | 'normal' | 'comfortable',
   copyOnSelect: true,
   recordImages: true,
@@ -70,7 +72,6 @@ const defaultSettings = {
   autoDeleteDays: 30,
   verificationCodeTtlMinutes: 10,
   autoCheckUpdates: true,
-  onboardingCompleted: false,
 }
 
 type Settings = typeof defaultSettings
@@ -121,13 +122,13 @@ function sanitizeSettings(input: Partial<Settings> | undefined): Settings {
     autoStart: Boolean(raw.autoStart),
     minimizeToTray: Boolean(raw.minimizeToTray),
     theme: isThemeSetting(raw.theme) ? raw.theme : 'dark',
+    accentColor: isAccentSetting(raw.accentColor) ? raw.accentColor : 'theme',
     language: raw.language === 'zh-CN' || raw.language === 'en-US' ? raw.language : 'system',
     opacity: clamp(raw.opacity, 0.7, 1, defaultSettings.opacity),
     fontSize: Math.round(clamp(raw.fontSize, 12, 18, defaultSettings.fontSize)),
     windowWidth: Math.round(clamp(raw.windowWidth, 350, 600, defaultSettings.windowWidth)),
     windowHeight: Math.round(clamp(raw.windowHeight, 400, 800, defaultSettings.windowHeight)),
     showPreview: Boolean(raw.showPreview),
-    showShortcutHints: raw.showShortcutHints !== false,
     listDensity: raw.listDensity === 'compact' || raw.listDensity === 'comfortable' ? raw.listDensity : 'normal',
     copyOnSelect: Boolean(raw.copyOnSelect),
     recordImages: raw.recordImages !== false,
@@ -140,7 +141,6 @@ function sanitizeSettings(input: Partial<Settings> | undefined): Settings {
     autoDeleteDays: Math.round(clamp(raw.autoDeleteDays, 0, 365, defaultSettings.autoDeleteDays)),
     verificationCodeTtlMinutes: Math.round(clamp(raw.verificationCodeTtlMinutes, 0, 1440, defaultSettings.verificationCodeTtlMinutes)),
     autoCheckUpdates: raw.autoCheckUpdates !== false,
-    onboardingCompleted: Boolean(raw.onboardingCompleted),
   }
 }
 
@@ -262,7 +262,31 @@ function safeDeleteImageFile(imagePath: string | undefined) {
   }
 }
 
-function removeHistoryItems(shouldRemove: (item: ClipboardItem) => boolean) {
+function scheduleImageDelete(imagePath: string | undefined, delayMs: number) {
+  if (!imagePath) return
+  const existing = pendingImageDeletes.get(imagePath)
+  if (existing) clearTimeout(existing)
+  if (delayMs <= 0) {
+    pendingImageDeletes.delete(imagePath)
+    safeDeleteImageFile(imagePath)
+    return
+  }
+  const timer = setTimeout(() => {
+    pendingImageDeletes.delete(imagePath)
+    safeDeleteImageFile(imagePath)
+  }, delayMs)
+  pendingImageDeletes.set(imagePath, timer)
+}
+
+function cancelImageDelete(imagePath: string | undefined) {
+  if (!imagePath) return
+  const timer = pendingImageDeletes.get(imagePath)
+  if (!timer) return
+  clearTimeout(timer)
+  pendingImageDeletes.delete(imagePath)
+}
+
+function removeHistoryItems(shouldRemove: (item: ClipboardItem) => boolean, imageDeleteDelayMs = 0) {
   const removed: ClipboardItem[] = []
   clipboardHistory = clipboardHistory.filter(item => {
     if (shouldRemove(item)) {
@@ -271,7 +295,7 @@ function removeHistoryItems(shouldRemove: (item: ClipboardItem) => boolean) {
     }
     return true
   })
-  removed.forEach(item => safeDeleteImageFile(item.imagePath))
+  removed.forEach(item => scheduleImageDelete(item.imagePath, imageDeleteDelayMs))
   return removed
 }
 
@@ -297,7 +321,12 @@ function saveClipboardImage(): { path: string; hash: string } | null {
   }
 }
 
-function sanitizeHistoryItem(item: any): ClipboardItem | null {
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === 'object' ? value as Record<string, unknown> : null
+}
+
+function sanitizeHistoryItem(input: unknown): ClipboardItem | null {
+  const item = asRecord(input)
   if (!item || typeof item.content !== 'string' || !item.content.trim()) return null
   const timestamp = Number(item.timestamp)
   const safeTimestamp = Number.isFinite(timestamp) && timestamp > 0 ? timestamp : Date.now()
@@ -340,13 +369,14 @@ function dedupeHistory(items: ClipboardItem[]) {
   return Array.from(byContent.values()).sort((a, b) => b.timestamp - a.timestamp)
 }
 
-function getImportedItems(payload: any) {
+function getImportedItems(payload: unknown) {
+  const record = asRecord(payload)
   const source = Array.isArray(payload)
     ? payload
-    : Array.isArray(payload?.items)
-      ? payload.items
-      : Array.isArray(payload?.history)
-        ? payload.history
+    : Array.isArray(record?.items)
+      ? record.items
+      : Array.isArray(record?.history)
+        ? record.history
         : []
   return source.map(sanitizeHistoryItem).filter(Boolean) as ClipboardItem[]
 }
@@ -358,7 +388,6 @@ function loadData() {
       const data: Partial<AppData> = JSON.parse(raw)
       clipboardHistory = Array.isArray(data.history) ? data.history.map(sanitizeHistoryItem).filter(Boolean) as ClipboardItem[] : []
       settings = sanitizeSettings(data.settings)
-      if (data.settings && typeof data.settings.onboardingCompleted !== 'boolean') settings.onboardingCompleted = true
       protectedToday = Number.isFinite(Number(data.protectedToday)) ? Number(data.protectedToday) : 0
       applyRetentionRules()
     }
@@ -369,7 +398,6 @@ function loadData() {
         const backup = JSON.parse(fs.readFileSync(backupPath, 'utf-8')) as Partial<AppData>
         clipboardHistory = Array.isArray(backup.history) ? backup.history.map(sanitizeHistoryItem).filter(Boolean) as ClipboardItem[] : []
         settings = sanitizeSettings(backup.settings)
-        if (backup.settings && typeof backup.settings.onboardingCompleted !== 'boolean') settings.onboardingCompleted = true
       }
     } catch (backupErr) {
       console.error('Failed to load backup data:', backupErr)
@@ -879,6 +907,26 @@ ipcMain.handle('update-item-tags', (_, id: string, tags: unknown) => {
   return clipboardHistory
 })
 
+ipcMain.handle('update-item', (_, id: string, patch: { content?: unknown; tags?: unknown }) => {
+  const item = clipboardHistory.find(entry => entry.id === id)
+  if (!item || item.type === 'image') return clipboardHistory
+
+  if (typeof patch?.content === 'string') {
+    if (!patch.content.trim()) throw new Error('Clipboard item cannot be empty')
+    if (Buffer.byteLength(patch.content, 'utf8') > 2 * 1024 * 1024) throw new Error('Clipboard item is too large')
+    item.content = patch.content
+    item.type = getClipboardContentType(patch.content)
+    item.timestamp = Date.now()
+  }
+  if (patch && Object.prototype.hasOwnProperty.call(patch, 'tags')) item.tags = normalizeTags(patch.tags)
+
+  clipboardHistory = dedupeHistory(clipboardHistory)
+  applyRetentionRules()
+  mainWindow?.webContents.send('history-updated', clipboardHistory)
+  scheduleSave()
+  return clipboardHistory
+})
+
 ipcMain.handle('copy-to-clipboard', (_, itemOrContent: ClipboardItem | string) => {
   const finishCopy = () => {
     if (settings.hideAfterCopy) mainWindow?.hide()
@@ -925,6 +973,43 @@ ipcMain.handle('delete-item', (_, id: string) => {
   return clipboardHistory
 })
 
+ipcMain.handle('delete-items', (_, ids: unknown) => {
+  const safeIds = new Set(Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string').slice(0, 500) : [])
+  const deleted = removeHistoryItems(item => safeIds.has(item.id), 8000)
+  mainWindow?.webContents.send('history-updated', clipboardHistory)
+  scheduleSave()
+  return { history: clipboardHistory, deleted }
+})
+
+ipcMain.handle('restore-items', (_, items: unknown) => {
+  const restored = (Array.isArray(items) ? items : [])
+    .slice(0, 500)
+    .map(sanitizeHistoryItem)
+    .filter(Boolean) as ClipboardItem[]
+  if (restored.length === 0) return clipboardHistory
+  restored.forEach(item => cancelImageDelete(item.imagePath))
+  clipboardHistory = dedupeHistory([...restored, ...clipboardHistory])
+  applyRetentionRules()
+  mainWindow?.webContents.send('history-updated', clipboardHistory)
+  scheduleSave()
+  return clipboardHistory
+})
+
+ipcMain.handle('batch-update-items', (_, ids: unknown, patch: { pinned?: unknown; favorited?: unknown; addTags?: unknown }) => {
+  const safeIds = new Set(Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string').slice(0, 500) : [])
+  const tags = normalizeTags(patch?.addTags)
+  for (const item of clipboardHistory) {
+    if (!safeIds.has(item.id)) continue
+    if (typeof patch?.pinned === 'boolean') item.pinned = patch.pinned
+    if (typeof patch?.favorited === 'boolean') item.favorited = patch.favorited
+    if (tags.length > 0) item.tags = normalizeTags([...(item.tags || []), ...tags])
+  }
+  applyRetentionRules()
+  mainWindow?.webContents.send('history-updated', clipboardHistory)
+  scheduleSave()
+  return clipboardHistory
+})
+
 ipcMain.handle('toggle-pin', (_, id: string) => {
   const item = clipboardHistory.find(item => item.id === id)
   if (item) {
@@ -961,7 +1046,7 @@ ipcMain.handle('clear-all-history', () => {
   return clipboardHistory
 })
 
-ipcMain.handle('import-history', (_, payload: any, mode: 'merge' | 'replace' = 'merge') => {
+ipcMain.handle('import-history', (_, payload: unknown, mode: 'merge' | 'replace' = 'merge') => {
   const imported = getImportedItems(payload)
   if (imported.length === 0) return { history: clipboardHistory, imported: 0 }
 
@@ -971,12 +1056,12 @@ ipcMain.handle('import-history', (_, payload: any, mode: 'merge' | 'replace' = '
     clipboardHistory = dedupeHistory([...imported, ...clipboardHistory])
   }
 
-  if (payload?.settings && typeof payload.settings === 'object') {
+  const payloadRecord = asRecord(payload)
+  if (payloadRecord?.settings && typeof payloadRecord.settings === 'object') {
     const oldSettings = settings
     const nextSettings = {
-      ...sanitizeSettings({ ...settings, ...payload.settings }),
+      ...sanitizeSettings({ ...settings, ...payloadRecord.settings }),
       hotkey: oldSettings.hotkey,
-      onboardingCompleted: oldSettings.onboardingCompleted,
     }
     settings = nextSettings
     applyAutoStart()
@@ -1049,6 +1134,7 @@ ipcMain.handle('toggle-maximize', () => {
 // App lifecycle
 app.whenReady().then(() => {
   loadData()
+  cleanupImageCache()
   applyAutoStart()
   createWindow()
   createTray()
@@ -1071,4 +1157,6 @@ app.on('before-quit', () => {
   flushPendingSave()
   stopClipboardWatcher()
   globalShortcut.unregisterAll()
+  pendingImageDeletes.forEach(timer => clearTimeout(timer))
+  pendingImageDeletes.clear()
 })

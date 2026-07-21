@@ -63,7 +63,7 @@ const ImagePreview: React.FC<Props> = ({ imagePath, size = 'thumb' }) => {
         <img
           src={src}
           onError={onError}
-          className={isDetail ? 'max-h-[36vh] w-full object-contain rounded-xl' : 'w-12 h-12 object-cover rounded-lg flex-shrink-0'}
+          className={isDetail ? 'max-h-[36vh] w-full object-contain rounded-lg' : 'w-12 h-12 object-cover rounded-lg flex-shrink-0'}
           style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-card)' }}
           alt={t('image.alt')}
         />
@@ -74,7 +74,7 @@ const ImagePreview: React.FC<Props> = ({ imagePath, size = 'thumb' }) => {
 
   return (
     <div
-      className={isDetail ? 'h-40 w-full rounded-xl flex flex-col items-center justify-center gap-2' : 'w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0'}
+      className={isDetail ? 'h-40 w-full rounded-lg flex flex-col items-center justify-center gap-2' : 'w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0'}
       style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-card)', color: 'var(--text-ghost)' }}
     >
       <ImageIcon size={isDetail ? 28 : 18} />

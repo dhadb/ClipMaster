@@ -40,14 +40,14 @@
 - **Fast recovery**: Search and filter copied text, links, code snippets, colors, JSON, Markdown, and images.
 - **Privacy guardrails**: High-risk content such as passwords, tokens, private keys, and card numbers is skipped by default.
 - **Keyboard friendly**: Open the app globally with `Ctrl + Shift + V`, then search, select, and copy quickly.
-- **Easy to start**: A first-run guide covers the core workflow, and Help lets you replay it or check for updates.
+- **Efficient workflows**: Combine time, type, and sort filters, then batch favorite, pin, tag, or delete records.
 
 ## Quick Start
 
 1. Open [Releases](https://github.com/dhadb/ClipMaster/releases/latest).
 2. Download `ClipMaster-Setup-1.2.0.exe`, or choose `ClipMaster-Portable-1.2.0.exe`.
 3. Run the installer, or launch the portable build directly.
-4. Follow the first-run guide, then copy anything and press `Ctrl + Shift + V` to open ClipMaster.
+4. Copy anything and press `Ctrl + Shift + V` to open ClipMaster.
 
 ## Verify the Installer
 
@@ -68,15 +68,17 @@ Windows may show a SmartScreen warning for unsigned open-source installers. Down
 | Live monitoring | Captures clipboard changes automatically |
 | History | Stores up to 500 clipboard entries |
 | Smart categories | Detects text, links, emails, code, colors, JSON, Markdown, images, and more |
-| Search | Search content and `#tags` with type filters and `type:` queries |
+| Combined filters | Search content and `#tags`, then combine type, time, newest/oldest/usage sorting, and `type:` queries |
 | Reusable snippets | Save frequently used text, commands, and replies manually |
 | Tags | Organize any entry with tags preserved across import and export |
 | Favorites | Pin important clipboard items |
+| Batch actions | Pin, favorite, tag, or delete multiple selected records |
+| Content editing | Edit snippet content and tags in details with automatic type detection |
+| Delete undo | Restore recently deleted records before the notification expires |
 | Stats | View type distribution and usage patterns |
-| First-run guide | Learn global access, search, tags, and local privacy in three steps |
-| Theme system | Dark, light, graphite, forest, rose, coast, high contrast, and system themes |
+| Personalized appearance | Eight themes, five independent accents, density, type size, opacity, and window size |
 | Update checks | Check GitHub Releases at startup or manually without automatic downloads or installs |
-| Export | Export history as JSON |
+| Import and export | Export JSON backups, then merge or replace history during import |
 | Local privacy | No upload, sync, or clipboard analytics |
 
 ## Shortcuts

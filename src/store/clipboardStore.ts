@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type { LanguageSetting } from '../i18n'
 import { matchesClipboardQuery, normalizeTags } from '../utils/clipboard'
 import { isThemeSetting, type ThemeSetting } from '../theme'
+import { isAccentSetting, type AccentSetting } from '../personalization'
 
 export interface ClipboardItem {
   id: string
@@ -22,13 +23,13 @@ export interface Settings {
   autoStart: boolean
   minimizeToTray: boolean
   theme: ThemeSetting
+  accentColor: AccentSetting
   language: LanguageSetting
   opacity: number
   fontSize: number
   windowWidth: number
   windowHeight: number
   showPreview: boolean
-  showShortcutHints: boolean
   listDensity: 'compact' | 'normal' | 'comfortable'
   copyOnSelect: boolean
   recordImages: boolean
@@ -39,7 +40,6 @@ export interface Settings {
   autoDeleteDays: number
   verificationCodeTtlMinutes: number
   autoCheckUpdates: boolean
-  onboardingCompleted: boolean
 }
 
 export interface PrivacyState {
@@ -65,7 +65,16 @@ export interface UpdateInfo {
 
 export type UpdateStatus = 'idle' | 'checking' | 'available' | 'current' | 'error'
 
-type ActiveTab = 'history' | 'favorites' | 'stats' | 'settings'
+export type ActiveTab = 'history' | 'favorites' | 'stats' | 'settings'
+export type SortMode = 'newest' | 'oldest' | 'most-used'
+export type TimeFilter = 'all' | 'today' | 'week'
+
+export interface ToastNotice {
+  id: number
+  message: string
+  tone: 'neutral' | 'success' | 'warning' | 'danger'
+  action?: 'undo-delete'
+}
 
 const defaultSettings: Settings = {
   maxHistory: 200,
@@ -73,13 +82,13 @@ const defaultSettings: Settings = {
   autoStart: true,
   minimizeToTray: true,
   theme: 'dark',
+  accentColor: 'theme',
   language: 'system',
   opacity: 0.98,
   fontSize: 14,
   windowWidth: 420,
   windowHeight: 600,
   showPreview: true,
-  showShortcutHints: true,
   listDensity: 'normal',
   copyOnSelect: true,
   recordImages: true,
@@ -90,7 +99,6 @@ const defaultSettings: Settings = {
   autoDeleteDays: 30,
   verificationCodeTtlMinutes: 10,
   autoCheckUpdates: true,
-  onboardingCompleted: false,
 }
 
 function normalizeSettings(settings: Partial<Settings>): Settings {
@@ -98,20 +106,33 @@ function normalizeSettings(settings: Partial<Settings>): Settings {
   return {
     ...merged,
     theme: isThemeSetting(merged.theme) ? merged.theme : 'dark',
+    accentColor: isAccentSetting(merged.accentColor) ? merged.accentColor : 'theme',
     language: merged.language === 'zh-CN' || merged.language === 'en-US' ? merged.language : 'system',
     ignoredPatterns: Array.isArray(merged.ignoredPatterns) ? merged.ignoredPatterns : [],
     opacity: Math.min(1, Math.max(0.7, merged.opacity)),
   }
 }
 
-function filterHistory(history: ClipboardItem[], activeTab: ActiveTab, searchQuery: string, filterType: string | null): ClipboardItem[] {
+export function filterHistory(history: ClipboardItem[], activeTab: ActiveTab, searchQuery: string, filterType: string | null, sortMode: SortMode, timeFilter: TimeFilter): ClipboardItem[] {
   let filtered = history
   if (activeTab === 'favorites') {
     filtered = filtered.filter(item => item.favorited)
   }
   if (searchQuery) filtered = filtered.filter(item => matchesClipboardQuery(item, searchQuery))
   if (filterType) filtered = filtered.filter(item => item.type === filterType)
-  return filtered
+  if (timeFilter !== 'all') {
+    const now = new Date()
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    if (timeFilter === 'week') start.setDate(start.getDate() - 6)
+    filtered = filtered.filter(item => item.timestamp >= start.getTime())
+  }
+  return [...filtered].sort((a, b) => {
+    if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
+    if (a.favorited !== b.favorited) return a.favorited ? -1 : 1
+    if (sortMode === 'oldest') return a.timestamp - b.timestamp
+    if (sortMode === 'most-used') return (b.copyCount || 0) - (a.copyCount || 0) || b.timestamp - a.timestamp
+    return b.timestamp - a.timestamp
+  })
 }
 
 interface ClipboardStore {
@@ -131,6 +152,13 @@ interface ClipboardStore {
   copiedId: string | null
   detailItemId: string | null
   filterType: string | null
+  sortMode: SortMode
+  timeFilter: TimeFilter
+  selectionMode: boolean
+  selectedIds: string[]
+  lastDeleted: ClipboardItem[]
+  toast: ToastNotice | null
+  _toastTimer: ReturnType<typeof setTimeout> | null
   _copiedTimer: ReturnType<typeof setTimeout> | null
 
   setHistory: (history: ClipboardItem[]) => void
@@ -147,9 +175,22 @@ interface ClipboardStore {
   setActiveTab: (tab: ActiveTab) => void
   setDetailItemId: (id: string | null) => void
   setFilterType: (type: string | null) => void
+  setSortMode: (mode: SortMode) => void
+  setTimeFilter: (filter: TimeFilter) => void
+  resetFilters: () => void
+  setSelectionMode: (enabled: boolean) => void
+  toggleSelection: (id: string) => void
+  selectAllFiltered: () => void
+  clearSelection: () => void
+  notify: (message: string, tone?: ToastNotice['tone'], action?: ToastNotice['action']) => void
+  dismissToast: () => void
   addItem: (draft: ClipboardItemDraft) => Promise<{ itemId: string | null; created: boolean }>
   updateItemTags: (id: string, tags: string[]) => Promise<void>
+  updateItem: (id: string, content: string, tags: string[]) => Promise<void>
   deleteItem: (id: string) => Promise<void>
+  deleteItems: (ids: string[]) => Promise<number>
+  restoreLastDeleted: () => Promise<number>
+  batchUpdateItems: (ids: string[], patch: { pinned?: boolean; favorited?: boolean; addTags?: string[] }) => Promise<void>
   togglePin: (id: string) => Promise<void>
   toggleFavorite: (id: string) => Promise<void>
   clearHistory: () => Promise<void>
@@ -177,16 +218,24 @@ export const useClipboardStore = create<ClipboardStore>((set, get) => ({
   copiedId: null,
   detailItemId: null,
   filterType: null,
+  sortMode: 'newest',
+  timeFilter: 'all',
+  selectionMode: false,
+  selectedIds: [],
+  lastDeleted: [],
+  toast: null,
+  _toastTimer: null,
   _copiedTimer: null,
 
   setHistory: (history) => {
-    const { searchQuery, activeTab, filterType } = get()
-    set({ history, filteredHistory: filterHistory(history, activeTab, searchQuery, filterType) })
+    const { searchQuery, activeTab, filterType, sortMode, timeFilter, selectedIds } = get()
+    const validIds = new Set(history.map(item => item.id))
+    set({ history, filteredHistory: filterHistory(history, activeTab, searchQuery, filterType, sortMode, timeFilter), selectedIds: selectedIds.filter(id => validIds.has(id)) })
   },
 
   setSearchQuery: (searchQuery) => {
-    const { history, activeTab, filterType } = get()
-    set({ searchQuery, filteredHistory: filterHistory(history, activeTab, searchQuery, filterType) })
+    const { history, activeTab, filterType, sortMode, timeFilter } = get()
+    set({ searchQuery, filteredHistory: filterHistory(history, activeTab, searchQuery, filterType, sortMode, timeFilter) })
   },
 
   setSelectedId: (selectedId) => set({ selectedId }),
@@ -227,13 +276,48 @@ export const useClipboardStore = create<ClipboardStore>((set, get) => ({
   setDetailItemId: (detailItemId) => set({ detailItemId }),
 
   setActiveTab: (activeTab) => {
-    const { history, searchQuery, filterType } = get()
-    set({ activeTab, showSettings: activeTab === 'settings', filteredHistory: filterHistory(history, activeTab, searchQuery, filterType) })
+    const { history, searchQuery, filterType, sortMode, timeFilter } = get()
+    set({ activeTab, showSettings: activeTab === 'settings', filteredHistory: filterHistory(history, activeTab, searchQuery, filterType, sortMode, timeFilter), selectionMode: false, selectedIds: [] })
   },
 
   setFilterType: (filterType) => {
-    const { history, searchQuery, activeTab } = get()
-    set({ filterType, filteredHistory: filterHistory(history, activeTab, searchQuery, filterType) })
+    const { history, searchQuery, activeTab, sortMode, timeFilter } = get()
+    set({ filterType, filteredHistory: filterHistory(history, activeTab, searchQuery, filterType, sortMode, timeFilter) })
+  },
+
+  setSortMode: (sortMode) => {
+    const { history, searchQuery, activeTab, filterType, timeFilter } = get()
+    set({ sortMode, filteredHistory: filterHistory(history, activeTab, searchQuery, filterType, sortMode, timeFilter) })
+  },
+
+  setTimeFilter: (timeFilter) => {
+    const { history, searchQuery, activeTab, filterType, sortMode } = get()
+    set({ timeFilter, filteredHistory: filterHistory(history, activeTab, searchQuery, filterType, sortMode, timeFilter) })
+  },
+
+  resetFilters: () => {
+    const { history, activeTab, sortMode } = get()
+    set({ searchQuery: '', filterType: null, timeFilter: 'all', filteredHistory: filterHistory(history, activeTab, '', null, sortMode, 'all') })
+  },
+
+  setSelectionMode: (selectionMode) => set({ selectionMode, selectedIds: selectionMode ? get().selectedIds : [] }),
+  toggleSelection: (id) => {
+    const selectedIds = get().selectedIds
+    set({ selectedIds: selectedIds.includes(id) ? selectedIds.filter(value => value !== id) : [...selectedIds, id] })
+  },
+  selectAllFiltered: () => set({ selectedIds: get().filteredHistory.map(item => item.id) }),
+  clearSelection: () => set({ selectedIds: [], selectionMode: false }),
+  notify: (message, tone = 'neutral', action) => {
+    const currentTimer = get()._toastTimer
+    if (currentTimer) clearTimeout(currentTimer)
+    const id = Date.now()
+    const timer = setTimeout(() => set({ toast: null, _toastTimer: null }), 4200)
+    set({ toast: { id, message, tone, action }, _toastTimer: timer })
+  },
+  dismissToast: () => {
+    const timer = get()._toastTimer
+    if (timer) clearTimeout(timer)
+    set({ toast: null, _toastTimer: null })
   },
 
   addItem: async (draft) => {
@@ -259,6 +343,21 @@ export const useClipboardStore = create<ClipboardStore>((set, get) => ({
     }
   },
 
+  updateItem: async (id, content, tags) => {
+    const nextContent = content.trim()
+    if (!nextContent) throw new Error('Content cannot be empty')
+    const previous = get().history
+    get().setHistory(previous.map(item => item.id === id ? { ...item, content, tags: normalizeTags(tags) } : item))
+    try {
+      if (!window.electronAPI) return
+      const history = await window.electronAPI.updateItem(id, { content, tags: normalizeTags(tags) })
+      get().setHistory(history)
+    } catch (err) {
+      get().setHistory(previous)
+      throw err
+    }
+  },
+
   deleteItem: async (id) => {
     try {
       if (window.electronAPI) {
@@ -266,6 +365,46 @@ export const useClipboardStore = create<ClipboardStore>((set, get) => ({
         get().setHistory(newHistory)
       }
     } catch (err) { console.error('deleteItem failed:', err) }
+  },
+
+  deleteItems: async (ids) => {
+    const uniqueIds = [...new Set(ids)].slice(0, 500)
+    if (uniqueIds.length === 0) return 0
+    try {
+      if (!window.electronAPI) return 0
+      const result = await window.electronAPI.deleteItems(uniqueIds)
+      set({ lastDeleted: result.deleted })
+      get().setHistory(result.history)
+      set({ selectedIds: [], selectionMode: false })
+      return result.deleted.length
+    } catch (err) {
+      console.error('deleteItems failed:', err)
+      return 0
+    }
+  },
+
+  restoreLastDeleted: async () => {
+    const deleted = get().lastDeleted
+    if (deleted.length === 0 || !window.electronAPI) return 0
+    try {
+      const history = await window.electronAPI.restoreItems(deleted)
+      get().setHistory(history)
+      set({ lastDeleted: [] })
+      return deleted.length
+    } catch (err) {
+      console.error('restoreLastDeleted failed:', err)
+      return 0
+    }
+  },
+
+  batchUpdateItems: async (ids, patch) => {
+    const uniqueIds = [...new Set(ids)].slice(0, 500)
+    if (uniqueIds.length === 0) return
+    try {
+      if (!window.electronAPI) return
+      const history = await window.electronAPI.batchUpdateItems(uniqueIds, { ...patch, addTags: normalizeTags(patch.addTags) })
+      get().setHistory(history)
+    } catch (err) { console.error('batchUpdateItems failed:', err) }
   },
 
   togglePin: async (id) => {

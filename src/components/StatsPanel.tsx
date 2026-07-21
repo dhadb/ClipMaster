@@ -1,9 +1,10 @@
 import React, { useMemo, memo } from 'react'
 import { BarChart3, Clock, Type, Link, Code, Mail, Hash, FileText, Zap, Image as ImageIcon, Phone, FolderOpen } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { useClipboardStore } from '../store/clipboardStore'
 import { useI18n } from '../i18n'
 
-const TYPE_MAP: Record<string, { Icon: any; cssVar: string }> = {
+const TYPE_MAP: Record<string, { Icon: LucideIcon; cssVar: string }> = {
   text: { Icon: Type, cssVar: 'var(--type-text)' },
   link: { Icon: Link, cssVar: 'var(--type-link)' },
   code: { Icon: Code, cssVar: 'var(--type-code)' },
@@ -53,7 +54,7 @@ const StatsPanel: React.FC = memo(() => {
   const maxHourly = Math.max(...stats.hourly, 1)
 
   const Card: React.FC<{ title: string; icon: React.ReactNode; children: React.ReactNode }> = ({ title, icon, children }) => (
-    <div className="glass-card rounded-xl p-4 space-y-3">
+    <div className="glass-card rounded-lg p-4 space-y-3">
       <div className="flex items-center gap-2 text-[13px] font-medium" style={{ color: 'var(--text-secondary)' }}>
         {icon}<span>{title}</span>
       </div>
@@ -76,7 +77,7 @@ const StatsPanel: React.FC = memo(() => {
           { label: t('stats.today'), value: stats.today, color: 'var(--color-success)' },
           { label: t('stats.week'), value: stats.week, color: '#818cf8' },
         ].map((s, i) => (
-          <div key={i} className="glass-card rounded-xl p-3.5 slide-up" style={{ animationDelay: `${80 + i * 35}ms` }}>
+          <div key={i} className="glass-card rounded-lg p-3.5 slide-up" style={{ animationDelay: `${80 + i * 35}ms` }}>
             <p className="text-[10px] mb-1.5" style={{ color: 'var(--text-ghost)' }}>{s.label}</p>
             <p className="text-xl font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>{s.value}</p>
           </div>

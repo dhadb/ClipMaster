@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react'
-import { Copy, X, Pin, PinOff, Trash2, Heart, Check, ExternalLink, Mail, Hash, Code, FileText, Type } from 'lucide-react'
+import { Copy, X, Pin, PinOff, Trash2, Heart, Check, ExternalLink, Mail, Hash, Code, FileText, Type, Pencil, Save } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { enUS, zhCN } from 'date-fns/locale'
 import ImagePreview from './ImagePreview'
@@ -7,7 +8,7 @@ import TagInput from './TagInput'
 import { useClipboardStore, ClipboardItem } from '../store/clipboardStore'
 import { useI18n } from '../i18n'
 
-const TYPE_CFG: Record<string, { Icon: any; cssVar: string }> = {
+const TYPE_CFG: Record<string, { Icon: LucideIcon; cssVar: string }> = {
   text: { Icon: Type, cssVar: 'var(--type-text)' },
   link: { Icon: ExternalLink, cssVar: 'var(--type-link)' },
   email: { Icon: Mail, cssVar: 'var(--type-email)' },
@@ -75,15 +76,30 @@ const ClipboardDetail: React.FC = () => {
   const history = useClipboardStore(s => s.history)
   const copiedId = useClipboardStore(s => s.copiedId)
   const copyItem = useClipboardStore(s => s.copyItem)
-  const deleteItem = useClipboardStore(s => s.deleteItem)
+  const deleteItems = useClipboardStore(s => s.deleteItems)
   const togglePin = useClipboardStore(s => s.togglePin)
   const toggleFavorite = useClipboardStore(s => s.toggleFavorite)
   const updateItemTags = useClipboardStore(s => s.updateItemTags)
+  const updateItem = useClipboardStore(s => s.updateItem)
+  const notify = useClipboardStore(s => s.notify)
   const setDetailItemId = useClipboardStore(s => s.setDetailItemId)
   const { t, typeLabel, language } = useI18n()
   const [copiedHint, setCopiedHint] = useState<string | null>(null)
+  const [editing, setEditing] = useState(false)
+  const [draftContent, setDraftContent] = useState('')
+  const [draftTags, setDraftTags] = useState<string[]>([])
+  const [saving, setSaving] = useState(false)
+  const [editError, setEditError] = useState('')
 
   const item = useMemo<ClipboardItem | undefined>(() => history.find(h => h.id === detailItemId), [history, detailItemId])
+
+  React.useEffect(() => {
+    if (!item) return
+    setDraftContent(item.content)
+    setDraftTags(item.tags || [])
+    setEditing(false)
+    setEditError('')
+  }, [item?.id])
 
   const onClose = useCallback(() => setDetailItemId(null), [setDetailItemId])
   const onCopy = useCallback(() => { if (item) copyItem(item.id) }, [copyItem, item])
@@ -91,9 +107,26 @@ const ClipboardDetail: React.FC = () => {
   const onFavorite = useCallback(() => { if (item) toggleFavorite(item.id) }, [toggleFavorite, item])
   const onDelete = useCallback(async () => {
     if (!item) return
-    await deleteItem(item.id)
+    const count = await deleteItems([item.id])
     setDetailItemId(null)
-  }, [deleteItem, item, setDetailItemId])
+    if (count > 0) notify(t('toast.deleted', { count }), 'success', 'undo-delete')
+  }, [deleteItems, item, notify, setDetailItemId, t])
+
+  const onSave = useCallback(async () => {
+    if (!item || !draftContent.trim() || saving) return
+    setSaving(true)
+    setEditError('')
+    try {
+      await updateItem(item.id, draftContent, draftTags)
+      setEditing(false)
+      notify(t('toast.updated'), 'success')
+    } catch (err) {
+      console.error('updateItem failed:', err)
+      setEditError(t('detail.updateFailed'))
+    } finally {
+      setSaving(false)
+    }
+  }, [draftContent, draftTags, item, notify, saving, t, updateItem])
   const onOpenLink = useCallback(() => {
     if (item?.type === 'link') window.electronAPI?.openExternalUrl(item.content)
   }, [item])
@@ -112,7 +145,17 @@ const ClipboardDetail: React.FC = () => {
   React.useEffect(() => {
     if (!detailItemId) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') {
+        if (editing) {
+          setEditing(false)
+          setDraftContent(item?.content || '')
+          setDraftTags(item?.tags || [])
+        } else onClose()
+      }
+      if (editing && (e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault()
+        void onSave()
+      }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c' && item) {
         e.preventDefault()
         copyItem(item.id)
@@ -120,14 +163,14 @@ const ClipboardDetail: React.FC = () => {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [copyItem, detailItemId, item, onClose])
+  }, [copyItem, detailItemId, editing, item, onClose, onSave])
 
   if (!detailItemId) return null
 
   if (!item) {
     return (
       <div className="absolute inset-0 z-50 flex items-center justify-center p-4 detail-backdrop" style={{ background: 'color-mix(in srgb, var(--bg-root) 72%, transparent)', backdropFilter: 'blur(10px)' }}>
-        <div className="w-full max-w-sm rounded-2xl p-5 text-center detail-panel" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-card)' }}>
+        <div className="w-full max-w-sm rounded-lg p-5 text-center detail-panel" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-card)' }}>
           <p className="text-[13px] mb-4" style={{ color: 'var(--text-secondary)' }}>{t('detail.missing')}</p>
           <button onClick={onClose} className="px-4 py-2 rounded-lg text-[12px]" style={{ background: 'var(--color-primary)', color: 'white' }}>{t('detail.close')}</button>
         </div>
@@ -149,7 +192,7 @@ const ClipboardDetail: React.FC = () => {
     <div className="absolute inset-0 z-50 flex flex-col detail-panel" style={{ background: 'var(--bg-root)' }}>
       <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid var(--border-divider)' }}>
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: typeBg }}>
+          <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: typeBg }}>
             <cfg.Icon size={16} color={cfg.cssVar} strokeWidth={2.2} />
           </div>
           <div className="min-w-0">
@@ -160,9 +203,10 @@ const ClipboardDetail: React.FC = () => {
             <div className="text-[10px] mt-0.5" style={{ color: 'var(--text-ghost)' }}>{t('detail.updated', { time: updatedAgo })}</div>
           </div>
         </div>
-        <button onClick={onClose} className="action-btn" title={t('detail.close')}>
-          <X size={15} />
-        </button>
+        <div className="flex items-center gap-1">
+          {item.type !== 'image' && !editing && <button onClick={() => setEditing(true)} className="action-btn" title={t('detail.edit')}><Pencil size={14} /></button>}
+          <button onClick={onClose} className="action-btn" title={t('detail.close')}><X size={15} /></button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
@@ -177,19 +221,19 @@ const ClipboardDetail: React.FC = () => {
 
         <div className="mb-3 rounded-lg px-3 py-2.5 slide-up" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-card)' }}>
           <div className="text-[10px] mb-2" style={{ color: 'var(--text-ghost)' }}>{t('tags.label')}</div>
-          <TagInput value={item.tags || []} onChange={tags => updateItemTags(item.id, tags)} compact />
+          <TagInput value={editing ? draftTags : item.tags || []} onChange={tags => editing ? setDraftTags(tags) : updateItemTags(item.id, tags)} compact />
         </div>
 
         {isCode && (
-          <div className="mb-3 p-4 rounded-xl text-center slide-up" style={{ background: 'color-mix(in srgb, var(--color-warning) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--color-warning) 24%, transparent)' }}>
+          <div className="mb-3 p-4 rounded-lg text-center slide-up" style={{ background: 'color-mix(in srgb, var(--color-warning) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--color-warning) 24%, transparent)' }}>
             <div className="text-[10px] mb-2" style={{ color: 'var(--color-warning)' }}>{t('detail.verificationTitle')}</div>
-            <div className="text-[30px] font-bold tracking-[0.28em]" style={{ color: 'var(--text-primary)' }}>{item.content.trim()}</div>
+            <div className="text-[30px] font-mono font-bold" style={{ color: 'var(--text-primary)' }}>{item.content.trim()}</div>
             <div className="text-[10px] mt-2" style={{ color: 'var(--text-ghost)' }}>{t('detail.autoExpire')}</div>
           </div>
         )}
 
         {item.type === 'color' && (
-          <div className="mb-3 p-3 rounded-xl" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-card)' }}>
+          <div className="mb-3 p-3 rounded-lg" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-card)' }}>
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-lg" style={{ background: item.content, border: '1px solid var(--border-card)' }} />
               <span className="text-[12px] font-mono" style={{ color: 'var(--text-secondary)' }}>{item.content}</span>
@@ -208,49 +252,58 @@ const ClipboardDetail: React.FC = () => {
         )}
 
         {item.type === 'link' && (
-          <button onClick={onOpenLink} className="mb-3 w-full p-3 rounded-xl flex items-center justify-between interactive-chip slide-up" style={{ background: 'color-mix(in srgb, var(--type-link) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--type-link) 18%, transparent)', color: 'var(--text-secondary)' }}>
+          <button onClick={onOpenLink} className="mb-3 w-full p-3 rounded-lg flex items-center justify-between interactive-chip slide-up" style={{ background: 'color-mix(in srgb, var(--type-link) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--type-link) 18%, transparent)', color: 'var(--text-secondary)' }}>
             <span className="text-[12px] truncate">{t('detail.openLink')}</span>
             <ExternalLink size={14} />
           </button>
         )}
 
         {item.type === 'email' && (
-          <button onClick={onOpenEmail} className="mb-3 w-full p-3 rounded-xl flex items-center justify-between interactive-chip slide-up" style={{ background: 'color-mix(in srgb, var(--type-email) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--type-email) 18%, transparent)', color: 'var(--text-secondary)' }}>
+          <button onClick={onOpenEmail} className="mb-3 w-full p-3 rounded-lg flex items-center justify-between interactive-chip slide-up" style={{ background: 'color-mix(in srgb, var(--type-email) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--type-email) 18%, transparent)', color: 'var(--text-secondary)' }}>
             <span className="text-[12px] truncate">{t('detail.mailTo', { email: item.content })}</span>
             <Mail size={14} />
           </button>
         )}
 
         {item.type === 'file-path' && (
-          <button onClick={onShowFile} className="mb-3 w-full p-3 rounded-xl flex items-center justify-between interactive-chip slide-up" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-card)', color: 'var(--text-secondary)' }}>
+          <button onClick={onShowFile} className="mb-3 w-full p-3 rounded-lg flex items-center justify-between interactive-chip slide-up" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-card)', color: 'var(--text-secondary)' }}>
             <span className="text-[12px] truncate">{t('detail.showFile')}</span>
             <FileText size={14} />
           </button>
         )}
 
         {item.type === 'image' && item.imagePath && (
-          <div className="mb-3 p-3 rounded-xl slide-up" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-card)' }}>
+          <div className="mb-3 p-3 rounded-lg slide-up" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-card)' }}>
             <ImagePreview imagePath={item.imagePath} size="detail" />
             <div className="text-[10px] mt-2 break-all font-mono" style={{ color: 'var(--text-ghost)' }}>{item.imagePath}</div>
           </div>
         )}
 
-        <div className="rounded-xl overflow-hidden slide-up" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-card)', animationDelay: '80ms' }}>
+        <div className="rounded-lg overflow-hidden slide-up" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-card)', animationDelay: '80ms' }}>
           <div className="px-3 py-2 text-[10px] flex items-center justify-between" style={{ color: 'var(--text-ghost)', borderBottom: '1px solid var(--border-divider)' }}>
             <span>{t('detail.fullContent')}</span>
-            <span>{t('item.chars', { count: item.content.length })}</span>
+            <span>{t('item.chars', { count: editing ? draftContent.length : item.content.length })}</span>
           </div>
-          <pre className="p-3 text-[12px] leading-relaxed whitespace-pre-wrap break-words max-h-[45vh] overflow-auto" style={{ color: 'var(--text-secondary)', fontFamily: item.type === 'code' || item.type === 'json' || item.type === 'markdown' ? 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace' : 'inherit' }}>
-            {displayContent}
-          </pre>
+          {editing ? (
+            <textarea autoFocus value={draftContent} onChange={event => setDraftContent(event.target.value)} className="min-h-[220px] w-full resize-none bg-transparent p-3 text-[12px] leading-relaxed outline-none" style={{ color: 'var(--text-primary)', fontFamily: item.type === 'code' || item.type === 'json' || item.type === 'markdown' ? 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace' : 'inherit' }} />
+          ) : (
+            <pre className="p-3 text-[12px] leading-relaxed whitespace-pre-wrap break-words max-h-[45vh] overflow-auto" style={{ color: 'var(--text-secondary)', fontFamily: item.type === 'code' || item.type === 'json' || item.type === 'markdown' ? 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace' : 'inherit' }}>{displayContent}</pre>
+          )}
         </div>
+        {editError && <p className="mt-2 text-[11px]" style={{ color: 'var(--color-danger)' }}>{editError}</p>}
       </div>
 
       <div className="px-4 py-3 flex items-center gap-2" style={{ borderTop: '1px solid var(--border-divider)' }}>
-        <button onClick={() => item.type === 'json' ? onCopyText(displayContent, t('detail.copiedFormat', { format: 'JSON' })) : onCopy()} className="flex-1 h-10 rounded-xl text-[13px] font-medium flex items-center justify-center gap-2 interactive-chip" style={{ background: isCopied || copiedHint ? 'var(--color-success)' : 'var(--color-primary)', color: 'white' }}>
-          {isCopied || copiedHint ? <Check size={15} strokeWidth={3} /> : <Copy size={15} />}
-          {copiedHint || (item.type === 'json' ? t('detail.copyJson') : isCopied ? t('item.copied') : t('detail.copyContent'))}
-        </button>
+        {editing ? (
+          <>
+            <button onClick={() => { setEditing(false); setDraftContent(item.content); setDraftTags(item.tags || []); setEditError('') }} className="h-10 flex-1 rounded-lg text-[12px] interactive-chip" style={{ color: 'var(--text-secondary)', background: 'var(--bg-surface)' }}>{t('quickAdd.cancel')}</button>
+            <button onClick={() => void onSave()} disabled={!draftContent.trim() || saving} className="h-10 flex-[1.6] rounded-lg text-[12px] font-medium flex items-center justify-center gap-2 disabled:opacity-40 interactive-chip" style={{ background: 'var(--color-primary)', color: 'white' }}><Save size={14} />{saving ? t('detail.saving') : t('detail.save')}</button>
+          </>
+        ) : <button onClick={() => item.type === 'json' ? onCopyText(displayContent, t('detail.copiedFormat', { format: 'JSON' })) : onCopy()} className="flex-1 h-10 rounded-lg text-[13px] font-medium flex items-center justify-center gap-2 interactive-chip" style={{ background: isCopied || copiedHint ? 'var(--color-success)' : 'var(--color-primary)', color: 'white' }}>
+            {isCopied || copiedHint ? <Check size={15} strokeWidth={3} /> : <Copy size={15} />}
+            {copiedHint || (item.type === 'json' ? t('detail.copyJson') : isCopied ? t('item.copied') : t('detail.copyContent'))}
+          </button>}
+        {!editing && <>
         <button onClick={onPin} className={`action-btn pin ${item.pinned ? 'active' : ''}`} title={item.pinned ? t('item.unpin') : t('item.pin')} style={{ width: 40, height: 40 }}>
           {item.pinned ? <PinOff size={15} /> : <Pin size={15} />}
         </button>
@@ -260,6 +313,7 @@ const ClipboardDetail: React.FC = () => {
         <button onClick={onDelete} className="action-btn delete" title={t('item.delete')} style={{ width: 40, height: 40 }}>
           <Trash2 size={15} />
         </button>
+        </>}
       </div>
     </div>
   )

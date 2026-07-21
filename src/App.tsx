@@ -7,24 +7,22 @@ import ClipboardDetail from './components/ClipboardDetail'
 import SettingsPanel from './components/SettingsPanel'
 import StatsPanel from './components/StatsPanel'
 import EmptyState from './components/EmptyState'
-import ShortcutHintBar from './components/ShortcutHintBar'
 import QuickAddDialog from './components/QuickAddDialog'
-import OnboardingDialog from './components/OnboardingDialog'
 import UpdateBanner from './components/UpdateBanner'
 import { Clipboard } from 'lucide-react'
 import { useClipboardStore } from './store/clipboardStore'
 import { useI18n } from './i18n'
 import { resolveTheme } from './theme'
+import { accentPalettes } from './personalization'
+import BulkActionBar from './components/BulkActionBar'
+import ToastCenter from './components/ToastCenter'
+import PrivacyStatusBar from './components/PrivacyStatusBar'
 
 function App() {
   const activeTab = useClipboardStore(s => s.activeTab)
   const showSettings = useClipboardStore(s => s.showSettings)
   const filteredHistory = useClipboardStore(s => s.filteredHistory)
-  const history = useClipboardStore(s => s.history)
   const settings = useClipboardStore(s => s.settings)
-  const privacy = useClipboardStore(s => s.privacy)
-  const pauseMonitoring = useClipboardStore(s => s.pauseMonitoring)
-  const resumeMonitoring = useClipboardStore(s => s.resumeMonitoring)
   const setHistory = useClipboardStore(s => s.setHistory)
   const setSettings = useClipboardStore(s => s.setSettings)
   const setShowSettings = useClipboardStore(s => s.setShowSettings)
@@ -50,6 +48,20 @@ function App() {
   React.useLayoutEffect(() => {
     document.documentElement.style.fontSize = `${settings.fontSize}px`
   }, [settings.fontSize])
+
+  React.useLayoutEffect(() => {
+    const root = document.documentElement
+    if (settings.accentColor === 'theme') {
+      root.style.removeProperty('--color-primary')
+      root.style.removeProperty('--color-primary-light')
+      root.style.removeProperty('--color-primary-dark')
+      return
+    }
+    const palette = accentPalettes[settings.accentColor]
+    root.style.setProperty('--color-primary', palette.primary)
+    root.style.setProperty('--color-primary-light', palette.light)
+    root.style.setProperty('--color-primary-dark', palette.dark)
+  }, [settings.accentColor, resolvedTheme])
 
   // 监听系统主题变化 (auto 模式)
   useEffect(() => {
@@ -195,36 +207,19 @@ function App() {
 
   return (
     <div
-      className="h-screen w-screen overflow-hidden rounded-2xl glass-effect flex flex-col"
+      className="relative h-screen w-screen overflow-hidden rounded-xl glass-effect flex flex-col"
       style={{ opacity: settings.opacity, transform: 'translateZ(0)' }}
     >
       <TitleBar />
       <UpdateBanner />
       {showSearch && <SearchBar />}
-      <TabBar />
+      {!showSettings && activeTab !== 'settings' && <TabBar />}
+      {showSearch && <BulkActionBar />}
       <div key={`${activeTab}-${showSettings ? 'settings' : 'content'}`} className="flex-1 overflow-hidden content-fade">{content}</div>
-      {showSearch && settings.showShortcutHints && filteredHistory.length > 0 && <ShortcutHintBar />}
       <ClipboardDetail />
       <QuickAddDialog />
-      <OnboardingDialog />
-      <div className="px-4 py-1.5 flex items-center justify-between"
-        style={{ borderTop: '1px solid var(--border-divider)' }}>
-        <div className="flex items-center gap-2 text-[10px]" style={{ color: 'var(--text-tertiary)' }}>
-          <div className="pulse-dot" style={privacy.paused ? { background: 'var(--color-warning)' } : undefined} />
-          <span>{privacy.paused ? t('app.paused') : t('app.monitoring')}</span>
-          <span style={{ color: 'var(--text-ghost)', opacity: 0.6 }}>·</span>
-          <span>{t('app.records', { count: history.length })}</span>
-          <span style={{ color: 'var(--text-ghost)', opacity: 0.6 }}>·</span>
-          <span>{t('app.protectedToday', { count: privacy.protectedToday })}</span>
-        </div>
-        <button
-          onClick={() => privacy.paused ? resumeMonitoring() : pauseMonitoring(5)}
-          className="text-[10px] px-2 py-1 rounded-md interactive-chip"
-          style={{ color: privacy.paused ? 'var(--color-success)' : 'var(--text-tertiary)', background: 'var(--bg-surface)' }}
-        >
-          {privacy.paused ? t('app.resume') : t('app.pause5')}
-        </button>
-      </div>
+      <ToastCenter />
+      <PrivacyStatusBar />
     </div>
   )
 }

@@ -1,9 +1,10 @@
 import React, { useState, useCallback, useEffect, memo } from 'react'
-import { Settings, Keyboard, Palette, Database, Bell, Sliders, Info, Zap, Heart, Shield, Image as ImageIcon, Globe2, HelpCircle, BookOpen, RefreshCw } from 'lucide-react'
-import { useClipboardStore } from '../store/clipboardStore'
+import { Settings, Keyboard, Palette, Database, Bell, Sliders, Info, Zap, Heart, Shield, Image as ImageIcon, Globe2, HelpCircle, RefreshCw } from 'lucide-react'
+import { useClipboardStore, type Settings as ClipboardSettings } from '../store/clipboardStore'
 import { useI18n } from '../i18n'
 import ThemePicker from './ThemePicker'
 import UpdateStatus from './UpdateStatus'
+import { accentIds, accentPalettes, type AccentSetting } from '../personalization'
 
 const appIconUrl = './icon.png'
 
@@ -93,7 +94,7 @@ const SettingsPanel: React.FC = memo(() => {
   )
 
   const Card: React.FC<{ title: string; icon: React.ReactNode; children: React.ReactNode }> = ({ title, icon, children }) => (
-    <div className="glass-card rounded-xl p-5 space-y-4">
+    <div className="glass-card rounded-lg p-5 space-y-4">
       <h3 className="text-[13px] font-semibold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
         {icon}{title}
       </h3>
@@ -118,8 +119,6 @@ const SettingsPanel: React.FC = memo(() => {
               <Item label={t('settings.ignoreSensitive')} desc={t('settings.ignoreSensitiveDesc')}><Toggle on={settings.ignoreSensitive} set={v => update('ignoreSensitive', v)} /></Item>
               <div className="h-px" style={{ background: 'var(--border-divider)' }} />
               <Item label={t('settings.recordImages')} desc={t('settings.recordImagesDesc')}><Toggle on={settings.recordImages} set={v => update('recordImages', v)} /></Item>
-              <div className="h-px" style={{ background: 'var(--border-divider)' }} />
-              <Item label={t('settings.shortcutHints')} desc={t('settings.shortcutHintsDesc')}><Toggle on={settings.showShortcutHints} set={v => update('showShortcutHints', v)} /></Item>
               <div className="h-px" style={{ background: 'var(--border-divider)' }} />
               <Item label={t('settings.showPreview')} desc={t('settings.showPreviewDesc')}><Toggle on={settings.showPreview} set={v => update('showPreview', v)} /></Item>
             </Card>
@@ -160,15 +159,29 @@ const SettingsPanel: React.FC = memo(() => {
             <Card title={t('settings.themeStyle')} icon={<Palette size={14} color="var(--color-primary-light)" />}>
               <ThemePicker value={settings.theme} onChange={theme => void update('theme', theme)} />
             </Card>
+            <Card title={t('settings.accentColor')} icon={<Zap size={14} color="var(--color-primary-light)" />}>
+              <p className="text-[11px] leading-relaxed" style={{ color: 'var(--text-ghost)' }}>{t('settings.accentColorDesc')}</p>
+              <div className="flex flex-wrap gap-2">
+                {accentIds.map(id => {
+                  const active = settings.accentColor === id
+                  const color = id === 'theme' ? 'var(--color-primary)' : accentPalettes[id].primary
+                  return (
+                    <button key={id} onClick={() => void update('accentColor', id as AccentSetting)} aria-pressed={active} className="flex h-9 w-9 items-center justify-center rounded-full interactive-chip" style={{ background: 'var(--bg-surface)', border: `1px solid ${active ? color : 'var(--border-card)'}`, boxShadow: active ? `0 0 0 2px color-mix(in srgb, ${color} 20%, transparent)` : 'none' }} title={t(`settings.accent.${id}` as Parameters<typeof t>[0])}>
+                      <span className="h-5 w-5 rounded-full" style={{ background: color }} />
+                    </button>
+                  )
+                })}
+              </div>
+            </Card>
             <Card title={t('settings.language')} icon={<Globe2 size={14} color="var(--color-success)" />}>
               <Item label={t('settings.language')} desc={t('settings.languageDesc')}>
                 <div className="grid gap-1 rounded-lg p-1 min-w-[118px]" style={{ background: 'var(--bg-surface)' }}>
-                  {[
+                  {([
                     { id: 'system', label: t('settings.languageSystem') },
                     { id: 'zh-CN', label: t('settings.languageZh') },
                     { id: 'en-US', label: t('settings.languageEn') },
-                  ].map(lang => (
-                    <button key={lang.id} onClick={() => update('language', lang.id as any)}
+                  ] as Array<{ id: ClipboardSettings['language']; label: string }>).map(lang => (
+                    <button key={lang.id} onClick={() => update('language', lang.id)}
                       className="px-2 py-1 rounded-md text-[11px] interactive-chip text-left"
                       style={{
                         color: settings.language === lang.id ? 'white' : 'var(--text-tertiary)',
@@ -183,12 +196,12 @@ const SettingsPanel: React.FC = memo(() => {
             <Card title={t('settings.interface')} icon={<Sliders size={14} color="var(--color-primary-light)" />}>
               <Item label={t('settings.listDensity')} desc={t('settings.listDensityDesc')}>
                 <div className="flex gap-1 rounded-lg p-1" style={{ background: 'var(--bg-surface)' }}>
-                  {[
+                  {([
                     { id: 'compact', label: t('settings.compact') },
                     { id: 'normal', label: t('settings.normal') },
                     { id: 'comfortable', label: t('settings.comfortable') },
-                  ].map(d => (
-                    <button key={d.id} onClick={() => update('listDensity', d.id as any)}
+                  ] as Array<{ id: ClipboardSettings['listDensity']; label: string }>).map(d => (
+                    <button key={d.id} onClick={() => update('listDensity', d.id)}
                       className="px-2 py-1 rounded-md text-[11px] interactive-chip"
                       style={{
                         color: settings.listDensity === d.id ? 'white' : 'var(--text-tertiary)',
@@ -234,46 +247,6 @@ const SettingsPanel: React.FC = memo(() => {
                 </p>
               )}
             </Card>
-            <Card title={t('settings.hotkeyHelp')} icon={<Keyboard size={14} color="var(--color-primary-light)" />}>
-              {[
-                { keys: settings.hotkey.split('+'), desc: t('settings.showHideWindow'), global: true },
-                { keys: ['Ctrl', 'F'], desc: t('settings.focusSearch'), global: false },
-                { keys: ['Ctrl', 'N'], desc: t('settings.newSnippet'), global: false },
-                { keys: ['↑', '↓'], desc: t('settings.moveSelection'), global: false },
-                { keys: ['Enter'], desc: t('settings.copySelection'), global: false },
-                { keys: ['Esc'], desc: t('settings.clearSearch'), global: false },
-                { keys: ['Delete'], desc: t('settings.deleteSelection'), global: false },
-              ].map((h, i) => (
-                <div key={i} className="flex items-center justify-between p-3 rounded-xl"
-                  style={{ background: 'var(--bg-surface)' }}>
-                  <div className="flex items-center gap-3">
-                    <span className="text-[13px]" style={{ color: 'var(--text-secondary)' }}>{h.desc}</span>
-                    {h.global && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded-md font-medium"
-                        style={{ color: 'var(--color-primary-light)', background: 'color-mix(in srgb, var(--color-primary) 8%, transparent)' }}>
-                        {t('settings.global')}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    {h.keys.map((k, j) => (
-                      <React.Fragment key={j}>
-                        {j > 0 && <span className="text-[10px]" style={{ color: 'var(--text-ghost)' }}>+</span>}
-                        <kbd className="px-2 py-1 rounded-md text-[11px] font-mono min-w-[26px] text-center"
-                          style={{
-                            background: 'var(--bg-elevated)',
-                            color: 'var(--text-secondary)',
-                            border: '1px solid var(--border-card)',
-                            boxShadow: 'var(--shadow-btn)',
-                          }}>
-                          {k}
-                        </kbd>
-                      </React.Fragment>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </Card>
           </div>
         )
       case 'storage':
@@ -281,12 +254,12 @@ const SettingsPanel: React.FC = memo(() => {
           <div className="space-y-4 slide-in-right">
             <Card title={t('settings.storageOverview')} icon={<Database size={14} color="var(--color-primary-light)" />}>
               <div className="grid grid-cols-2 gap-3">
-                <div className="p-4 rounded-xl"
+                <div className="p-4 rounded-lg"
                   style={{ background: 'color-mix(in srgb, var(--color-primary) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--color-primary) 8%, transparent)' }}>
                   <p className="text-2xl font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>{historyLen}</p>
                   <p className="text-[11px] mt-1" style={{ color: 'var(--text-tertiary)' }}>{t('settings.currentRecords')}</p>
                 </div>
-                <div className="p-4 rounded-xl"
+                <div className="p-4 rounded-lg"
                   style={{ background: 'color-mix(in srgb, var(--color-success) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--color-success) 8%, transparent)' }}>
                   <p className="text-2xl font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>
                     {useClipboardStore.getState().history.filter(h => h.favorited).length}
@@ -328,23 +301,6 @@ const SettingsPanel: React.FC = memo(() => {
       case 'help':
         return (
           <div className="space-y-4 slide-in-right">
-            <Card title={t('settings.gettingStarted')} icon={<BookOpen size={14} color="var(--color-primary)" />}>
-              <div className="space-y-2">
-                {[
-                  { keys: 'Ctrl+Shift+V', label: t('settings.showHideWindow') },
-                  { keys: 'Ctrl+F', label: t('settings.focusSearch') },
-                  { keys: 'Ctrl+N', label: t('settings.newSnippet') },
-                ].map(item => (
-                  <div key={item.keys} className="flex items-center justify-between rounded-lg px-3 py-2.5" style={{ background: 'var(--bg-surface)' }}>
-                    <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>{item.label}</span>
-                    <kbd className="rounded-md px-2 py-1 text-[10px] font-mono" style={{ color: 'var(--text-tertiary)', background: 'var(--bg-elevated)' }}>{item.keys}</kbd>
-                  </div>
-                ))}
-              </div>
-              <button onClick={() => void update('onboardingCompleted', false)} className="flex h-9 items-center gap-2 rounded-lg px-3 text-[11px] interactive-chip" style={{ color: 'white', background: 'var(--color-primary)' }}>
-                <RefreshCw size={12} />{t('settings.replayGuide')}
-              </button>
-            </Card>
             <Card title={t('settings.updates')} icon={<RefreshCw size={14} color="var(--color-success)" />}>
               <UpdateStatus />
             </Card>
@@ -353,12 +309,12 @@ const SettingsPanel: React.FC = memo(() => {
       case 'about':
         return (
           <div className="space-y-4 slide-in-right">
-            <div className="glass-card rounded-xl p-6 text-center space-y-4">
-              <div className="w-16 h-16 mx-auto rounded-2xl flex items-center justify-center shimmer soft-float overflow-hidden"
+            <div className="glass-card rounded-lg p-6 text-center space-y-4">
+              <div className="w-16 h-16 mx-auto rounded-lg flex items-center justify-center shimmer soft-float overflow-hidden"
                 style={{
                   boxShadow: '0 8px 24px color-mix(in srgb, var(--color-primary) 25%, transparent)',
                 }}>
-                <img src={appIconUrl} alt="" className="w-16 h-16 rounded-2xl" draggable={false} />
+                <img src={appIconUrl} alt="" className="w-16 h-16 rounded-lg" draggable={false} />
               </div>
               <div>
                 <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>ClipMaster</h2>
@@ -385,11 +341,11 @@ const SettingsPanel: React.FC = memo(() => {
   }
 
   return (
-    <div className="h-full flex">
-      <div className="w-36 flex-shrink-0 p-2.5 space-y-0.5"
+    <div className="settings-layout h-full flex">
+      <div className="settings-sidebar w-36 flex-shrink-0 p-2.5 space-y-0.5"
         style={{ borderRight: '1px solid var(--border-divider)', background: 'var(--bg-surface)' }}>
         <div className="mb-3 px-2.5">
-          <p className="text-[9px] uppercase tracking-widest font-semibold"
+          <p className="text-[9px] uppercase font-semibold"
             style={{ color: 'var(--text-ghost)' }}>
             {t('settings.sidebar')}
           </p>
@@ -409,7 +365,7 @@ const SettingsPanel: React.FC = memo(() => {
           )
         })}
       </div>
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="settings-content flex-1 overflow-y-auto p-4">
         {renderContent()}
       </div>
     </div>

@@ -25,7 +25,11 @@ export interface ElectronAPI {
   copyToClipboard: (item: ClipboardItem | string) => Promise<ClipboardItem[]>
   createItem: (draft: ClipboardItemDraft) => Promise<{ history: ClipboardItem[]; itemId: string | null; created: boolean }>
   updateItemTags: (id: string, tags: string[]) => Promise<ClipboardItem[]>
+  updateItem: (id: string, patch: { content?: string; tags?: string[] }) => Promise<ClipboardItem[]>
   deleteItem: (id: string) => Promise<ClipboardItem[]>
+  deleteItems: (ids: string[]) => Promise<{ history: ClipboardItem[]; deleted: ClipboardItem[] }>
+  restoreItems: (items: ClipboardItem[]) => Promise<ClipboardItem[]>
+  batchUpdateItems: (ids: string[], patch: { pinned?: boolean; favorited?: boolean; addTags?: string[] }) => Promise<ClipboardItem[]>
   togglePin: (id: string) => Promise<ClipboardItem[]>
   toggleFavorite: (id: string) => Promise<ClipboardItem[]>
   clearHistory: () => Promise<ClipboardItem[]>

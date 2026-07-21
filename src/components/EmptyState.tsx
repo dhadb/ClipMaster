@@ -1,14 +1,18 @@
 import React from 'react'
-import { Clipboard, Search, Star, ArrowDown, Keyboard, Copy } from 'lucide-react'
+import { Clipboard, Search, Star, Plus, X } from 'lucide-react'
 import { useClipboardStore } from '../store/clipboardStore'
 import { useI18n } from '../i18n'
 
 const EmptyState: React.FC = () => {
   const activeTab = useClipboardStore(s => s.activeTab)
   const searchQuery = useClipboardStore(s => s.searchQuery)
+  const filterType = useClipboardStore(s => s.filterType)
+  const timeFilter = useClipboardStore(s => s.timeFilter)
+  const resetFilters = useClipboardStore(s => s.resetFilters)
+  const setQuickAddOpen = useClipboardStore(s => s.setQuickAddOpen)
   const { t } = useI18n()
 
-  const isSearching = searchQuery.length > 0
+  const isSearching = searchQuery.length > 0 || Boolean(filterType) || timeFilter !== 'all'
   const isFavorites = activeTab === 'favorites'
 
   const MainIcon = isSearching ? Search : isFavorites ? Star : Clipboard
@@ -17,9 +21,8 @@ const EmptyState: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col items-center justify-center px-8 py-10">
-      {/* 图标 */}
       <div className="relative mb-6 fade-in">
-        <div className="w-20 h-20 rounded-2xl flex items-center justify-center soft-float shimmer"
+        <div className="w-16 h-16 rounded-lg flex items-center justify-center soft-float"
           style={{
             background: 'color-mix(in srgb, var(--color-primary) 6%, transparent)',
             border: '1px solid color-mix(in srgb, var(--color-primary) 8%, transparent)',
@@ -29,50 +32,15 @@ const EmptyState: React.FC = () => {
         </div>
       </div>
 
-      {/* 文字 */}
       <div className="text-center space-y-2 max-w-[260px] fade-in" style={{ animationDelay: '80ms' }}>
         <h3 className="text-[15px] font-semibold" style={{ color: 'var(--text-primary)' }}>{title}</h3>
         <p className="text-[13px] leading-relaxed" style={{ color: 'var(--text-tertiary)' }}>{desc}</p>
       </div>
 
-      {/* 提示 */}
-      {!isSearching && !isFavorites && (
-        <div className="mt-6 px-4 py-2 rounded-full fade-in"
-          style={{
-            background: 'var(--bg-surface)',
-            border: '1px solid var(--border-card)',
-            animationDelay: '160ms',
-          }}>
-          <div className="flex items-center gap-2 text-[12px]" style={{ color: 'var(--text-secondary)' }}>
-            <ArrowDown size={13} color="var(--color-primary-light)" />
-            <span>{t('empty.start')}</span>
-          </div>
-        </div>
-      )}
-
-      {/* 快捷键提示 */}
-      {!isSearching && (
-        <div className="mt-8 grid grid-cols-2 gap-2 w-full max-w-[280px] fade-in" style={{ animationDelay: '240ms' }}>
-          {[
-            { icon: Keyboard, label: 'Ctrl+Shift+V', desc: t('empty.quickOpen') },
-            { icon: Search, label: 'Ctrl+F', desc: t('empty.searchContent') },
-            { icon: Copy, label: t('empty.doubleClick'), desc: t('empty.quickCopy') },
-            { icon: Star, label: t('tabs.favorites'), desc: t('empty.favoriteContent') },
-          ].map((tip, i) => (
-            <div key={i} className="flex items-center gap-2 p-2 rounded-lg interactive-chip"
-              style={{ background: 'var(--bg-surface)' }}>
-              <div className="w-6 h-6 rounded-md flex items-center justify-center"
-                style={{ background: 'var(--bg-elevated)' }}>
-                <tip.icon size={11} color="var(--text-ghost)" />
-              </div>
-              <div>
-                <p className="text-[11px] font-medium" style={{ color: 'var(--text-secondary)' }}>{tip.label}</p>
-                <p className="text-[9px]" style={{ color: 'var(--text-ghost)' }}>{tip.desc}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      <button onClick={() => isSearching ? resetFilters() : setQuickAddOpen(true)} className="mt-6 inline-flex h-9 items-center gap-2 rounded-md px-4 text-[11px] font-medium interactive-chip" style={{ background: 'var(--color-primary)', color: 'white' }}>
+        {isSearching ? <X size={13} /> : <Plus size={13} />}
+        {isSearching ? t('search.reset') : t('empty.createSnippet')}
+      </button>
     </div>
   )
 }

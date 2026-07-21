@@ -27,3 +27,18 @@ export function parseClipMasterReleaseUrl(value: unknown): ClipMasterRelease | n
     return null
   }
 }
+
+export function parseClipMasterReleasePage(value: unknown): ClipMasterRelease | null {
+  if (typeof value !== 'string') return null
+
+  const metaTags = value.match(/<meta\b[^>]*>/gi) || []
+  const releaseMeta = metaTags.find(tag => /\bproperty=["']og:url["']/i.test(tag))
+  const content = releaseMeta?.match(/\bcontent=["']([^"']+)["']/i)?.[1]
+  if (!content) return null
+
+  try {
+    return parseClipMasterReleaseUrl(new URL(content, 'https://github.com').toString())
+  } catch {
+    return null
+  }
+}

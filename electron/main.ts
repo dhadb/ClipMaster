@@ -3,7 +3,7 @@ import path from 'path'
 import fs from 'fs'
 import { normalizeTags } from '../src/utils/clipboard'
 import { compareVersions } from '../src/utils/version'
-import { parseClipMasterReleaseUrl } from '../src/utils/update'
+import { parseClipMasterReleasePage, parseClipMasterReleaseUrl } from '../src/utils/update'
 import { isThemeSetting, type ThemeSetting } from '../src/theme'
 import { isAccentSetting, type AccentSetting } from '../src/personalization'
 
@@ -835,7 +835,7 @@ ipcMain.handle('check-for-updates', async (_, force = false): Promise<UpdateInfo
 
   const currentVersion = app.getVersion()
   const response = await net.fetch(latestReleaseUrl, {
-    method: 'HEAD',
+    method: 'GET',
     redirect: 'follow',
     signal: AbortSignal.timeout(10_000),
     headers: {
@@ -845,7 +845,8 @@ ipcMain.handle('check-for-updates', async (_, force = false): Promise<UpdateInfo
   })
   if (!response.ok) throw new Error(`Update request failed with status ${response.status}`)
 
-  const release = parseClipMasterReleaseUrl(response.url)
+  const releasePage = await response.text()
+  const release = parseClipMasterReleaseUrl(response.url) || parseClipMasterReleasePage(releasePage)
   if (!release) throw new Error('Update response did not resolve to a valid release')
   const info: UpdateInfo = {
     currentVersion,

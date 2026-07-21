@@ -3,6 +3,7 @@ import path from 'path'
 import fs from 'fs'
 import { normalizeTags } from '../src/utils/clipboard'
 import { compareVersions } from '../src/utils/version'
+import { parseClipMasterReleaseUrl } from '../src/utils/update'
 import { isThemeSetting, type ThemeSetting } from '../src/theme'
 import { isAccentSetting, type AccentSetting } from '../src/personalization'
 
@@ -827,33 +828,31 @@ interface UpdateInfo {
 }
 
 let updateCache: { checkedAt: number; info: UpdateInfo } | null = null
+const latestReleaseUrl = 'https://github.com/dhadb/ClipMaster/releases/latest'
 
 ipcMain.handle('check-for-updates', async (_, force = false): Promise<UpdateInfo> => {
   if (!force && updateCache && Date.now() - updateCache.checkedAt < 10 * 60 * 1000) return updateCache.info
 
   const currentVersion = app.getVersion()
-  const response = await net.fetch('https://api.github.com/repos/dhadb/ClipMaster/releases/latest', {
+  const response = await net.fetch(latestReleaseUrl, {
+    method: 'HEAD',
+    redirect: 'follow',
     signal: AbortSignal.timeout(10_000),
     headers: {
-      Accept: 'application/vnd.github+json',
+      Accept: 'text/html',
       'User-Agent': `ClipMaster/${currentVersion}`,
-      'X-GitHub-Api-Version': '2022-11-28',
     },
   })
   if (!response.ok) throw new Error(`Update request failed with status ${response.status}`)
 
-  const payload = await response.json() as { tag_name?: unknown; html_url?: unknown; published_at?: unknown }
-  const latestVersion = typeof payload.tag_name === 'string' ? payload.tag_name.replace(/^v/i, '') : ''
-  if (!latestVersion) throw new Error('Update response did not include a version')
-  const releaseUrl = typeof payload.html_url === 'string' && /^https:\/\/github\.com\/dhadb\/ClipMaster\/releases\//i.test(payload.html_url)
-    ? payload.html_url
-    : 'https://github.com/dhadb/ClipMaster/releases/latest'
+  const release = parseClipMasterReleaseUrl(response.url)
+  if (!release) throw new Error('Update response did not resolve to a valid release')
   const info: UpdateInfo = {
     currentVersion,
-    latestVersion,
-    hasUpdate: compareVersions(latestVersion, currentVersion) > 0,
-    releaseUrl,
-    publishedAt: typeof payload.published_at === 'string' ? payload.published_at : null,
+    latestVersion: release.latestVersion,
+    hasUpdate: compareVersions(release.latestVersion, currentVersion) > 0,
+    releaseUrl: release.releaseUrl,
+    publishedAt: null,
   }
   updateCache = { checkedAt: Date.now(), info }
   return info

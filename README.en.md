@@ -23,7 +23,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.2.0-blue.svg" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.3.0-blue.svg" alt="Version">
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-green.svg" alt="Platform">
   <img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="License">
   <img src="https://img.shields.io/badge/privacy-local--first-brightgreen.svg" alt="Local first">
@@ -45,7 +45,7 @@
 ## Quick Start
 
 1. Open [Releases](https://github.com/dhadb/ClipMaster/releases/latest).
-2. Download `ClipMaster-Setup-1.2.0.exe`, or choose `ClipMaster-Portable-1.2.0.exe`.
+2. Download `ClipMaster-Setup-1.3.0.exe`, or choose `ClipMaster-Portable-1.3.0.exe`.
 3. Run the installer, or launch the portable build directly.
 4. Copy anything and press `Ctrl + Shift + V` to open ClipMaster.
 
@@ -54,7 +54,7 @@
 Release assets include `checksums.sha256`. After downloading the installer, verify it in PowerShell:
 
 ```powershell
-Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-1.2.0.exe"
+Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-1.3.0.exe"
 ```
 
 Compare the SHA256 output with `checksums.sha256`. If it does not match, do not run the installer and report it in [Issues](https://github.com/dhadb/ClipMaster/issues).

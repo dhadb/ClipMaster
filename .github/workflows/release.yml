@@ -5,6 +5,10 @@ on:
     tags:
       - "v*"
 
+concurrency:
+  group: clipmaster-publish
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
@@ -24,7 +28,8 @@ jobs:
           registry-url: https://registry.npmjs.org
 
       - name: Install dependencies
-        run: npm ci --no-audit --fund=false --registry=https://registry.npmjs.org
+        shell: powershell
+        run: ./scripts/install-dependencies.ps1
 
       - name: Audit runtime dependencies
         run: npm audit --omit=dev --audit-level=high --registry=https://registry.npmjs.org

@@ -4,6 +4,24 @@ import fs from 'fs'
 import { normalizeTags } from '../src/utils/clipboard'
 import { compareVersions } from '../src/utils/version'
 import { parseClipMasterReleasePage, parseClipMasterReleaseUrl } from '../src/utils/update'
+import { getLocalDateKey, normalizeDailyCounter } from '../src/utils/dailyCounter'
+import { compileIgnoredRules, matchesIgnoredRules, normalizeIgnoredPatterns, type CompiledIgnoredRule } from '../src/utils/ignoredRules'
+import { isSensitiveClipboardContent } from '../src/utils/privacy'
+import { isResolvedPathInside } from '../src/utils/pathSafety'
+import { retainHistoryItems } from '../src/utils/retention'
+import { parseJsonDocument, recoverWithBackup } from '../src/utils/recovery'
+import { getConstrainedImageSize } from '../src/utils/imageLimits'
+import {
+  getBoundedImportSource,
+  isTextWithinLimit,
+  MAX_HISTORY_TEXT_BYTES,
+  MAX_IMAGE_BYTES,
+  MAX_IMAGE_EDGE,
+  MAX_IMAGE_PIXELS,
+  MAX_PERSISTED_DATA_BYTES,
+  MAX_THUMBNAIL_BYTES,
+  THUMBNAIL_EDGE,
+} from '../src/utils/limits'
 import { isThemeSetting, type ThemeSetting } from '../src/theme'
 import { isAccentSetting, type AccentSetting } from '../src/personalization'
 
@@ -21,8 +39,12 @@ let savedBounds: { x: number; y: number; width: number; height: number } | null 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 let pauseUntil = 0
 let protectedToday = 0
+let protectedDate = getLocalDateKey()
 let currentHotkey = ''
 const pendingImageDeletes = new Map<string, ReturnType<typeof setTimeout>>()
+const hasSingleInstanceLock = app.requestSingleInstanceLock()
+
+if (!hasSingleInstanceLock) app.quit()
 
 // === Persistence ===
 const dataPath = path.join(app.getPath('userData'), 'clipmaster-data.json')
@@ -105,10 +127,12 @@ interface AppData {
   history: ClipboardItem[]
   settings: Settings
   protectedToday?: number
+  protectedDate?: string
 }
 
 let clipboardHistory: ClipboardItem[] = []
 let settings: Settings = { ...defaultSettings }
+let ignoredRules: CompiledIgnoredRule[] = []
 
 function clamp(value: unknown, min: number, max: number, fallback: number) {
   const num = typeof value === 'number' && Number.isFinite(value) ? value : fallback
@@ -135,9 +159,7 @@ function sanitizeSettings(input: Partial<Settings> | undefined): Settings {
     recordImages: raw.recordImages !== false,
     soundEnabled: Boolean(raw.soundEnabled),
     ignoreSensitive: raw.ignoreSensitive !== false,
-    ignoredPatterns: Array.isArray(raw.ignoredPatterns)
-      ? raw.ignoredPatterns.filter((pattern): pattern is string => typeof pattern === 'string').map(pattern => pattern.trim()).filter(Boolean).slice(0, 50)
-      : [],
+    ignoredPatterns: normalizeIgnoredPatterns(raw.ignoredPatterns),
     hideAfterCopy: Boolean(raw.hideAfterCopy),
     autoDeleteDays: Math.round(clamp(raw.autoDeleteDays, 0, 365, defaultSettings.autoDeleteDays)),
     verificationCodeTtlMinutes: Math.round(clamp(raw.verificationCodeTtlMinutes, 0, 1440, defaultSettings.verificationCodeTtlMinutes)),
@@ -173,22 +195,52 @@ function getClipboardContentType(text: string): ClipboardType {
 
 // 生成图片哈希用于去重
 function getImageHash(buffer: Buffer): string {
-  return require('crypto').createHash('md5').update(buffer).digest('hex').substring(0, 16)
+  return require('crypto').createHash('sha256').update(buffer).digest('hex').substring(0, 24)
 }
 
 function isImageHistoryItem(item: ClipboardItem | undefined): item is ClipboardItem & { imagePath: string } {
   return item?.type === 'image' && typeof item.imagePath === 'string' && item.imagePath.length > 0
 }
 
-function getSafeImageDataUrl(imagePath: string | undefined) {
+function resolveSafeImagePath(imagePath: string | undefined) {
+  if (!imagePath) return null
+  const resolvedRoot = path.resolve(imagesDir)
+  const resolvedImagePath = path.resolve(imagePath)
+  return isResolvedPathInside(resolvedRoot, resolvedImagePath, path.sep, process.platform === 'win32') ? resolvedImagePath : null
+}
+
+function getThumbnailPath(imagePath: string) {
+  const extension = path.extname(imagePath)
+  return path.join(path.dirname(imagePath), `${path.basename(imagePath, extension)}.thumb.png`)
+}
+
+function ensureImageThumbnail(imagePath: string) {
+  const thumbnailPath = getThumbnailPath(imagePath)
+  if (fs.existsSync(thumbnailPath)) return thumbnailPath
+  const image = nativeImage.createFromPath(imagePath)
+  if (image.isEmpty()) return null
+  const { width, height } = image.getSize()
+  const scale = Math.min(1, THUMBNAIL_EDGE / Math.max(width, height))
+  const thumbnail = scale < 1
+    ? image.resize({ width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)), quality: 'good' })
+    : image
+  const buffer = thumbnail.toPNG()
+  if (buffer.byteLength > MAX_THUMBNAIL_BYTES) return null
+  fs.writeFileSync(thumbnailPath, buffer)
+  return thumbnailPath
+}
+
+function getSafeImageDataUrl(imagePath: string | undefined, size: 'thumb' | 'detail' = 'thumb') {
   if (!imagePath) return null
   try {
-    const resolvedImagesDir = path.resolve(imagesDir)
-    const resolvedImagePath = path.resolve(imagePath)
-    if (!resolvedImagePath.startsWith(resolvedImagesDir + path.sep)) return null
+    const resolvedImagePath = resolveSafeImagePath(imagePath)
+    if (!resolvedImagePath) return null
     if (!fs.existsSync(resolvedImagePath)) return null
-    const buffer = fs.readFileSync(resolvedImagePath)
-    if (buffer.byteLength > 8 * 1024 * 1024) return null
+    const dataPath = size === 'thumb' ? ensureImageThumbnail(resolvedImagePath) : resolvedImagePath
+    if (!dataPath) return null
+    const buffer = fs.readFileSync(dataPath)
+    const maxBytes = size === 'thumb' ? MAX_THUMBNAIL_BYTES : MAX_IMAGE_BYTES
+    if (buffer.byteLength > maxBytes) return null
     return `data:image/png;base64,${buffer.toString('base64')}`
   } catch (err) {
     console.error('Failed to read image data url:', err)
@@ -199,9 +251,8 @@ function getSafeImageDataUrl(imagePath: string | undefined) {
 function getImageInfo(imagePath: string | undefined) {
   if (!imagePath) return null
   try {
-    const resolvedImagesDir = path.resolve(imagesDir)
-    const resolvedImagePath = path.resolve(imagePath)
-    if (!resolvedImagePath.startsWith(resolvedImagesDir + path.sep)) return null
+    const resolvedImagePath = resolveSafeImagePath(imagePath)
+    if (!resolvedImagePath) return null
     if (!fs.existsSync(resolvedImagePath)) return null
     const stat = fs.statSync(resolvedImagePath)
     const image = nativeImage.createFromPath(resolvedImagePath)
@@ -216,12 +267,14 @@ function getImageInfo(imagePath: string | undefined) {
 function cleanupImageCache() {
   try {
     if (!fs.existsSync(imagesDir)) return { deleted: 0, bytes: 0 }
-    const used = new Set(
-      clipboardHistory
-        .map(item => item.imagePath)
-        .filter((imagePath): imagePath is string => Boolean(imagePath))
-        .map(imagePath => path.resolve(imagePath))
-    )
+    const used = new Set<string>()
+    clipboardHistory
+      .map(item => resolveSafeImagePath(item.imagePath))
+      .filter((imagePath): imagePath is string => Boolean(imagePath))
+      .forEach(imagePath => {
+        used.add(imagePath)
+        used.add(getThumbnailPath(imagePath))
+      })
     let deleted = 0
     let bytes = 0
     for (const fileName of fs.readdirSync(imagesDir)) {
@@ -253,11 +306,12 @@ function canShowFilePath(filePath: string) {
 function safeDeleteImageFile(imagePath: string | undefined) {
   if (!imagePath) return
   try {
-    const resolvedImagesDir = path.resolve(imagesDir)
-    const resolvedImagePath = path.resolve(imagePath)
-    if (!resolvedImagePath.startsWith(resolvedImagesDir + path.sep)) return
-    if (clipboardHistory.some(item => item.imagePath === imagePath)) return
+    const resolvedImagePath = resolveSafeImagePath(imagePath)
+    if (!resolvedImagePath) return
+    if (clipboardHistory.some(item => resolveSafeImagePath(item.imagePath) === resolvedImagePath)) return
     if (fs.existsSync(resolvedImagePath)) fs.unlinkSync(resolvedImagePath)
+    const thumbnailPath = getThumbnailPath(resolvedImagePath)
+    if (fs.existsSync(thumbnailPath)) fs.unlinkSync(thumbnailPath)
   } catch (err) {
     console.error('Failed to delete image file:', err)
   }
@@ -303,10 +357,26 @@ function removeHistoryItems(shouldRemove: (item: ClipboardItem) => boolean, imag
 // 保存剪贴板图片
 function saveClipboardImage(): { path: string; hash: string } | null {
   try {
-    const image = clipboard.readImage()
+    let image = clipboard.readImage()
     if (image.isEmpty()) return null
+    const originalSize = image.getSize()
+    const constrainedSize = getConstrainedImageSize(originalSize.width, originalSize.height, MAX_IMAGE_EDGE, MAX_IMAGE_PIXELS)
+    if (!constrainedSize) return null
+    if (constrainedSize.width !== originalSize.width || constrainedSize.height !== originalSize.height) {
+      image = image.resize({ ...constrainedSize, quality: 'good' })
+    }
 
-    const buffer = image.toPNG()
+    let buffer = image.toPNG()
+    for (let attempt = 0; buffer.byteLength > MAX_IMAGE_BYTES && attempt < 3; attempt += 1) {
+      const currentSize = image.getSize()
+      image = image.resize({
+        width: Math.max(1, Math.round(currentSize.width * 0.72)),
+        height: Math.max(1, Math.round(currentSize.height * 0.72)),
+        quality: 'good',
+      })
+      buffer = image.toPNG()
+    }
+    if (buffer.byteLength > MAX_IMAGE_BYTES) return null
     const hash = getImageHash(buffer)
 
     // 检查是否重复
@@ -314,6 +384,7 @@ function saveClipboardImage(): { path: string; hash: string } | null {
 
     const imagePath = path.join(imagesDir, `${hash}.png`)
     if (!fs.existsSync(imagePath)) fs.writeFileSync(imagePath, buffer)
+    ensureImageThumbnail(imagePath)
     lastClipboardImageHash = hash
     return { path: imagePath, hash }
   } catch (err) {
@@ -326,13 +397,15 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' ? value as Record<string, unknown> : null
 }
 
-function sanitizeHistoryItem(input: unknown): ClipboardItem | null {
+function sanitizeHistoryItem(input: unknown, allowImagePath = true): ClipboardItem | null {
   const item = asRecord(input)
-  if (!item || typeof item.content !== 'string' || !item.content.trim()) return null
+  if (!item || typeof item.content !== 'string' || !item.content.trim() || !isTextWithinLimit(item.content)) return null
   const timestamp = Number(item.timestamp)
   const safeTimestamp = Number.isFinite(timestamp) && timestamp > 0 ? timestamp : Date.now()
   const rawType = typeof item.type === 'string' ? item.type : getClipboardContentType(item.content)
   const type = (CLIPBOARD_TYPES as readonly string[]).includes(rawType) ? rawType as ClipboardType : getClipboardContentType(item.content)
+  const imagePath = allowImagePath && typeof item.imagePath === 'string' ? resolveSafeImagePath(item.imagePath) : null
+  if (type === 'image' && !imagePath) return null
   return {
     id: typeof item.id === 'string' && item.id ? item.id : generateId(),
     content: item.content,
@@ -342,7 +415,7 @@ function sanitizeHistoryItem(input: unknown): ClipboardItem | null {
     favorited: Boolean(item.favorited),
     copyCount: Math.max(1, Number.isFinite(Number(item.copyCount)) ? Number(item.copyCount) : 1),
     firstTimestamp: Number.isFinite(Number(item.firstTimestamp)) ? Number(item.firstTimestamp) : safeTimestamp,
-    imagePath: typeof item.imagePath === 'string' && item.imagePath ? item.imagePath : undefined,
+    imagePath: imagePath || undefined,
     tags: normalizeTags(item.tags),
   }
 }
@@ -371,44 +444,50 @@ function dedupeHistory(items: ClipboardItem[]) {
 }
 
 function getImportedItems(payload: unknown) {
-  const record = asRecord(payload)
-  const source = Array.isArray(payload)
-    ? payload
-    : Array.isArray(record?.items)
-      ? record.items
-      : Array.isArray(record?.history)
-        ? record.history
-        : []
-  return source.map(sanitizeHistoryItem).filter(Boolean) as ClipboardItem[]
+  return getBoundedImportSource(payload)
+    .map(item => sanitizeHistoryItem(item, false))
+    .filter(Boolean) as ClipboardItem[]
+}
+
+function readPersistedData(filePath: string): Partial<AppData> {
+  const stat = fs.statSync(filePath)
+  if (!stat.isFile() || stat.size > MAX_PERSISTED_DATA_BYTES) throw new Error('Persisted data file exceeds the safety limit')
+  return parseJsonDocument<Partial<AppData>>(fs.readFileSync(filePath, 'utf-8'))
+}
+
+function applyLoadedData(data: Partial<AppData>) {
+  clipboardHistory = getBoundedImportSource({ history: data.history })
+    .map(item => sanitizeHistoryItem(item, true))
+    .filter(Boolean) as ClipboardItem[]
+  settings = sanitizeSettings(data.settings)
+  ignoredRules = compileIgnoredRules(settings.ignoredPatterns)
+  const dailyCounter = normalizeDailyCounter(data.protectedDate, data.protectedToday)
+  protectedDate = dailyCounter.date
+  protectedToday = dailyCounter.count
+  applyRetentionRules()
 }
 
 function loadData() {
-  try {
-    if (fs.existsSync(dataPath)) {
-      const raw = fs.readFileSync(dataPath, 'utf-8')
-      const data: Partial<AppData> = JSON.parse(raw)
-      clipboardHistory = Array.isArray(data.history) ? data.history.map(sanitizeHistoryItem).filter(Boolean) as ClipboardItem[] : []
-      settings = sanitizeSettings(data.settings)
-      protectedToday = Number.isFinite(Number(data.protectedToday)) ? Number(data.protectedToday) : 0
-      applyRetentionRules()
-    }
-  } catch (err) {
-    console.error('Failed to load data:', err)
-    try {
-      if (fs.existsSync(backupPath)) {
-        const backup = JSON.parse(fs.readFileSync(backupPath, 'utf-8')) as Partial<AppData>
-        clipboardHistory = Array.isArray(backup.history) ? backup.history.map(sanitizeHistoryItem).filter(Boolean) as ClipboardItem[] : []
-        settings = sanitizeSettings(backup.settings)
-      }
-    } catch (backupErr) {
-      console.error('Failed to load backup data:', backupErr)
-    }
+  const recovered = recoverWithBackup(
+    () => fs.existsSync(dataPath) ? readPersistedData(dataPath) : null,
+    () => fs.existsSync(backupPath) ? readPersistedData(backupPath) : null,
+  )
+  if (recovered.primaryError) console.error('Failed to load data:', recovered.primaryError)
+  if (recovered.backupError) console.error('Failed to load backup data:', recovered.backupError)
+  if (recovered.value) {
+    applyLoadedData(recovered.value)
+    return
   }
+  ignoredRules = compileIgnoredRules(settings.ignoredPatterns)
+  const dailyCounter = normalizeDailyCounter(undefined, undefined)
+  protectedDate = dailyCounter.date
+  protectedToday = dailyCounter.count
 }
 
 function saveData() {
   try {
-    const data: AppData = { history: clipboardHistory, settings, protectedToday }
+    refreshProtectedCounter()
+    const data: AppData = { history: clipboardHistory, settings, protectedToday, protectedDate }
     const tmpPath = `${dataPath}.${process.pid}.tmp`
     if (fs.existsSync(dataPath)) fs.copyFileSync(dataPath, backupPath)
     fs.writeFileSync(tmpPath, JSON.stringify(data), 'utf-8')
@@ -440,57 +519,16 @@ function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).substring(2)
 }
 
-function isVerificationCode(text: string) {
-  return /^\d{4,8}$/.test(text.trim())
-}
-
-function isSensitiveClipboardContent(text: string) {
-  const trimmed = text.trim()
-  const patterns = [
-    /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
-    /\beyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\b/,
-    /\b(?:sk|pk|rk|ghp|github_pat|xox[baprs])-?[a-zA-Z0-9_\-]{20,}\b/i,
-    /\bAKIA[0-9A-Z]{16}\b/,
-    /\b(?:password|passwd|pwd|token|secret|api[_-]?key)\s*[:=]\s*\S+/i,
-    /\b\d{15,19}\b/,
-    /\b\d{17}[\dXx]\b/,
-  ]
-  return patterns.some(pattern => pattern.test(trimmed))
-}
-
 function matchesIgnoredPattern(text: string) {
-  const trimmed = text.trim()
-  if (!trimmed || settings.ignoredPatterns.length === 0) return false
-  return settings.ignoredPatterns.some(pattern => {
-    try {
-      return new RegExp(pattern, 'i').test(trimmed)
-    } catch {
-      return trimmed.toLowerCase().includes(pattern.toLowerCase())
-    }
-  })
+  return matchesIgnoredRules(ignoredRules, text)
 }
 
 function applyRetentionRules() {
-  const now = Date.now()
-  const normalMaxAge = settings.autoDeleteDays > 0 ? settings.autoDeleteDays * 24 * 60 * 60 * 1000 : Infinity
-  const codeMaxAge = settings.verificationCodeTtlMinutes > 0 ? settings.verificationCodeTtlMinutes * 60 * 1000 : Infinity
-
-  const retainedByAge = clipboardHistory.filter(item => {
-    if (item.pinned || item.favorited) return true
-    const age = now - item.timestamp
-    if (isVerificationCode(item.content)) return age <= codeMaxAge
-    return age <= normalMaxAge
-  })
-
-  const protectedItems = retainedByAge.filter(item => item.pinned || item.favorited)
-  const normalItems = retainedByAge.filter(item => !item.pinned && !item.favorited)
-  const maxNormal = Math.max(0, settings.maxHistory - protectedItems.length)
-  const nextHistory = [...protectedItems, ...normalItems.slice(0, maxNormal)].sort((a, b) => {
-    if (a.pinned && !b.pinned) return -1
-    if (!a.pinned && b.pinned) return 1
-    if (a.favorited && !b.favorited) return -1
-    if (!a.favorited && b.favorited) return 1
-    return b.timestamp - a.timestamp
+  const nextHistory = retainHistoryItems(clipboardHistory, {
+    maxHistory: settings.maxHistory,
+    autoDeleteDays: settings.autoDeleteDays,
+    verificationCodeTtlMinutes: settings.verificationCodeTtlMinutes,
+    maxTextBytes: MAX_HISTORY_TEXT_BYTES,
   })
   const nextIds = new Set(nextHistory.map(item => item.id))
   const removedImages = clipboardHistory
@@ -500,7 +538,23 @@ function applyRetentionRules() {
   removedImages.forEach(safeDeleteImageFile)
 }
 
+function refreshProtectedCounter() {
+  const next = normalizeDailyCounter(protectedDate, protectedToday)
+  const changed = next.date !== protectedDate || next.count !== protectedToday
+  protectedDate = next.date
+  protectedToday = next.count
+  return changed
+}
+
+function recordProtectedItem() {
+  refreshProtectedCounter()
+  protectedToday += 1
+  emitPrivacyState()
+  scheduleSave()
+}
+
 function getPrivacyState() {
+  refreshProtectedCounter()
   return { paused: pauseUntil > Date.now(), pauseUntil, protectedToday }
 }
 
@@ -510,9 +564,11 @@ function emitPrivacyState() {
 
 function applyAutoStart() {
   try {
+    const portableExecutable = process.env.PORTABLE_EXECUTABLE_FILE
+    const executablePath = portableExecutable && fs.existsSync(portableExecutable) ? portableExecutable : process.execPath
     app.setLoginItemSettings({
       openAtLogin: settings.autoStart,
-      path: process.execPath,
+      path: executablePath,
     })
   } catch (err) {
     console.error('Failed to update auto start:', err)
@@ -679,6 +735,10 @@ function startClipboardWatcher() {
   if (clipboardWatcher || isQuitting) return
   clipboardWatcher = setInterval(() => {
     try {
+      if (refreshProtectedCounter()) {
+        emitPrivacyState()
+        scheduleSave()
+      }
       if (pauseUntil > 0 && pauseUntil <= Date.now()) resumeMonitoring()
       if (pauseUntil > Date.now()) return
 
@@ -694,19 +754,20 @@ function startClipboardWatcher() {
         hasError = true
       }
 
+      if (currentContent && currentContent !== lastClipboardContent && !isTextWithinLimit(currentContent)) {
+        lastClipboardContent = currentContent
+        currentContent = ''
+      }
+
       if (currentContent && currentContent !== lastClipboardContent && matchesIgnoredPattern(currentContent)) {
         lastClipboardContent = currentContent
-        protectedToday += 1
-        emitPrivacyState()
-        scheduleSave()
+        recordProtectedItem()
         return
       }
 
       if (settings.ignoreSensitive && currentContent && currentContent !== lastClipboardContent && isSensitiveClipboardContent(currentContent)) {
         lastClipboardContent = currentContent
-        protectedToday += 1
-        emitPrivacyState()
-        scheduleSave()
+        recordProtectedItem()
         return
       }
 
@@ -803,7 +864,7 @@ function startClipboardWatcher() {
 }
 
 // IPC Handlers
-ipcMain.handle('get-image-data-url', (_, imagePath: string | undefined) => getSafeImageDataUrl(imagePath))
+ipcMain.handle('get-image-data-url', (_, imagePath: string | undefined, size: 'thumb' | 'detail' = 'thumb') => getSafeImageDataUrl(imagePath, size === 'detail' ? 'detail' : 'thumb'))
 ipcMain.handle('get-image-info', (_, imagePath: string | undefined) => getImageInfo(imagePath))
 ipcMain.handle('cleanup-image-cache', () => cleanupImageCache())
 ipcMain.handle('open-external-url', async (_, url: string) => {
@@ -862,7 +923,7 @@ ipcMain.handle('check-for-updates', async (_, force = false): Promise<UpdateInfo
 ipcMain.handle('create-item', (_, draft: { content?: unknown; tags?: unknown; pinned?: unknown; favorited?: unknown }) => {
   const content = typeof draft?.content === 'string' ? draft.content : ''
   if (!content.trim()) return { history: clipboardHistory, itemId: null, created: false }
-  if (Buffer.byteLength(content, 'utf8') > 2 * 1024 * 1024) throw new Error('Clipboard item is too large')
+  if (!isTextWithinLimit(content)) throw new Error('Clipboard item is too large')
 
   const tags = normalizeTags(draft.tags)
   const existingIndex = clipboardHistory.findIndex(item => item.type !== 'image' && item.content === content)
@@ -913,7 +974,7 @@ ipcMain.handle('update-item', (_, id: string, patch: { content?: unknown; tags?:
 
   if (typeof patch?.content === 'string') {
     if (!patch.content.trim()) throw new Error('Clipboard item cannot be empty')
-    if (Buffer.byteLength(patch.content, 'utf8') > 2 * 1024 * 1024) throw new Error('Clipboard item is too large')
+    if (!isTextWithinLimit(patch.content)) throw new Error('Clipboard item is too large')
     item.content = patch.content
     item.type = getClipboardContentType(patch.content)
     item.timestamp = Date.now()
@@ -933,6 +994,7 @@ ipcMain.handle('copy-to-clipboard', (_, itemOrContent: ClipboardItem | string) =
   }
 
   if (typeof itemOrContent === 'string') {
+    if (!isTextWithinLimit(itemOrContent)) throw new Error('Clipboard item is too large')
     clipboard.writeText(itemOrContent)
     lastClipboardContent = itemOrContent
     finishCopy()
@@ -940,13 +1002,15 @@ ipcMain.handle('copy-to-clipboard', (_, itemOrContent: ClipboardItem | string) =
   }
 
   const historyItem = clipboardHistory.find(item => item.id === itemOrContent.id)
-  const item = historyItem || itemOrContent
+  const item = historyItem || sanitizeHistoryItem(itemOrContent, true)
+  if (!item) return clipboardHistory
+  const safeImagePath = isImageHistoryItem(item) ? resolveSafeImagePath(item.imagePath) : null
 
-  if (isImageHistoryItem(item) && fs.existsSync(item.imagePath)) {
-    const image = nativeImage.createFromPath(item.imagePath)
+  if (safeImagePath && fs.existsSync(safeImagePath)) {
+    const image = nativeImage.createFromPath(safeImagePath)
     if (!image.isEmpty()) {
       clipboard.writeImage(image)
-      lastClipboardImageHash = item.content.replace(/^\[图片\]\s*/, '')
+      lastClipboardImageHash = path.basename(safeImagePath, path.extname(safeImagePath))
       lastImageCheckAt = Date.now()
     } else {
       clipboard.writeText(item.content)
@@ -1064,6 +1128,7 @@ ipcMain.handle('import-history', (_, payload: unknown, mode: 'merge' | 'replace'
       hotkey: oldSettings.hotkey,
     }
     settings = nextSettings
+    ignoredRules = compileIgnoredRules(settings.ignoredPatterns)
     applyAutoStart()
     mainWindow?.webContents.send('settings-updated', settings)
   }
@@ -1085,6 +1150,7 @@ ipcMain.handle('update-settings', (_, newSettings: Partial<Settings>) => {
   }
 
   settings = nextSettings
+  ignoredRules = compileIgnoredRules(settings.ignoredPatterns)
 
   if (oldSettings.autoStart !== settings.autoStart) applyAutoStart()
   if (oldSettings.language !== settings.language) rebuildTrayMenu()
@@ -1113,7 +1179,7 @@ ipcMain.handle('resume-monitoring', () => {
 })
 
 ipcMain.handle('minimize-window', () => mainWindow?.minimize())
-ipcMain.handle('close-window', () => mainWindow?.hide())
+ipcMain.handle('close-window', () => mainWindow?.close())
 ipcMain.handle('toggle-maximize', () => {
   if (!mainWindow) return
   if (isMaximized) {
@@ -1132,31 +1198,36 @@ ipcMain.handle('toggle-maximize', () => {
 })
 
 // App lifecycle
-app.whenReady().then(() => {
-  loadData()
-  cleanupImageCache()
-  applyAutoStart()
-  createWindow()
-  createTray()
-  startClipboardWatcher()
-  registerHotkey()
-})
+if (hasSingleInstanceLock) {
+  app.on('second-instance', () => {
+    if (mainWindow?.isMinimized()) mainWindow.restore()
+    showWindow()
+  })
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    // Keep running in tray
-  }
-})
+  app.whenReady().then(() => {
+    loadData()
+    cleanupImageCache()
+    applyAutoStart()
+    createWindow()
+    createTray()
+    startClipboardWatcher()
+    registerHotkey()
+  })
 
-app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) createWindow()
-})
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin' && !settings.minimizeToTray) app.quit()
+  })
 
-app.on('before-quit', () => {
-  isQuitting = true
-  flushPendingSave()
-  stopClipboardWatcher()
-  globalShortcut.unregisterAll()
-  pendingImageDeletes.forEach(timer => clearTimeout(timer))
-  pendingImageDeletes.clear()
-})
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+  })
+
+  app.on('before-quit', () => {
+    isQuitting = true
+    flushPendingSave()
+    stopClipboardWatcher()
+    globalShortcut.unregisterAll()
+    pendingImageDeletes.forEach(timer => clearTimeout(timer))
+    pendingImageDeletes.clear()
+  })
+}

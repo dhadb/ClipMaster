@@ -78,7 +78,7 @@ Windows may show a SmartScreen warning for unsigned open-source installers. Down
 | Stats | View type distribution and usage patterns |
 | Personalized appearance | Eight themes, five independent accents, density, type size, opacity, and window size |
 | Update checks | Check GitHub Releases at startup or manually without automatic downloads or installs |
-| Import and export | Export JSON backups, then merge or replace history during import |
+| Import and export | Export text-only JSON metadata without images or local paths, then merge or replace history during import |
 | Local privacy | No upload, sync, or clipboard analytics |
 
 ## Shortcuts

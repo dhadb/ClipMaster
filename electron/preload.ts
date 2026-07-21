@@ -67,7 +67,7 @@ export interface UpdateInfo {
 }
 
 const electronAPI = {
-  getImageDataUrl: (imagePath?: string): Promise<string | null> => ipcRenderer.invoke('get-image-data-url', imagePath),
+  getImageDataUrl: (imagePath?: string, size: 'thumb' | 'detail' = 'thumb'): Promise<string | null> => ipcRenderer.invoke('get-image-data-url', imagePath, size),
   getImageInfo: (imagePath?: string): Promise<{ bytes: number; width: number; height: number } | null> => ipcRenderer.invoke('get-image-info', imagePath),
   cleanupImageCache: (): Promise<{ deleted: number; bytes: number }> => ipcRenderer.invoke('cleanup-image-cache'),
   openExternalUrl: (url: string): Promise<boolean> => ipcRenderer.invoke('open-external-url', url),

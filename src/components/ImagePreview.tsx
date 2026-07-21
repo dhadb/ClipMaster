@@ -1,13 +1,14 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { Image as ImageIcon } from 'lucide-react'
 import { useI18n } from '../i18n'
+import { WeightedLruCache } from '../utils/lru'
 
 interface Props {
   imagePath?: string
   size?: 'thumb' | 'detail'
 }
 
-const imageDataUrlCache = new Map<string, string>()
+const imageDataUrlCache = new WeightedLruCache<string>(32, 24 * 1024 * 1024)
 
 const ImagePreview: React.FC<Props> = ({ imagePath, size = 'thumb' }) => {
   const { t } = useI18n()
@@ -15,6 +16,7 @@ const ImagePreview: React.FC<Props> = ({ imagePath, size = 'thumb' }) => {
   const [info, setInfo] = useState<{ bytes: number; width: number; height: number } | null>(null)
   const [failed, setFailed] = useState(false)
   const isDetail = size === 'detail'
+  const cacheKey = `${size}:${imagePath || ''}`
 
   useEffect(() => {
     let cancelled = false
@@ -27,23 +29,22 @@ const ImagePreview: React.FC<Props> = ({ imagePath, size = 'thumb' }) => {
       return
     }
 
-    const cached = imageDataUrlCache.get(imagePath)
+    const cached = imageDataUrlCache.get(cacheKey)
     if (cached) {
       setSrc(cached)
-      return
+    } else {
+      window.electronAPI.getImageDataUrl(imagePath, size)
+        .then(dataUrl => {
+          if (cancelled) return
+          if (dataUrl) {
+            imageDataUrlCache.set(cacheKey, dataUrl, dataUrl.length)
+            setSrc(dataUrl)
+          } else setFailed(true)
+        })
+        .catch(() => {
+          if (!cancelled) setFailed(true)
+        })
     }
-
-    window.electronAPI.getImageDataUrl(imagePath)
-      .then(dataUrl => {
-        if (cancelled) return
-        if (dataUrl) {
-          imageDataUrlCache.set(imagePath, dataUrl)
-          setSrc(dataUrl)
-        } else setFailed(true)
-      })
-      .catch(() => {
-        if (!cancelled) setFailed(true)
-      })
 
     if (isDetail && window.electronAPI?.getImageInfo) {
       window.electronAPI.getImageInfo(imagePath)
@@ -52,9 +53,12 @@ const ImagePreview: React.FC<Props> = ({ imagePath, size = 'thumb' }) => {
     }
 
     return () => { cancelled = true }
-  }, [imagePath, isDetail])
+  }, [cacheKey, imagePath, isDetail, size])
 
-  const onError = useCallback(() => setFailed(true), [])
+  const onError = useCallback(() => {
+    imageDataUrlCache.delete(cacheKey)
+    setFailed(true)
+  }, [cacheKey])
 
   if (src && !failed) {
     const meta = info ? `${info.width} × ${info.height} · ${(info.bytes / 1024).toFixed(1)} KB` : ''

@@ -1,5 +1,5 @@
 const sharp = require('sharp')
-const toIco = require('to-ico')
+const { default: toIco } = require('png-to-ico')
 const fs = require('fs')
 const path = require('path')
 

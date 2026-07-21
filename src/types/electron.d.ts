@@ -16,7 +16,7 @@ export interface UpdateInfo {
 }
 
 export interface ElectronAPI {
-  getImageDataUrl: (imagePath?: string) => Promise<string | null>
+  getImageDataUrl: (imagePath?: string, size?: 'thumb' | 'detail') => Promise<string | null>
   openExternalUrl: (url: string) => Promise<boolean>
   showFileInFolder: (filePath: string) => Promise<boolean>
   getHistory: () => Promise<ClipboardItem[]>

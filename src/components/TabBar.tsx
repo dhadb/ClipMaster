@@ -2,6 +2,8 @@ import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from '
 import { BarChart3, CheckSquare, Clock3, Download, MoreHorizontal, Sparkles, Star, Trash2, Upload, X } from 'lucide-react'
 import { useClipboardStore } from '../store/clipboardStore'
 import { useI18n } from '../i18n'
+import { createTextMetadataBackup } from '../utils/backup'
+import { getBoundedImportSource, MAX_IMPORT_FILE_BYTES } from '../utils/limits'
 import ConfirmDialog from './ConfirmDialog'
 
 type ClearMode = 'kept' | 'all' | null
@@ -44,11 +46,12 @@ const TabBar: React.FC = memo(() => {
   }, [menuOpen])
 
   const onExport = useCallback(() => {
-    const blob = new Blob([JSON.stringify({ version: '1.1', items: history, settings }, null, 2)], { type: 'application/json' })
+    const backup = createTextMetadataBackup(history, settings)
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' })
     const anchor = document.createElement('a')
     const url = URL.createObjectURL(blob)
     anchor.href = url
-    anchor.download = `clipmaster-${new Date().toISOString().slice(0, 10)}.json`
+    anchor.download = `clipmaster-text-${new Date().toISOString().slice(0, 10)}.json`
     anchor.click()
     setTimeout(() => URL.revokeObjectURL(url), 1000)
     notify(t('toast.exported'), 'success')
@@ -60,14 +63,15 @@ const TabBar: React.FC = memo(() => {
     event.target.value = ''
     if (!file) return
     try {
+      if (file.size > MAX_IMPORT_FILE_BYTES) throw new Error('Import file exceeds the safety limit')
       const payload = JSON.parse(await file.text())
-      const source = Array.isArray(payload) ? payload : Array.isArray(payload?.items) ? payload.items : Array.isArray(payload?.history) ? payload.history : []
+      const source = getBoundedImportSource(payload)
       if (source.length === 0) throw new Error('No records')
       setImportPayload(payload)
       setImportCount(source.length)
     } catch (err) {
       console.error('Import failed:', err)
-      notify(t('tabs.importFailed'), 'danger')
+      notify(file.size > MAX_IMPORT_FILE_BYTES ? t('tabs.importTooLarge') : t('tabs.importFailed'), 'danger')
     }
   }, [notify, t])
 

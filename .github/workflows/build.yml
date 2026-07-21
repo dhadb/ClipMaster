@@ -24,6 +24,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Audit runtime dependencies
+        run: npm audit --omit=dev --audit-level=high --registry=https://registry.npmjs.org
+
+      - name: Audit build dependencies
+        run: npm audit --audit-level=high --registry=https://registry.npmjs.org
+
       - name: Run tests
         run: npm test
 

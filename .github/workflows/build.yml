@@ -39,7 +39,7 @@ jobs:
         run: npm test
 
       - name: Build app
-        run: npm run build -- --publish never
+        run: npm run build
 
       - name: Generate SHA256 checksums
         shell: powershell

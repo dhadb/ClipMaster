@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { filterHistory, type ClipboardItem } from './clipboardStore'
+import { filterHistory, useClipboardStore, type ClipboardItem } from './clipboardStore'
 
 function item(id: string, timestamp: number, overrides: Partial<ClipboardItem> = {}): ClipboardItem {
   return {
@@ -38,5 +38,23 @@ describe('filterHistory', () => {
     const now = Date.now()
     const yesterday = now - 36 * 60 * 60 * 1000
     expect(filterHistory([item('today', now), item('old', yesterday)], 'history', '', null, 'newest', 'today').map(value => value.id)).toEqual(['today'])
+  })
+
+  it('resets search, filters, and sort mode together', () => {
+    const store = useClipboardStore.getState()
+    store.setHistory([item('recent', 3), item('old', 1)])
+    store.setSearchQuery('recent')
+    store.setFilterType('text')
+    store.setTimeFilter('week')
+    store.setSortMode('most-used')
+
+    useClipboardStore.getState().resetFilters()
+    const state = useClipboardStore.getState()
+
+    expect(state.searchQuery).toBe('')
+    expect(state.filterType).toBeNull()
+    expect(state.timeFilter).toBe('all')
+    expect(state.sortMode).toBe('newest')
+    expect(state.filteredHistory.map(value => value.id)).toEqual(['recent', 'old'])
   })
 })

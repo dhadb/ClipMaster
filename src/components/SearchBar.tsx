@@ -54,6 +54,10 @@ const SearchBar: React.FC = () => {
   }, [setSearchQuery])
 
   const onClear = useCallback(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current)
+      timerRef.current = null
+    }
     setLocal('')
     setSearchQuery('')
     inputRef.current?.focus()
@@ -62,6 +66,13 @@ const SearchBar: React.FC = () => {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f' && !event.altKey && !event.shiftKey) {
+        const target = event.target as HTMLElement | null
+        const isEditing = target && (
+          target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable
+        )
+        if (isEditing && target !== inputRef.current) return
         event.preventDefault()
         inputRef.current?.focus()
       }
@@ -99,7 +110,7 @@ const SearchBar: React.FC = () => {
     { id: 'week', label: t('search.timeWeek'), Icon: CalendarDays },
   ]
 
-  const hasFilter = Boolean(local || filterType || timeFilter !== 'all')
+  const hasFilter = Boolean(local || filterType || timeFilter !== 'all' || sortMode !== 'newest')
   const activeFilterCount = Number(Boolean(filterType)) + Number(timeFilter !== 'all') + Number(sortMode !== 'newest')
 
   return (
@@ -131,7 +142,7 @@ const SearchBar: React.FC = () => {
 
       <div className="flex min-h-7 items-center justify-between px-1 pt-1.5 text-[10px]" style={{ color: 'var(--text-ghost)' }}>
         <span>{hasFilter ? t('search.resultSummary', { count: filteredLen, total: history.length }) : t('search.totalSummary', { count: history.length })}</span>
-        {hasFilter && <button onClick={() => { resetFilters(); setLocal('') }} className="inline-flex items-center gap-1 rounded px-1.5 py-1 interactive-chip" style={{ color: 'var(--color-primary-light)' }}><X size={10} />{t('search.reset')}</button>}
+        {hasFilter && <button onClick={() => { onClear(); resetFilters() }} className="inline-flex items-center gap-1 rounded px-1.5 py-1 interactive-chip" style={{ color: 'var(--color-primary-light)' }}><X size={10} />{t('search.reset')}</button>}
       </div>
 
       {showFilters && (

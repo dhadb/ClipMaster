@@ -151,6 +151,13 @@ function App() {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'n') {
+        const target = event.target as HTMLElement | null
+        const isEditing = target && (
+          target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable
+        )
+        if (isEditing) return
         event.preventDefault()
         setQuickAddOpen(true)
       }

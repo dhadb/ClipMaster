@@ -296,8 +296,9 @@ export const useClipboardStore = create<ClipboardStore>((set, get) => ({
   },
 
   resetFilters: () => {
-    const { history, activeTab, sortMode } = get()
-    set({ searchQuery: '', filterType: null, timeFilter: 'all', filteredHistory: filterHistory(history, activeTab, '', null, sortMode, 'all') })
+    const { history, activeTab } = get()
+    const sortMode: SortMode = 'newest'
+    set({ searchQuery: '', filterType: null, timeFilter: 'all', sortMode, filteredHistory: filterHistory(history, activeTab, '', null, sortMode, 'all') })
   },
 
   setSelectionMode: (selectionMode) => set({ selectionMode, selectedIds: selectionMode ? get().selectedIds : [] }),

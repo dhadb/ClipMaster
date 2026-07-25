@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, memo } from 'react'
+import React, { useState, useCallback, useEffect, useMemo, memo } from 'react'
 import { Settings, Keyboard, Palette, Database, Bell, Sliders, Info, Zap, Heart, Shield, Image as ImageIcon, Globe2, HelpCircle, RefreshCw } from 'lucide-react'
 import { useClipboardStore, type Settings as ClipboardSettings } from '../store/clipboardStore'
 import { useI18n } from '../i18n'
@@ -11,6 +11,7 @@ const appIconUrl = './icon.png'
 const SettingsPanel: React.FC = memo(() => {
   const settings = useClipboardStore(s => s.settings)
   const updateSettings = useClipboardStore(s => s.updateSettings)
+  const history = useClipboardStore(s => s.history)
   const historyLen = useClipboardStore(s => s.history.length)
   const appVersion = useClipboardStore(s => s.appVersion)
   const { t } = useI18n()
@@ -19,6 +20,9 @@ const SettingsPanel: React.FC = memo(() => {
   const [hotkeyMessage, setHotkeyMessage] = useState('')
   const [ignoredDraft, setIgnoredDraft] = useState(settings.ignoredPatterns.join('\n'))
   const [cacheMessage, setCacheMessage] = useState('')
+
+  const favoriteCount = useMemo(() => history.filter(item => item.favorited).length, [history])
+  const imageCount = useMemo(() => history.filter(item => item.type === 'image').length, [history])
 
   useEffect(() => {
     setHotkeyDraft(settings.hotkey)
@@ -262,7 +266,7 @@ const SettingsPanel: React.FC = memo(() => {
                 <div className="p-4 rounded-lg"
                   style={{ background: 'color-mix(in srgb, var(--color-success) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--color-success) 8%, transparent)' }}>
                   <p className="text-2xl font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>
-                    {useClipboardStore.getState().history.filter(h => h.favorited).length}
+                    {favoriteCount}
                   </p>
                   <p className="text-[11px] mt-1" style={{ color: 'var(--text-tertiary)' }}>{t('settings.favoriteCount')}</p>
                 </div>
@@ -271,7 +275,7 @@ const SettingsPanel: React.FC = memo(() => {
             <Card title={t('settings.imageCache')} icon={<ImageIcon size={14} color="var(--color-success)" />}>
               <Item label={t('settings.imageRecords')} desc={t('settings.imageRecordsDesc')}>
                 <span className="text-[13px] tabular-nums" style={{ color: 'var(--text-secondary)' }}>
-                  {t('settings.countUnit', { count: useClipboardStore.getState().history.filter(h => h.type === 'image').length })}
+                  {t('settings.countUnit', { count: imageCount })}
                 </span>
               </Item>
               <div className="h-px" style={{ background: 'var(--border-divider)' }} />

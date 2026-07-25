@@ -145,6 +145,12 @@ const ClipboardDetail: React.FC = () => {
   React.useEffect(() => {
     if (!detailItemId) return
     const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null
+      const isEditingTarget = target && (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable
+      )
       if (e.key === 'Escape') {
         if (editing) {
           setEditing(false)
@@ -156,7 +162,7 @@ const ClipboardDetail: React.FC = () => {
         e.preventDefault()
         void onSave()
       }
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c' && item) {
+      if (!isEditingTarget && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c' && item) {
         e.preventDefault()
         copyItem(item.id)
       }

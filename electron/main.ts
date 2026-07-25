@@ -885,11 +885,87 @@ interface UpdateInfo {
   latestVersion: string
   hasUpdate: boolean
   releaseUrl: string
+  downloadUrl: string
   publishedAt: string | null
+}
+
+interface UpdateDownloadProgress {
+  receivedBytes: number
+  totalBytes: number | null
+  percent: number | null
 }
 
 let updateCache: { checkedAt: number; info: UpdateInfo } | null = null
 const latestReleaseUrl = 'https://github.com/dhadb/ClipMaster/releases/latest'
+const maxUpdateDownloadBytes = 300 * 1024 * 1024
+let downloadedInstallerPath: string | null = null
+let downloadedInstallerVersion: string | null = null
+let updateDownloadPromise: Promise<{ version: string }> | null = null
+
+function getUpdateDownloadUrl(version: string) {
+  const encodedVersion = encodeURIComponent(version)
+  return `https://github.com/dhadb/ClipMaster/releases/download/v${encodedVersion}/ClipMaster-Setup-${encodedVersion}.exe`
+}
+
+function emitUpdateDownloadProgress(progress: UpdateDownloadProgress) {
+  mainWindow?.webContents.send('update-download-progress', progress)
+}
+
+async function downloadInstaller(info: UpdateInfo): Promise<{ version: string }> {
+  const installerPath = path.join(app.getPath('temp'), `ClipMaster-Setup-${info.latestVersion}.exe`)
+  const partialPath = `${installerPath}.download`
+
+  if (downloadedInstallerPath && downloadedInstallerVersion === info.latestVersion && fs.existsSync(downloadedInstallerPath)) {
+    emitUpdateDownloadProgress({ receivedBytes: fs.statSync(downloadedInstallerPath).size, totalBytes: fs.statSync(downloadedInstallerPath).size, percent: 100 })
+    return { version: info.latestVersion }
+  }
+
+  await fs.promises.rm(partialPath, { force: true })
+  emitUpdateDownloadProgress({ receivedBytes: 0, totalBytes: null, percent: null })
+
+  const response = await net.fetch(info.downloadUrl, {
+    method: 'GET',
+    redirect: 'follow',
+    signal: AbortSignal.timeout(5 * 60 * 1000),
+    headers: {
+      Accept: 'application/octet-stream',
+      'User-Agent': `ClipMaster/${info.currentVersion}`,
+    },
+  })
+  if (!response.ok) throw new Error(`Download request failed with status ${response.status}`)
+  if (!response.body) throw new Error('Update download returned an empty response')
+
+  const contentLength = Number(response.headers.get('content-length'))
+  const totalBytes = Number.isFinite(contentLength) && contentLength > 0 ? contentLength : null
+  if (totalBytes !== null && totalBytes > maxUpdateDownloadBytes) throw new Error('Update package is too large')
+
+  let receivedBytes = 0
+  const reader = response.body.getReader()
+  const file = await fs.promises.open(partialPath, 'w')
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      if (!value || value.byteLength === 0) continue
+      receivedBytes += value.byteLength
+      if (receivedBytes > maxUpdateDownloadBytes) throw new Error('Update package is too large')
+      await file.write(Buffer.from(value))
+      const percent = totalBytes ? Math.min(100, Math.round((receivedBytes / totalBytes) * 100)) : null
+      emitUpdateDownloadProgress({ receivedBytes, totalBytes, percent })
+    }
+  } finally {
+    await file.close()
+    await reader.cancel().catch(() => undefined)
+  }
+
+  if (receivedBytes === 0) throw new Error('Update download returned an empty file')
+  await fs.promises.rm(installerPath, { force: true })
+  await fs.promises.rename(partialPath, installerPath)
+  downloadedInstallerPath = installerPath
+  downloadedInstallerVersion = info.latestVersion
+  emitUpdateDownloadProgress({ receivedBytes, totalBytes: totalBytes || receivedBytes, percent: 100 })
+  return { version: info.latestVersion }
+}
 
 ipcMain.handle('check-for-updates', async (_, force = false): Promise<UpdateInfo> => {
   if (!force && updateCache && Date.now() - updateCache.checkedAt < 10 * 60 * 1000) return updateCache.info
@@ -914,10 +990,33 @@ ipcMain.handle('check-for-updates', async (_, force = false): Promise<UpdateInfo
     latestVersion: release.latestVersion,
     hasUpdate: compareVersions(release.latestVersion, currentVersion) > 0,
     releaseUrl: release.releaseUrl,
+    downloadUrl: getUpdateDownloadUrl(release.latestVersion),
     publishedAt: null,
   }
   updateCache = { checkedAt: Date.now(), info }
   return info
+})
+
+ipcMain.handle('download-update', async () => {
+  const info = updateCache?.info
+  if (!info?.hasUpdate) throw new Error('No update is available')
+  if (!updateDownloadPromise) {
+    updateDownloadPromise = downloadInstaller(info).finally(() => { updateDownloadPromise = null })
+  }
+  return updateDownloadPromise
+})
+
+ipcMain.handle('install-update', async () => {
+  if (!downloadedInstallerPath || !downloadedInstallerVersion || !fs.existsSync(downloadedInstallerPath)) {
+    throw new Error('Update package has not been downloaded')
+  }
+  const openError = await shell.openPath(downloadedInstallerPath)
+  if (openError) throw new Error(openError)
+  isQuitting = true
+  flushPendingSave()
+  stopClipboardWatcher()
+  app.quit()
+  return { version: downloadedInstallerVersion }
 })
 
 ipcMain.handle('create-item', (_, draft: { content?: unknown; tags?: unknown; pinned?: unknown; favorited?: unknown }) => {

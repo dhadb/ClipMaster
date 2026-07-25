@@ -12,7 +12,14 @@ export interface UpdateInfo {
   latestVersion: string
   hasUpdate: boolean
   releaseUrl: string
+  downloadUrl: string
   publishedAt: string | null
+}
+
+export interface UpdateDownloadProgress {
+  receivedBytes: number
+  totalBytes: number | null
+  percent: number | null
 }
 
 export interface ElectronAPI {
@@ -22,6 +29,8 @@ export interface ElectronAPI {
   getHistory: () => Promise<ClipboardItem[]>
   getAppVersion: () => Promise<string>
   checkForUpdates: (force?: boolean) => Promise<UpdateInfo>
+  downloadUpdate: () => Promise<{ version: string }>
+  installUpdate: () => Promise<{ version: string }>
   copyToClipboard: (item: ClipboardItem | string) => Promise<ClipboardItem[]>
   createItem: (draft: ClipboardItemDraft) => Promise<{ history: ClipboardItem[]; itemId: string | null; created: boolean }>
   updateItemTags: (id: string, tags: string[]) => Promise<ClipboardItem[]>
@@ -48,6 +57,7 @@ export interface ElectronAPI {
   onHistoryUpdated: (callback: (history: ClipboardItem[]) => void) => () => void
   onSettingsUpdated: (callback: (settings: Settings) => void) => () => void
   onPrivacyUpdated: (callback: (state: PrivacyState) => void) => () => void
+  onUpdateDownloadProgress: (callback: (progress: UpdateDownloadProgress) => void) => () => void
   onShowSettings: (callback: () => void) => () => void
 }
 

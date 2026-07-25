@@ -60,10 +60,17 @@ export interface UpdateInfo {
   latestVersion: string
   hasUpdate: boolean
   releaseUrl: string
+  downloadUrl: string
   publishedAt: string | null
 }
 
-export type UpdateStatus = 'idle' | 'checking' | 'available' | 'current' | 'error'
+export interface UpdateDownloadProgress {
+  receivedBytes: number
+  totalBytes: number | null
+  percent: number | null
+}
+
+export type UpdateStatus = 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'installing' | 'current' | 'error'
 
 export type ActiveTab = 'history' | 'favorites' | 'stats' | 'settings'
 export type SortMode = 'newest' | 'oldest' | 'most-used'
@@ -147,6 +154,7 @@ interface ClipboardStore {
   appVersion: string
   updateInfo: UpdateInfo | null
   updateStatus: UpdateStatus
+  updateDownloadProgress: UpdateDownloadProgress
   updateDismissed: boolean
   activeTab: ActiveTab
   copiedId: string | null
@@ -171,6 +179,8 @@ interface ClipboardStore {
   setAppVersion: (version: string) => void
   updateSettings: (patch: Partial<Settings>) => Promise<Settings>
   checkForUpdates: (force?: boolean) => Promise<UpdateInfo | null>
+  downloadUpdate: () => Promise<boolean>
+  installUpdate: () => Promise<boolean>
   dismissUpdate: () => void
   setActiveTab: (tab: ActiveTab) => void
   setDetailItemId: (id: string | null) => void
@@ -213,6 +223,7 @@ export const useClipboardStore = create<ClipboardStore>((set, get) => ({
   appVersion: '',
   updateInfo: null,
   updateStatus: 'idle',
+  updateDownloadProgress: { receivedBytes: 0, totalBytes: null, percent: null },
   updateDismissed: false,
   activeTab: 'history',
   copiedId: null,
@@ -270,6 +281,31 @@ export const useClipboardStore = create<ClipboardStore>((set, get) => ({
       console.error('checkForUpdates failed:', err)
       set({ updateStatus: 'error' })
       return null
+    }
+  },
+  downloadUpdate: async () => {
+    if (!window.electronAPI || !get().updateInfo?.hasUpdate) return false
+    set({ updateStatus: 'downloading', updateDownloadProgress: { receivedBytes: 0, totalBytes: null, percent: null } })
+    try {
+      await window.electronAPI.downloadUpdate()
+      set({ updateStatus: 'downloaded' })
+      return true
+    } catch (err) {
+      console.error('downloadUpdate failed:', err)
+      set({ updateStatus: 'error' })
+      return false
+    }
+  },
+  installUpdate: async () => {
+    if (!window.electronAPI) return false
+    set({ updateStatus: 'installing' })
+    try {
+      await window.electronAPI.installUpdate()
+      return true
+    } catch (err) {
+      console.error('installUpdate failed:', err)
+      set({ updateStatus: 'error' })
+      return false
     }
   },
   dismissUpdate: () => set({ updateDismissed: true }),

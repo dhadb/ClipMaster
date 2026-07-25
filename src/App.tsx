@@ -103,6 +103,9 @@ function App() {
         addCleanup(window.electronAPI.onPrivacyUpdated((state) => {
           if (isMounted) useClipboardStore.getState().setPrivacy(state)
         }))
+        addCleanup(window.electronAPI.onUpdateDownloadProgress((progress) => {
+          if (isMounted) useClipboardStore.setState({ updateDownloadProgress: progress })
+        }))
         addCleanup(window.electronAPI.onShowSettings(() => {
           if (isMounted) {
             setShowSettings(true)

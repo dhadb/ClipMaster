@@ -63,7 +63,14 @@ export interface UpdateInfo {
   latestVersion: string
   hasUpdate: boolean
   releaseUrl: string
+  downloadUrl: string
   publishedAt: string | null
+}
+
+export interface UpdateDownloadProgress {
+  receivedBytes: number
+  totalBytes: number | null
+  percent: number | null
 }
 
 const electronAPI = {
@@ -75,6 +82,8 @@ const electronAPI = {
   getHistory: (): Promise<ClipboardItem[]> => ipcRenderer.invoke('get-history'),
   getAppVersion: (): Promise<string> => ipcRenderer.invoke('get-app-version'),
   checkForUpdates: (force = false): Promise<UpdateInfo> => ipcRenderer.invoke('check-for-updates', force),
+  downloadUpdate: (): Promise<{ version: string }> => ipcRenderer.invoke('download-update'),
+  installUpdate: (): Promise<{ version: string }> => ipcRenderer.invoke('install-update'),
   copyToClipboard: (item: ClipboardItem | string): Promise<ClipboardItem[]> => ipcRenderer.invoke('copy-to-clipboard', item),
   createItem: (draft: ClipboardItemDraft): Promise<{ history: ClipboardItem[]; itemId: string | null; created: boolean }> => ipcRenderer.invoke('create-item', draft),
   updateItemTags: (id: string, tags: string[]): Promise<ClipboardItem[]> => ipcRenderer.invoke('update-item-tags', id, tags),
@@ -110,6 +119,11 @@ const electronAPI = {
     const handler = (_event: IpcRendererEvent, state: PrivacyState) => callback(state)
     ipcRenderer.on('privacy-updated', handler)
     return () => { ipcRenderer.removeListener('privacy-updated', handler) }
+  },
+  onUpdateDownloadProgress: (callback: (progress: UpdateDownloadProgress) => void) => {
+    const handler = (_event: IpcRendererEvent, progress: UpdateDownloadProgress) => callback(progress)
+    ipcRenderer.on('update-download-progress', handler)
+    return () => { ipcRenderer.removeListener('update-download-progress', handler) }
   },
   onShowSettings: (callback: () => void) => {
     const handler = () => callback()

@@ -23,7 +23,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.3.0-blue.svg" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.4.1-blue.svg" alt="Version">
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-green.svg" alt="Platform">
   <img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="License">
   <img src="https://img.shields.io/badge/privacy-local--first-brightgreen.svg" alt="Local first">
@@ -45,7 +45,7 @@
 ## Quick Start
 
 1. Open [Releases](https://github.com/dhadb/ClipMaster/releases/latest).
-2. Download `ClipMaster-Setup-1.3.0.exe`, or choose `ClipMaster-Portable-1.3.0.exe`.
+2. Download `ClipMaster-Setup-1.4.1.exe`, or choose `ClipMaster-Portable-1.4.1.exe`.
 3. Run the installer, or launch the portable build directly.
 4. Copy anything and press `Ctrl + Shift + V` to open ClipMaster.
 
@@ -54,12 +54,16 @@
 Release assets include `checksums.sha256`. After downloading the installer, verify it in PowerShell:
 
 ```powershell
-Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-1.3.0.exe"
+Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-1.4.1.exe"
 ```
 
 Compare the SHA256 output with `checksums.sha256`. If it does not match, do not run the installer and report it in [Issues](https://github.com/dhadb/ClipMaster/issues).
 
 Windows may show a SmartScreen warning for unsigned open-source installers. Download ClipMaster only from this repository's GitHub Releases.
+
+### In-app updates
+
+Starting with `v1.4.1`, ClipMaster can download the official Windows installer inside the app after finding a new release, show live progress, and install it with a restart. If the download fails, the GitHub Release page remains available as a fallback.
 
 ## Features
 
@@ -77,7 +81,7 @@ Windows may show a SmartScreen warning for unsigned open-source installers. Down
 | Delete undo | Restore recently deleted records before the notification expires |
 | Stats | View type distribution and usage patterns |
 | Personalized appearance | Eight themes, five independent accents, density, type size, opacity, and window size |
-| Update checks | Check GitHub Releases at startup or manually without automatic downloads or installs |
+| Update checks | Check GitHub Releases at startup or manually, then download, install, and restart in the app |
 | Import and export | Export text-only JSON metadata without images or local paths, then merge or replace history during import |
 | Local privacy | No upload, sync, or clipboard analytics |
 

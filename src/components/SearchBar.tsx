@@ -45,6 +45,11 @@ const SearchBar: React.FC = () => {
 
   useEffect(() => { setLocal(searchQuery) }, [searchQuery])
   useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current) }, [])
+  useEffect(() => {
+    const focusSearch = () => inputRef.current?.focus()
+    window.addEventListener('clipmaster-focus-search', focusSearch)
+    return () => window.removeEventListener('clipmaster-focus-search', focusSearch)
+  }, [])
 
   const onChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const value = event.target.value

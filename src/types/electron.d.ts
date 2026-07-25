@@ -22,12 +22,19 @@ export interface UpdateDownloadProgress {
   percent: number | null
 }
 
+export interface DataSecurityStatus {
+  available: boolean
+  active: boolean
+  migrating: boolean
+}
+
 export interface ElectronAPI {
   getImageDataUrl: (imagePath?: string, size?: 'thumb' | 'detail') => Promise<string | null>
   openExternalUrl: (url: string) => Promise<boolean>
   showFileInFolder: (filePath: string) => Promise<boolean>
   getHistory: () => Promise<ClipboardItem[]>
   getAppVersion: () => Promise<string>
+  getDataSecurityStatus: () => Promise<DataSecurityStatus>
   checkForUpdates: (force?: boolean) => Promise<UpdateInfo>
   downloadUpdate: () => Promise<{ version: string }>
   installUpdate: () => Promise<{ version: string }>
@@ -58,6 +65,7 @@ export interface ElectronAPI {
   onSettingsUpdated: (callback: (settings: Settings) => void) => () => void
   onPrivacyUpdated: (callback: (state: PrivacyState) => void) => () => void
   onUpdateDownloadProgress: (callback: (progress: UpdateDownloadProgress) => void) => () => void
+  onFocusSearch: (callback: () => void) => () => void
   onShowSettings: (callback: () => void) => () => void
 }
 

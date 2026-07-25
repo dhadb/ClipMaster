@@ -7,8 +7,8 @@ export const MAX_HISTORY_TEXT_BYTES = 64 * 1024 * 1024
 export const MAX_IMAGE_BYTES = 8 * 1024 * 1024
 export const MAX_IMAGE_PIXELS = 12_000_000
 export const MAX_IMAGE_EDGE = 4096
-export const MAX_THUMBNAIL_BYTES = 1024 * 1024
-export const THUMBNAIL_EDGE = 320
+export const MAX_THUMBNAIL_BYTES = 512 * 1024
+export const THUMBNAIL_EDGE = 256
 
 export function getUtf8ByteLength(value: string): number {
   return new TextEncoder().encode(value).byteLength

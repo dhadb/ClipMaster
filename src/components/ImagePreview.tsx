@@ -8,7 +8,7 @@ interface Props {
   size?: 'thumb' | 'detail'
 }
 
-const imageDataUrlCache = new WeightedLruCache<string>(32, 24 * 1024 * 1024)
+const imageDataUrlCache = new WeightedLruCache<string>(20, 12 * 1024 * 1024)
 
 const ImagePreview: React.FC<Props> = ({ imagePath, size = 'thumb' }) => {
   const { t } = useI18n()

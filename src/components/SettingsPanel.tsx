@@ -7,6 +7,7 @@ import UpdateStatus from './UpdateStatus'
 import { accentIds, accentPalettes, type AccentSetting } from '../personalization'
 
 const appIconUrl = './icon.png'
+type HotkeySettingKey = 'hotkey' | 'searchHotkey' | 'clearHotkey'
 
 const SettingsPanel: React.FC = memo(() => {
   const settings = useClipboardStore(s => s.settings)
@@ -16,27 +17,32 @@ const SettingsPanel: React.FC = memo(() => {
   const appVersion = useClipboardStore(s => s.appVersion)
   const { t } = useI18n()
   const [section, setSection] = useState('general')
-  const [hotkeyDraft, setHotkeyDraft] = useState(settings.hotkey)
+  const [hotkeyDrafts, setHotkeyDrafts] = useState<Record<HotkeySettingKey, string>>({ hotkey: settings.hotkey, searchHotkey: settings.searchHotkey, clearHotkey: settings.clearHotkey })
   const [hotkeyMessage, setHotkeyMessage] = useState('')
   const [ignoredDraft, setIgnoredDraft] = useState(settings.ignoredPatterns.join('\n'))
   const [cacheMessage, setCacheMessage] = useState('')
+  const [securityStatus, setSecurityStatus] = useState<{ available: boolean; active: boolean; migrating: boolean } | null>(null)
 
   const favoriteCount = useMemo(() => history.filter(item => item.favorited).length, [history])
   const imageCount = useMemo(() => history.filter(item => item.type === 'image').length, [history])
 
   useEffect(() => {
-    setHotkeyDraft(settings.hotkey)
+    setHotkeyDrafts({ hotkey: settings.hotkey, searchHotkey: settings.searchHotkey, clearHotkey: settings.clearHotkey })
     setIgnoredDraft(settings.ignoredPatterns.join('\n'))
-  }, [settings.hotkey, settings.ignoredPatterns])
+  }, [settings.hotkey, settings.searchHotkey, settings.clearHotkey, settings.ignoredPatterns])
+
+  useEffect(() => {
+    window.electronAPI?.getDataSecurityStatus().then(setSecurityStatus).catch(() => setSecurityStatus(null))
+  }, [])
 
   const update = useCallback(async <K extends keyof typeof settings>(key: K, val: typeof settings[K]) => {
     try {
       const applied = await updateSettings({ [key]: val } as Partial<typeof settings>)
       if (applied) {
-        if (key === 'hotkey') {
+        if (key === 'hotkey' || key === 'searchHotkey' || key === 'clearHotkey') {
           const requested = String(val)
-          if (applied.hotkey !== requested) {
-            setHotkeyDraft(applied.hotkey)
+          if (applied[key] !== requested) {
+            setHotkeyDrafts(previous => ({ ...previous, [key]: String(applied[key]) }))
             setHotkeyMessage(t('settings.hotkeyUnavailable'))
           } else {
             setHotkeyMessage(t('settings.hotkeyUpdated'))
@@ -45,7 +51,7 @@ const SettingsPanel: React.FC = memo(() => {
       }
     } catch (err) {
       console.error('updateSettings failed:', err)
-      if (key === 'hotkey') setHotkeyMessage(t('settings.hotkeyFailed'))
+      if (key === 'hotkey' || key === 'searchHotkey' || key === 'clearHotkey') setHotkeyMessage(t('settings.hotkeyFailed'))
     }
   }, [t, updateSettings])
 
@@ -235,16 +241,25 @@ const SettingsPanel: React.FC = memo(() => {
         return (
           <div className="space-y-4 slide-in-right">
             <Card title={t('settings.globalHotkey')} icon={<Keyboard size={14} color="var(--color-primary-light)" />}>
-              <Item label={t('settings.showHideWindow')} desc={t('settings.hotkeyExample')}>
-                <input
-                  value={hotkeyDraft}
-                  onChange={e => setHotkeyDraft(e.target.value)}
-                  onBlur={() => update('hotkey', hotkeyDraft)}
-                  onKeyDown={e => { if (e.key === 'Enter') update('hotkey', hotkeyDraft) }}
-                  className="px-2 py-1 rounded-md text-[12px] font-mono w-44"
-                  style={{ background: 'var(--bg-elevated)', color: 'var(--text-secondary)', border: '1px solid var(--border-card)' }}
-                />
-              </Item>
+              {([
+                ['hotkey', 'settings.showHideWindow'],
+                ['searchHotkey', 'settings.searchHotkey'],
+                ['clearHotkey', 'settings.clearHotkey'],
+              ] as Array<[HotkeySettingKey, 'settings.showHideWindow' | 'settings.searchHotkey' | 'settings.clearHotkey']>).map(([key, label]) => (
+                <React.Fragment key={key}>
+                  <Item label={t(label)} desc={t('settings.hotkeyExample')}>
+                    <input
+                      value={hotkeyDrafts[key]}
+                      onChange={e => setHotkeyDrafts(previous => ({ ...previous, [key]: e.target.value }))}
+                      onBlur={() => void update(key, hotkeyDrafts[key])}
+                      onKeyDown={e => { if (e.key === 'Enter') void update(key, hotkeyDrafts[key]) }}
+                      className="px-2 py-1 rounded-md text-[12px] font-mono w-44"
+                      style={{ background: 'var(--bg-elevated)', color: 'var(--text-secondary)', border: '1px solid var(--border-card)' }}
+                    />
+                  </Item>
+                  {key !== 'clearHotkey' && <div className="h-px" style={{ background: 'var(--border-divider)' }} />}
+                </React.Fragment>
+              ))}
               {hotkeyMessage && (
                 <p className="text-[11px] px-1" style={{ color: hotkeyMessage === t('settings.hotkeyUnavailable') || hotkeyMessage === t('settings.hotkeyFailed') ? 'var(--color-warning)' : 'var(--color-success)' }}>
                   {hotkeyMessage}
@@ -276,6 +291,12 @@ const SettingsPanel: React.FC = memo(() => {
               <Item label={t('settings.imageRecords')} desc={t('settings.imageRecordsDesc')}>
                 <span className="text-[13px] tabular-nums" style={{ color: 'var(--text-secondary)' }}>
                   {t('settings.countUnit', { count: imageCount })}
+                </span>
+              </Item>
+              <div className="h-px" style={{ background: 'var(--border-divider)' }} />
+              <Item label={t('settings.dataEncryption')} desc={t('settings.dataEncryptionDesc')}>
+                <span className="rounded-md px-2 py-1 text-[11px] font-medium" style={{ color: securityStatus?.active ? 'var(--color-success)' : 'var(--color-warning)', background: securityStatus?.active ? 'color-mix(in srgb, var(--color-success) 12%, transparent)' : 'color-mix(in srgb, var(--color-warning) 12%, transparent)' }}>
+                  {securityStatus?.active ? t('settings.encryptionEnabled') : securityStatus?.migrating ? t('settings.encryptionMigrating') : t('settings.encryptionUnavailable')}
                 </span>
               </Item>
               <div className="h-px" style={{ background: 'var(--border-divider)' }} />

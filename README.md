@@ -23,7 +23,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.4.1-blue.svg" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.5.0-blue.svg" alt="Version">
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-green.svg" alt="Platform">
   <img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="License">
   <img src="https://img.shields.io/badge/privacy-local--first-brightgreen.svg" alt="Local first">
@@ -47,7 +47,7 @@
 ### 安装使用
 
 1. 打开 [Releases](https://github.com/dhadb/ClipMaster/releases/latest)。
-2. 下载 `ClipMaster-Setup-1.4.1.exe`，或选择 `ClipMaster-Portable-1.4.1.exe` 免安装版。
+2. 下载 `ClipMaster-Setup-1.5.0.exe`，或选择 `ClipMaster-Portable-1.5.0.exe` 免安装版。
 3. 运行安装包并按向导安装；便携版可直接运行。
 4. 复制任意内容并按 `Ctrl + Shift + V` 打开 ClipMaster。
 
@@ -56,7 +56,7 @@
 Release 页面会附带 `checksums.sha256`。下载后可以在 PowerShell 中校验：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-1.4.1.exe"
+Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-1.5.0.exe"
 ```
 
 将输出的 SHA256 与 `checksums.sha256` 中的值对比。如果不一致，请不要运行安装包，并在 [Issues](https://github.com/dhadb/ClipMaster/issues) 中反馈。
@@ -66,6 +66,8 @@ Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-1.4.1.exe"
 ### 应用内更新
 
 从 `v1.4.1` 开始，ClipMaster 检查到新版本后可以直接在应用内下载官方 Windows 安装包，显示下载进度，并在完成后安装并重启。下载失败时仍可打开 GitHub Release 页面手动处理。
+
+`v1.5.0` 进一步使用 Electron `safeStorage` 加密本地历史和设置，支持显示、搜索、清理三组全局快捷键，并将图片缩略图压缩为低占用 JPEG。
 
 ## 功能特性
 
@@ -84,6 +86,9 @@ Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-1.4.1.exe"
 | 使用统计 | 查看类型分布、时段高峰等数据 |
 | 个性化外观 | 八种主题、五种独立强调色、列表密度、字体、透明度与窗口尺寸 |
 | 更新检查 | 启动后或在帮助页检查 GitHub Releases，可在应用内下载、安装并重启 |
+| 数据安全 | 使用 Electron `safeStorage` 加密本地持久化数据，并兼容旧版明文数据迁移 |
+| 全局快捷键 | 支持弹出历史、聚焦搜索、清理未保护记录，并可在设置中分别配置 |
+| 图片性能 | 生成 256px JPEG 缩略图，限制渲染层缓存，自动清理未引用图片文件 |
 | 数据导入导出 | 导出不含图片和本机路径的文本元数据 JSON，导入时可选择智能合并或完整替换 |
 | 本地隐私 | 不上传、不同步、不分析剪贴板内容 |
 
@@ -92,6 +97,8 @@ Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-1.4.1.exe"
 | 快捷键 | 功能 | 范围 |
 | --- | --- | --- |
 | `Ctrl + Shift + V` | 显示 / 隐藏窗口 | 全局 |
+| `Ctrl + Shift + F` | 打开窗口并聚焦搜索 | 全局 |
+| `Ctrl + Shift + Delete` | 清理未置顶、未收藏记录 | 全局 |
 | `Ctrl + F` | 聚焦搜索框 | 应用内 |
 | `Ctrl + N` | 新建常用片段 | 应用内 |
 | `↑` / `↓` | 上下选择 | 应用内 |

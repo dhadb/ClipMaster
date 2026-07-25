@@ -18,6 +18,8 @@ export interface ClipboardItem {
 export interface Settings {
   maxHistory: number
   hotkey: string
+  searchHotkey: string
+  clearHotkey: string
   autoStart: boolean
   minimizeToTray: boolean
   theme: ThemeSetting
@@ -73,6 +75,12 @@ export interface UpdateDownloadProgress {
   percent: number | null
 }
 
+export interface DataSecurityStatus {
+  available: boolean
+  active: boolean
+  migrating: boolean
+}
+
 const electronAPI = {
   getImageDataUrl: (imagePath?: string, size: 'thumb' | 'detail' = 'thumb'): Promise<string | null> => ipcRenderer.invoke('get-image-data-url', imagePath, size),
   getImageInfo: (imagePath?: string): Promise<{ bytes: number; width: number; height: number } | null> => ipcRenderer.invoke('get-image-info', imagePath),
@@ -81,6 +89,7 @@ const electronAPI = {
   showFileInFolder: (filePath: string): Promise<boolean> => ipcRenderer.invoke('show-file-in-folder', filePath),
   getHistory: (): Promise<ClipboardItem[]> => ipcRenderer.invoke('get-history'),
   getAppVersion: (): Promise<string> => ipcRenderer.invoke('get-app-version'),
+  getDataSecurityStatus: (): Promise<DataSecurityStatus> => ipcRenderer.invoke('get-data-security-status'),
   checkForUpdates: (force = false): Promise<UpdateInfo> => ipcRenderer.invoke('check-for-updates', force),
   downloadUpdate: (): Promise<{ version: string }> => ipcRenderer.invoke('download-update'),
   installUpdate: (): Promise<{ version: string }> => ipcRenderer.invoke('install-update'),
@@ -124,6 +133,11 @@ const electronAPI = {
     const handler = (_event: IpcRendererEvent, progress: UpdateDownloadProgress) => callback(progress)
     ipcRenderer.on('update-download-progress', handler)
     return () => { ipcRenderer.removeListener('update-download-progress', handler) }
+  },
+  onFocusSearch: (callback: () => void) => {
+    const handler = () => callback()
+    ipcRenderer.on('focus-search', handler)
+    return () => { ipcRenderer.removeListener('focus-search', handler) }
   },
   onShowSettings: (callback: () => void) => {
     const handler = () => callback()

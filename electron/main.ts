@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Tray, Menu, clipboard, globalShortcut, nativeImage, ipcMain, screen, shell, net } from 'electron'
+import { app, BrowserWindow, Tray, Menu, clipboard, globalShortcut, nativeImage, ipcMain, screen, shell, net, safeStorage } from 'electron'
 import path from 'path'
 import fs from 'fs'
 import { normalizeTags } from '../src/utils/clipboard'
@@ -40,8 +40,10 @@ let saveTimer: ReturnType<typeof setTimeout> | null = null
 let pauseUntil = 0
 let protectedToday = 0
 let protectedDate = getLocalDateKey()
-let currentHotkey = ''
+type HotkeyAction = 'toggle' | 'search' | 'clear'
+const currentHotkeys = new Map<HotkeyAction, string>()
 const pendingImageDeletes = new Map<string, ReturnType<typeof setTimeout>>()
+let storageEncryptionState: 'encrypted' | 'plain' | 'unknown' = 'unknown'
 const hasSingleInstanceLock = app.requestSingleInstanceLock()
 
 if (!hasSingleInstanceLock) app.quit()
@@ -75,6 +77,8 @@ interface ClipboardItem {
 const defaultSettings = {
   maxHistory: 200,
   hotkey: 'CommandOrControl+Shift+V',
+  searchHotkey: 'CommandOrControl+Shift+F',
+  clearHotkey: 'CommandOrControl+Shift+Delete',
   autoStart: true,
   minimizeToTray: true,
   theme: 'dark' as ThemeSetting,
@@ -104,6 +108,7 @@ const trayTranslations: Record<ResolvedLanguage, Record<string, string>> = {
   'zh-CN': {
     tooltip: 'ClipMaster - 剪贴板管理器',
     show: '显示 ClipMaster',
+    search: '搜索剪贴板',
     resume: '恢复记录',
     pause5: '暂停记录 5 分钟',
     pause30: '暂停记录 30 分钟',
@@ -114,6 +119,7 @@ const trayTranslations: Record<ResolvedLanguage, Record<string, string>> = {
   'en-US': {
     tooltip: 'ClipMaster - Clipboard Manager',
     show: 'Show ClipMaster',
+    search: 'Search clipboard',
     resume: 'Resume recording',
     pause5: 'Pause recording for 5 minutes',
     pause30: 'Pause recording for 30 minutes',
@@ -144,6 +150,8 @@ function sanitizeSettings(input: Partial<Settings> | undefined): Settings {
   return {
     maxHistory: Math.round(clamp(raw.maxHistory, 50, 500, defaultSettings.maxHistory)),
     hotkey: typeof raw.hotkey === 'string' && raw.hotkey.trim() ? raw.hotkey.trim() : defaultSettings.hotkey,
+    searchHotkey: typeof raw.searchHotkey === 'string' && raw.searchHotkey.trim() ? raw.searchHotkey.trim() : defaultSettings.searchHotkey,
+    clearHotkey: typeof raw.clearHotkey === 'string' && raw.clearHotkey.trim() ? raw.clearHotkey.trim() : defaultSettings.clearHotkey,
     autoStart: Boolean(raw.autoStart),
     minimizeToTray: Boolean(raw.minimizeToTray),
     theme: isThemeSetting(raw.theme) ? raw.theme : 'dark',
@@ -211,7 +219,7 @@ function resolveSafeImagePath(imagePath: string | undefined) {
 
 function getThumbnailPath(imagePath: string) {
   const extension = path.extname(imagePath)
-  return path.join(path.dirname(imagePath), `${path.basename(imagePath, extension)}.thumb.png`)
+  return path.join(path.dirname(imagePath), `${path.basename(imagePath, extension)}.thumb.jpg`)
 }
 
 function ensureImageThumbnail(imagePath: string) {
@@ -224,7 +232,7 @@ function ensureImageThumbnail(imagePath: string) {
   const thumbnail = scale < 1
     ? image.resize({ width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)), quality: 'good' })
     : image
-  const buffer = thumbnail.toPNG()
+  const buffer = thumbnail.toJPEG(72)
   if (buffer.byteLength > MAX_THUMBNAIL_BYTES) return null
   fs.writeFileSync(thumbnailPath, buffer)
   return thumbnailPath
@@ -241,7 +249,8 @@ function getSafeImageDataUrl(imagePath: string | undefined, size: 'thumb' | 'det
     const buffer = fs.readFileSync(dataPath)
     const maxBytes = size === 'thumb' ? MAX_THUMBNAIL_BYTES : MAX_IMAGE_BYTES
     if (buffer.byteLength > maxBytes) return null
-    return `data:image/png;base64,${buffer.toString('base64')}`
+    const mimeType = path.extname(dataPath).toLowerCase() === '.jpg' ? 'image/jpeg' : 'image/png'
+    return `data:${mimeType};base64,${buffer.toString('base64')}`
   } catch (err) {
     console.error('Failed to read image data url:', err)
     return null
@@ -312,6 +321,8 @@ function safeDeleteImageFile(imagePath: string | undefined) {
     if (fs.existsSync(resolvedImagePath)) fs.unlinkSync(resolvedImagePath)
     const thumbnailPath = getThumbnailPath(resolvedImagePath)
     if (fs.existsSync(thumbnailPath)) fs.unlinkSync(thumbnailPath)
+    const legacyThumbnailPath = path.join(path.dirname(resolvedImagePath), `${path.basename(resolvedImagePath, path.extname(resolvedImagePath))}.thumb.png`)
+    if (fs.existsSync(legacyThumbnailPath)) fs.unlinkSync(legacyThumbnailPath)
   } catch (err) {
     console.error('Failed to delete image file:', err)
   }
@@ -449,10 +460,41 @@ function getImportedItems(payload: unknown) {
     .filter(Boolean) as ClipboardItem[]
 }
 
+const encryptedStorageFormat = 'clipmaster-encrypted-v1'
+
+function isDataEncryptionAvailable() {
+  try {
+    return safeStorage.isEncryptionAvailable()
+  } catch {
+    return false
+  }
+}
+
+function serializePersistedData(data: AppData) {
+  const plainText = JSON.stringify(data)
+  if (!isDataEncryptionAvailable()) {
+    storageEncryptionState = 'plain'
+    return plainText
+  }
+  const encrypted = safeStorage.encryptString(plainText).toString('base64')
+  storageEncryptionState = 'encrypted'
+  return JSON.stringify({ format: encryptedStorageFormat, payload: encrypted })
+}
+
 function readPersistedData(filePath: string): Partial<AppData> {
   const stat = fs.statSync(filePath)
   if (!stat.isFile() || stat.size > MAX_PERSISTED_DATA_BYTES) throw new Error('Persisted data file exceeds the safety limit')
-  return parseJsonDocument<Partial<AppData>>(fs.readFileSync(filePath, 'utf-8'))
+  const raw = fs.readFileSync(filePath, 'utf-8')
+  const envelope = parseJsonDocument<Record<string, unknown>>(raw)
+  if (envelope?.format === encryptedStorageFormat && typeof envelope.payload === 'string') {
+    if (!isDataEncryptionAvailable()) throw new Error('Encrypted data is unavailable on this device')
+    const decrypted = safeStorage.decryptString(Buffer.from(envelope.payload, 'base64'))
+    if (Buffer.byteLength(decrypted, 'utf8') > MAX_PERSISTED_DATA_BYTES) throw new Error('Decrypted data exceeds the safety limit')
+    storageEncryptionState = 'encrypted'
+    return parseJsonDocument<Partial<AppData>>(decrypted)
+  }
+  storageEncryptionState = 'plain'
+  return envelope as Partial<AppData>
 }
 
 function applyLoadedData(data: Partial<AppData>) {
@@ -476,6 +518,7 @@ function loadData() {
   if (recovered.backupError) console.error('Failed to load backup data:', recovered.backupError)
   if (recovered.value) {
     applyLoadedData(recovered.value)
+    if (storageEncryptionState === 'plain' && isDataEncryptionAvailable()) scheduleSave()
     return
   }
   ignoredRules = compileIgnoredRules(settings.ignoredPatterns)
@@ -488,9 +531,10 @@ function saveData() {
   try {
     refreshProtectedCounter()
     const data: AppData = { history: clipboardHistory, settings, protectedToday, protectedDate }
+    const serialized = serializePersistedData(data)
     const tmpPath = `${dataPath}.${process.pid}.tmp`
-    if (fs.existsSync(dataPath)) fs.copyFileSync(dataPath, backupPath)
-    fs.writeFileSync(tmpPath, JSON.stringify(data), 'utf-8')
+    if (fs.existsSync(dataPath)) fs.writeFileSync(backupPath, serialized, 'utf-8')
+    fs.writeFileSync(tmpPath, serialized, 'utf-8')
     fs.renameSync(tmpPath, dataPath)
   } catch (err) {
     console.error('Failed to save data:', err)
@@ -575,23 +619,42 @@ function applyAutoStart() {
   }
 }
 
-function registerHotkey(nextHotkey = settings.hotkey) {
-  const hotkey = nextHotkey.trim()
-  if (!hotkey) return false
-  if (currentHotkey === hotkey) return true
-  try {
-    const ok = globalShortcut.register(hotkey, () => toggleWindow())
-    if (!ok) {
-      console.error(`Failed to register shortcut: ${hotkey}`)
-      return false
-    }
-    if (currentHotkey) globalShortcut.unregister(currentHotkey)
-    currentHotkey = hotkey
-    return true
-  } catch (err) {
-    console.error('Failed to register shortcut:', err)
-    return false
+const hotkeyDefinitions: Array<{ action: HotkeyAction; key: 'hotkey' | 'searchHotkey' | 'clearHotkey' }> = [
+  { action: 'toggle', key: 'hotkey' },
+  { action: 'search', key: 'searchHotkey' },
+  { action: 'clear', key: 'clearHotkey' },
+]
+
+function unregisterHotkeys() {
+  currentHotkeys.forEach(hotkey => globalShortcut.unregister(hotkey))
+  currentHotkeys.clear()
+}
+
+function registerHotkeys(nextSettings = settings) {
+  unregisterHotkeys()
+  let allRegistered = true
+  const callbacks: Record<HotkeyAction, () => void> = {
+    toggle: () => toggleWindow(),
+    search: () => {
+      showWindow()
+      setTimeout(() => mainWindow?.webContents.send('focus-search'), 0)
+    },
+    clear: () => {
+      removeHistoryItems(item => !item.pinned && !item.favorited)
+      mainWindow?.webContents.send('history-updated', clipboardHistory)
+      scheduleSave()
+    },
   }
+  for (const definition of hotkeyDefinitions) {
+    const hotkey = nextSettings[definition.key].trim()
+    if (!hotkey || currentHotkeys.has(definition.action) || !globalShortcut.register(hotkey, callbacks[definition.action])) {
+      allRegistered = false
+      if (hotkey) console.error(`Failed to register shortcut: ${hotkey}`)
+      continue
+    }
+    currentHotkeys.set(definition.action, hotkey)
+  }
+  return allRegistered
 }
 
 function createWindow() {
@@ -626,7 +689,7 @@ function createWindow() {
   }
 
   mainWindow.on('blur', () => {
-    if (mainWindow && !mainWindow.webContents.isDevToolsOpened()) {
+    if (settings.minimizeToTray && mainWindow && !mainWindow.webContents.isDevToolsOpened()) {
       mainWindow.hide()
     }
   })
@@ -657,6 +720,10 @@ function rebuildTrayMenu() {
   tray.setToolTip(getTrayText('tooltip'))
   const contextMenu = Menu.buildFromTemplate([
     { label: getTrayText('show'), click: () => toggleWindow() },
+    { label: getTrayText('search'), click: () => {
+      showWindow()
+      setTimeout(() => mainWindow?.webContents.send('focus-search'), 0)
+    } },
     { type: 'separator' },
     { label: paused ? getTrayText('resume') : getTrayText('pause5'), click: () => paused ? resumeMonitoring() : pauseMonitoring(5) },
     { label: getTrayText('pause30'), click: () => pauseMonitoring(30) },
@@ -879,6 +946,14 @@ ipcMain.handle('show-file-in-folder', async (_, filePath: string) => {
 })
 ipcMain.handle('get-history', () => clipboardHistory)
 ipcMain.handle('get-app-version', () => app.getVersion())
+ipcMain.handle('get-data-security-status', () => {
+  const available = isDataEncryptionAvailable()
+  return {
+    available,
+    active: available && storageEncryptionState !== 'plain',
+    migrating: available && storageEncryptionState === 'plain',
+  }
+})
 
 interface UpdateInfo {
   currentVersion: string
@@ -1225,6 +1300,8 @@ ipcMain.handle('import-history', (_, payload: unknown, mode: 'merge' | 'replace'
     const nextSettings = {
       ...sanitizeSettings({ ...settings, ...payloadRecord.settings }),
       hotkey: oldSettings.hotkey,
+      searchHotkey: oldSettings.searchHotkey,
+      clearHotkey: oldSettings.clearHotkey,
     }
     settings = nextSettings
     ignoredRules = compileIgnoredRules(settings.ignoredPatterns)
@@ -1242,10 +1319,12 @@ ipcMain.handle('get-settings', () => settings)
 
 ipcMain.handle('update-settings', (_, newSettings: Partial<Settings>) => {
   const oldSettings = settings
-  const nextSettings = sanitizeSettings({ ...settings, ...newSettings })
+  let nextSettings = sanitizeSettings({ ...settings, ...newSettings })
 
-  if (oldSettings.hotkey !== nextSettings.hotkey && !registerHotkey(nextSettings.hotkey)) {
-    nextSettings.hotkey = oldSettings.hotkey
+  const hotkeysChanged = hotkeyDefinitions.some(({ key }) => oldSettings[key] !== nextSettings[key])
+  if (hotkeysChanged && !registerHotkeys(nextSettings)) {
+    nextSettings = sanitizeSettings({ ...nextSettings, hotkey: oldSettings.hotkey, searchHotkey: oldSettings.searchHotkey, clearHotkey: oldSettings.clearHotkey })
+    registerHotkeys(nextSettings)
   }
 
   settings = nextSettings
@@ -1277,7 +1356,11 @@ ipcMain.handle('resume-monitoring', () => {
   return getPrivacyState()
 })
 
-ipcMain.handle('minimize-window', () => mainWindow?.minimize())
+ipcMain.handle('minimize-window', () => {
+  if (!mainWindow) return
+  if (settings.minimizeToTray) mainWindow.hide()
+  else mainWindow.minimize()
+})
 ipcMain.handle('close-window', () => mainWindow?.close())
 ipcMain.handle('toggle-maximize', () => {
   if (!mainWindow) return
@@ -1310,7 +1393,7 @@ if (hasSingleInstanceLock) {
     createWindow()
     createTray()
     startClipboardWatcher()
-    registerHotkey()
+    registerHotkeys()
   })
 
   app.on('window-all-closed', () => {
@@ -1325,7 +1408,7 @@ if (hasSingleInstanceLock) {
     isQuitting = true
     flushPendingSave()
     stopClipboardWatcher()
-    globalShortcut.unregisterAll()
+    unregisterHotkeys()
     pendingImageDeletes.forEach(timer => clearTimeout(timer))
     pendingImageDeletes.clear()
   })

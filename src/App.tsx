@@ -106,6 +106,12 @@ function App() {
         addCleanup(window.electronAPI.onUpdateDownloadProgress((progress) => {
           if (isMounted) useClipboardStore.setState({ updateDownloadProgress: progress })
         }))
+        addCleanup(window.electronAPI.onFocusSearch(() => {
+          if (!isMounted) return
+          setShowSettings(false)
+          setActiveTab('history')
+          setTimeout(() => window.dispatchEvent(new Event('clipmaster-focus-search')), 0)
+        }))
         addCleanup(window.electronAPI.onShowSettings(() => {
           if (isMounted) {
             setShowSettings(true)

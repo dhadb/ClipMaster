@@ -20,6 +20,8 @@ export interface ClipboardItem {
 export interface Settings {
   maxHistory: number
   hotkey: string
+  searchHotkey: string
+  clearHotkey: string
   autoStart: boolean
   minimizeToTray: boolean
   theme: ThemeSetting
@@ -86,6 +88,8 @@ export interface ToastNotice {
 const defaultSettings: Settings = {
   maxHistory: 200,
   hotkey: 'CommandOrControl+Shift+V',
+  searchHotkey: 'CommandOrControl+Shift+F',
+  clearHotkey: 'CommandOrControl+Shift+Delete',
   autoStart: true,
   minimizeToTray: true,
   theme: 'dark',

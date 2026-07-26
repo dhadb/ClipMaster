@@ -32,4 +32,9 @@ describe('matchesClipboardQuery', () => {
   it('keeps hash-prefixed clipboard content searchable', () => {
     expect(matchesClipboardQuery({ content: '#FFAA00', type: 'color' }, '#ffaa')).toBe(true)
   })
+
+  it('supports token-level fuzzy matching and local pinyin matching', () => {
+    expect(matchesClipboardQuery({ content: 'git push origin main', type: 'code' }, 'git pu')).toBe(true)
+    expect(matchesClipboardQuery({ content: '部署文档', type: 'text' }, 'bswd')).toBe(true)
+  })
 })

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AtSign,
+  BookmarkPlus,
   Braces,
   CalendarDays,
   Clock3,
@@ -35,6 +36,10 @@ const SearchBar: React.FC = () => {
   const setTimeFilter = useClipboardStore(s => s.setTimeFilter)
   const resetFilters = useClipboardStore(s => s.resetFilters)
   const setQuickAddOpen = useClipboardStore(s => s.setQuickAddOpen)
+  const recentSearches = useClipboardStore(s => s.recentSearches)
+  const rememberSearch = useClipboardStore(s => s.rememberSearch)
+  const savedFilters = useClipboardStore(s => s.settings.savedFilters)
+  const updateSettings = useClipboardStore(s => s.updateSettings)
   const { t } = useI18n()
 
   const [local, setLocal] = useState(searchQuery)
@@ -67,6 +72,26 @@ const SearchBar: React.FC = () => {
     setSearchQuery('')
     inputRef.current?.focus()
   }, [setSearchQuery])
+
+  const applySavedFilter = useCallback((filter: typeof savedFilters[number]) => {
+    setLocal(filter.query)
+    setSearchQuery(filter.query)
+    setFilterType(filter.filterType)
+    setTimeFilter(filter.timeFilter)
+    setSortMode(filter.sortMode)
+    setShowFilters(true)
+  }, [savedFilters, setFilterType, setSearchQuery, setSortMode, setTimeFilter])
+
+  const saveCurrentFilter = useCallback(() => {
+    const query = local.trim().replace(/\s+/g, ' ').slice(0, 160)
+    const label = query || filterType || (timeFilter === 'today' ? t('search.timeToday') : timeFilter === 'week' ? t('search.timeWeek') : t('search.savedFilter'))
+    const filter = { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, label: label.slice(0, 32), query, filterType, timeFilter, sortMode }
+    void updateSettings({ savedFilters: [...savedFilters, filter].slice(-8) })
+  }, [filterType, local, savedFilters, sortMode, t, timeFilter, updateSettings])
+
+  const removeSavedFilter = useCallback((id: string) => {
+    void updateSettings({ savedFilters: savedFilters.filter(filter => filter.id !== id) })
+  }, [savedFilters, updateSettings])
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -130,7 +155,13 @@ const SearchBar: React.FC = () => {
             value={local}
             onChange={onChange}
             onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
+            onBlur={() => { setFocused(false); rememberSearch(local) }}
+            onKeyDown={event => {
+              if (event.key !== 'Enter') return
+              event.preventDefault()
+              rememberSearch(local)
+              inputRef.current?.blur()
+            }}
             className="ml-2.5 min-w-0 flex-1 border-none bg-transparent text-[13px] outline-none"
             style={{ color: 'var(--text-primary)' }}
           />
@@ -141,9 +172,19 @@ const SearchBar: React.FC = () => {
               <SlidersHorizontal size={13} />
               {activeFilterCount > 0 && <span className="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full" style={{ background: 'var(--color-primary-light)' }} />}
             </button>
+            <button onClick={saveCurrentFilter} className="action-btn" title={t('search.saveFilter')}>
+              <BookmarkPlus size={13} />
+            </button>
           </div>
         </div>
       </div>
+
+      {focused && !local && recentSearches.length > 0 && (
+        <div className="flex items-center gap-1 overflow-x-auto px-1 pt-1.5" style={{ scrollbarWidth: 'none' }}>
+          <span className="flex-shrink-0 text-[10px]" style={{ color: 'var(--text-ghost)' }}>{t('search.recent')}</span>
+          {recentSearches.map(query => <button key={query} onMouseDown={event => event.preventDefault()} onClick={() => { setLocal(query); setSearchQuery(query) }} className="filter-chip flex-shrink-0">{query}</button>)}
+        </div>
+      )}
 
       <div className="flex min-h-7 items-center justify-between px-1 pt-1.5 text-[10px]" style={{ color: 'var(--text-ghost)' }}>
         <span>{hasFilter ? t('search.resultSummary', { count: filteredLen, total: history.length }) : t('search.totalSummary', { count: history.length })}</span>
@@ -171,6 +212,16 @@ const SearchBar: React.FC = () => {
               {sortOptions.map(({ id, label }) => <button key={id} onClick={() => setSortMode(id)} className={sortMode === id ? 'active' : ''}>{label}</button>)}
             </div>
           </div>
+          {savedFilters.length > 0 && (
+            <div className="flex flex-wrap gap-1 border-t pt-2" style={{ borderColor: 'var(--border-divider)' }}>
+              {savedFilters.map(filter => (
+                <div key={filter.id} className="inline-flex max-w-full items-center rounded-md" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-card)' }}>
+                  <button onClick={() => applySavedFilter(filter)} className="max-w-[160px] truncate px-2 py-1 text-[10px] interactive-chip" style={{ color: 'var(--text-secondary)' }}>{filter.label}</button>
+                  <button onClick={() => removeSavedFilter(filter.id)} className="action-btn mr-0.5 h-5 w-5" title={t('search.removeFilter')}><X size={10} /></button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

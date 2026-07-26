@@ -1,5 +1,5 @@
 import React from 'react'
-import { Clipboard, Search, Star, Plus, X } from 'lucide-react'
+import { Clipboard, Search, Star, X } from 'lucide-react'
 import { useClipboardStore } from '../store/clipboardStore'
 import { useI18n } from '../i18n'
 
@@ -9,7 +9,6 @@ const EmptyState: React.FC = () => {
   const filterType = useClipboardStore(s => s.filterType)
   const timeFilter = useClipboardStore(s => s.timeFilter)
   const resetFilters = useClipboardStore(s => s.resetFilters)
-  const setQuickAddOpen = useClipboardStore(s => s.setQuickAddOpen)
   const { t } = useI18n()
 
   const isSearching = searchQuery.length > 0 || Boolean(filterType) || timeFilter !== 'all'
@@ -17,7 +16,7 @@ const EmptyState: React.FC = () => {
 
   const MainIcon = isSearching ? Search : isFavorites ? Star : Clipboard
   const title = isSearching ? t('empty.noMatches') : isFavorites ? t('empty.noFavorites') : t('empty.emptyClipboard')
-  const desc = isSearching ? t('empty.tryOther') : isFavorites ? t('empty.favoriteHint') : t('empty.copyHint')
+  const desc = isSearching ? t('empty.tryOther') : isFavorites ? t('empty.favoriteHint') : t('empty.firstPasteHint')
 
   return (
     <div className="h-full flex flex-col items-center justify-center px-8 py-10">
@@ -37,10 +36,10 @@ const EmptyState: React.FC = () => {
         <p className="text-[13px] leading-relaxed" style={{ color: 'var(--text-tertiary)' }}>{desc}</p>
       </div>
 
-      <button onClick={() => isSearching ? resetFilters() : setQuickAddOpen(true)} className="mt-6 inline-flex h-9 items-center gap-2 rounded-md px-4 text-[11px] font-medium interactive-chip" style={{ background: 'var(--color-primary)', color: 'white' }}>
-        {isSearching ? <X size={13} /> : <Plus size={13} />}
-        {isSearching ? t('search.reset') : t('empty.createSnippet')}
-      </button>
+      {isSearching && <button onClick={resetFilters} className="mt-6 inline-flex h-9 items-center gap-2 rounded-md px-4 text-[11px] font-medium interactive-chip" style={{ background: 'var(--color-primary)', color: 'white' }}>
+        <X size={13} />
+        {t('search.reset')}
+      </button>}
     </div>
   )
 }

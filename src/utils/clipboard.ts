@@ -1,3 +1,5 @@
+import { match as matchPinyin } from 'pinyin-pro'
+
 export const MAX_TAGS = 8
 export const MAX_TAG_LENGTH = 24
 
@@ -22,17 +24,46 @@ interface SearchableClipboardItem {
   content: string
   type: string
   tags?: string[]
+  workspace?: string
+}
+
+function getSearchTokens(rawQuery: string) {
+  return rawQuery.trim().toLowerCase().split(/\s+/).filter(Boolean)
+}
+
+function getSubsequenceIndexes(text: string, token: string): number[] | null {
+  let cursor = 0
+  const indexes: number[] = []
+  for (const character of token) {
+    const index = text.indexOf(character, cursor)
+    if (index === -1) return null
+    indexes.push(index)
+    cursor = index + 1
+  }
+  return indexes
+}
+
+function matchesFuzzyToken(text: string, token: string) {
+  if (text.includes(token)) return true
+  if (getSubsequenceIndexes(text, token)) return true
+
+  // pinyin-pro runs locally in the renderer; no clipboard content is sent away.
+  if (/^[a-z]+$/i.test(token) && /[\u3400-\u9fff]/.test(text)) {
+    return matchPinyin(text, token, { insensitive: true, precision: 'any' }) !== null
+  }
+  return false
 }
 
 export function matchesClipboardQuery(item: SearchableClipboardItem, rawQuery: string): boolean {
-  const query = rawQuery.trim().toLowerCase()
-  if (!query) return true
+  const tokens = getSearchTokens(rawQuery)
+  if (tokens.length === 0) return true
 
   const content = item.content.toLowerCase()
   const tags = normalizeTags(item.tags).map(tag => tag.toLowerCase())
-  const searchable = `${content}\n${tags.join('\n')}`
+  const workspace = item.workspace?.toLowerCase() || ''
+  const searchable = `${content}\n${tags.join('\n')}\n${workspace}`
 
-  return query.split(/\s+/).every(token => {
+  return tokens.every(token => {
     if (token.startsWith('#') && token.length > 1) {
       const tagQuery = token.slice(1)
       return content.includes(token) || tags.some(tag => tag.includes(tagQuery))
@@ -40,6 +71,33 @@ export function matchesClipboardQuery(item: SearchableClipboardItem, rawQuery: s
     if (token.startsWith('type:') && token.length > 5) {
       return item.type.toLowerCase() === token.slice(5)
     }
-    return searchable.includes(token)
+    if (token.startsWith('workspace:') && token.length > 10) {
+      return matchesFuzzyToken(workspace, token.slice(10))
+    }
+    return matchesFuzzyToken(searchable, token)
   })
+}
+
+export function getClipboardHighlightIndexes(content: string, rawQuery: string): number[] {
+  const normalized = content.toLowerCase()
+  const indexes = new Set<number>()
+
+  for (const token of getSearchTokens(rawQuery)) {
+    if (token.startsWith('#') || token.startsWith('type:') || token.startsWith('workspace:')) continue
+    const exactIndex = normalized.indexOf(token)
+    if (exactIndex >= 0) {
+      for (let index = exactIndex; index < exactIndex + token.length; index += 1) indexes.add(index)
+      continue
+    }
+    const fuzzyIndexes = getSubsequenceIndexes(normalized, token)
+    if (fuzzyIndexes) {
+      fuzzyIndexes.forEach(index => indexes.add(index))
+      continue
+    }
+    if (/^[a-z]+$/i.test(token) && /[\u3400-\u9fff]/.test(content)) {
+      matchPinyin(content, token, { insensitive: true, precision: 'any' })?.forEach(index => indexes.add(index))
+    }
+  }
+
+  return [...indexes].sort((a, b) => a - b)
 }

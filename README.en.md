@@ -23,7 +23,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.5.0-blue.svg" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.6.0-blue.svg" alt="Version">
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-green.svg" alt="Platform">
   <img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="License">
   <img src="https://img.shields.io/badge/privacy-local--first-brightgreen.svg" alt="Local first">
@@ -37,24 +37,24 @@
 ## Why ClipMaster
 
 - **Local-first**: Clipboard history, settings, and image cache are stored only under `%AppData%/ClipMaster/`.
-- **Fast recovery**: Search and filter copied text, links, code snippets, colors, JSON, Markdown, and images.
+- **Fast recovery**: Fuzzy, pinyin, tag, type, and workspace search finds copied text, links, code snippets, colors, JSON, Markdown, and images.
 - **Privacy guardrails**: High-risk content such as passwords, tokens, private keys, and card numbers is skipped by default.
-- **Keyboard friendly**: Open the app globally with `Ctrl + Shift + V`, then search, select, and copy quickly.
+- **Quick paste**: Press `Ctrl + Shift + V`, choose an entry with the arrow keys, then press `Enter` to return to the previous Windows app and paste it automatically.
 - **Efficient workflows**: Combine time, type, and sort filters, then batch favorite, pin, tag, or delete records.
 
 ## Quick Start
 
 1. Open [Releases](https://github.com/dhadb/ClipMaster/releases/latest).
-2. Download `ClipMaster-Setup-1.5.0.exe`, or choose `ClipMaster-Portable-1.5.0.exe`.
+2. Download `ClipMaster-Setup-1.6.0.exe`, or choose `ClipMaster-Portable-1.6.0.exe`.
 3. Run the installer, or launch the portable build directly.
-4. Copy anything and press `Ctrl + Shift + V` to open ClipMaster.
+4. Copy anything, press `Ctrl + Shift + V`, select an entry with the arrow keys, and press `Enter` to paste it back into the previous app.
 
 ## Verify the Installer
 
 Release assets include `checksums.sha256`. After downloading the installer, verify it in PowerShell:
 
 ```powershell
-Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-1.5.0.exe"
+Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-1.6.0.exe"
 ```
 
 Compare the SHA256 output with `checksums.sha256`. If it does not match, do not run the installer and report it in [Issues](https://github.com/dhadb/ClipMaster/issues).
@@ -67,6 +67,8 @@ Starting with `v1.4.1`, ClipMaster can download the official Windows installer i
 
 `v1.5.0` adds Electron `safeStorage` encryption for local history and settings, separate global shortcuts for showing history, focusing search, and clearing unprotected records, plus compact JPEG thumbnails with bounded renderer cache usage.
 
+`v1.6.0` adds Windows quick paste, offline fuzzy and pinyin search with highlights, recent searches and encrypted saved filters, copy timelines, automatic foreground-app workspaces with manual workspace labels, richer content actions, and clearer privacy pause states. Quick paste, pinyin lookup, and workspace detection run locally; clipboard content is never uploaded.
+
 ## Features
 
 | Feature | Description |
@@ -74,12 +76,15 @@ Starting with `v1.4.1`, ClipMaster can download the official Windows installer i
 | Live monitoring | Captures clipboard changes automatically |
 | History | Stores up to 500 clipboard entries |
 | Smart categories | Detects text, links, emails, code, colors, JSON, Markdown, images, and more |
-| Combined filters | Search content and `#tags`, then combine type, time, newest/oldest/usage sorting, and `type:` queries |
+| Command-style search | Fuzzy matches such as `git pu`, offline pinyin search, highlights, recent searches, saved filters, plus `#tags`, `type:`, and `workspace:` queries |
 | Reusable snippets | Save frequently used text, commands, and replies manually |
 | Tags | Organize any entry with tags preserved across import and export |
-| Favorites | Pin important clipboard items |
+| Collections | Use pinning for immediate access and collections plus tags for durable grouping such as replies, commands, and addresses |
+| Workspaces | Automatically label captures by the foreground Windows app; add a manual workspace such as Project A, thesis, or travel in details |
 | Batch actions | Pin, favorite, tag, or delete multiple selected records |
 | Content editing | Edit snippet content and tags in details with automatic type detection |
+| Smart content actions | Open or clean tracking parameters from links, format or compact JSON, copy HEX/RGB colors, and normalize code line endings |
+| Copy timeline | Review recent times an item was copied without duplicating it in the list |
 | Delete undo | Restore recently deleted records before the notification expires |
 | Stats | View type distribution and usage patterns |
 | Personalized appearance | Eight themes, five independent accents, density, type size, opacity, and window size |
@@ -89,18 +94,19 @@ Starting with `v1.4.1`, ClipMaster can download the official Windows installer i
 | Image performance | Store 256px JPEG thumbnails, bound renderer cache usage, and clean unreferenced image files |
 | Import and export | Export text-only JSON metadata without images or local paths, then merge or replace history during import |
 | Local privacy | No upload, sync, or clipboard analytics |
+| Privacy controls | Shows how many sensitive items were skipped without revealing them; pause for a duration, until resumed, or while staying in the current app |
 
 ## Shortcuts
 
 | Shortcut | Action | Scope |
 | --- | --- | --- |
-| `Ctrl + Shift + V` | Show / hide window | Global |
+| `Ctrl + Shift + V` | Open the quick-paste panel | Global |
 | `Ctrl + Shift + F` | Show window and focus search | Global |
 | `Ctrl + Shift + Delete` | Clear unpinned, unfavorited records | Global |
 | `Ctrl + F` | Focus search | In app |
 | `Ctrl + N` | Create a reusable snippet | In app |
 | `↑` / `↓` | Move selection | In app |
-| `Enter` | Copy selected item | In app |
+| `Enter` | Paste selected item back into the previous Windows app | In app |
 | `Delete` | Delete selected item | In app |
 | `Esc` | Clear search / close | In app |
 

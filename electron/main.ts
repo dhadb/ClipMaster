@@ -1,6 +1,7 @@
 import { app, BrowserWindow, Tray, Menu, clipboard, globalShortcut, nativeImage, ipcMain, screen, shell, net, safeStorage } from 'electron'
 import path from 'path'
 import fs from 'fs'
+import { execFileSync, spawn } from 'child_process'
 import { normalizeTags } from '../src/utils/clipboard'
 import { compareVersions } from '../src/utils/version'
 import { parseClipMasterReleasePage, parseClipMasterReleaseUrl } from '../src/utils/update'
@@ -38,6 +39,10 @@ let isMaximized = false
 let savedBounds: { x: number; y: number; width: number; height: number } | null = null
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 let pauseUntil = 0
+type PauseMode = 'timed' | 'until-resume' | 'application' | null
+let pauseMode: PauseMode = null
+let pausedWorkspace = ''
+let lastPauseWorkspaceCheckAt = 0
 let protectedToday = 0
 let protectedDate = getLocalDateKey()
 type HotkeyAction = 'toggle' | 'search' | 'clear'
@@ -61,6 +66,15 @@ if (!fs.existsSync(imagesDir)) {
 const CLIPBOARD_TYPES = ['text', 'link', 'email', 'color', 'number', 'code', 'long-text', 'json', 'markdown', 'file-path', 'phone', 'image'] as const
 type ClipboardType = typeof CLIPBOARD_TYPES[number]
 
+interface SavedFilter {
+  id: string
+  label: string
+  query: string
+  filterType: string | null
+  timeFilter: 'all' | 'today' | 'week'
+  sortMode: 'newest' | 'oldest' | 'most-used'
+}
+
 interface ClipboardItem {
   id: string
   content: string
@@ -70,6 +84,9 @@ interface ClipboardItem {
   favorited: boolean
   copyCount: number
   firstTimestamp: number
+  copyTimestamps?: number[]
+  workspace?: string
+  workspaceManual?: boolean
   imagePath?: string  // 图片路径
   tags?: string[]  // 智能标签
 }
@@ -96,6 +113,8 @@ const defaultSettings = {
   ignoreSensitive: true,
   ignoredPatterns: [] as string[],
   hideAfterCopy: false,
+  quickPaste: true,
+  savedFilters: [] as SavedFilter[],
   autoDeleteDays: 30,
   verificationCodeTtlMinutes: 10,
   autoCheckUpdates: true,
@@ -134,6 +153,9 @@ interface AppData {
   settings: Settings
   protectedToday?: number
   protectedDate?: string
+  pauseUntil?: number
+  pauseMode?: PauseMode
+  pausedWorkspace?: string
 }
 
 let clipboardHistory: ClipboardItem[] = []
@@ -143,6 +165,31 @@ let ignoredRules: CompiledIgnoredRule[] = []
 function clamp(value: unknown, min: number, max: number, fallback: number) {
   const num = typeof value === 'number' && Number.isFinite(value) ? value : fallback
   return Math.min(max, Math.max(min, num))
+}
+
+function sanitizeSavedFilters(input: unknown): SavedFilter[] {
+  if (!Array.isArray(input)) return []
+  const seen = new Set<string>()
+  const filters: SavedFilter[] = []
+  for (const candidate of input) {
+    const value = asRecord(candidate)
+    if (!value || typeof value.id !== 'string' || typeof value.query !== 'string') continue
+    const id = value.id.trim().slice(0, 80)
+    if (!id || seen.has(id)) continue
+    seen.add(id)
+    const query = value.query.trim().slice(0, 160)
+    const label = (typeof value.label === 'string' ? value.label : query).trim().slice(0, 32) || 'Filter'
+    filters.push({
+      id,
+      label,
+      query,
+      filterType: typeof value.filterType === 'string' ? value.filterType.slice(0, 32) : null,
+      timeFilter: value.timeFilter === 'today' || value.timeFilter === 'week' ? value.timeFilter : 'all',
+      sortMode: value.sortMode === 'oldest' || value.sortMode === 'most-used' ? value.sortMode : 'newest',
+    })
+    if (filters.length === 8) break
+  }
+  return filters
 }
 
 function sanitizeSettings(input: Partial<Settings> | undefined): Settings {
@@ -169,6 +216,8 @@ function sanitizeSettings(input: Partial<Settings> | undefined): Settings {
     ignoreSensitive: raw.ignoreSensitive !== false,
     ignoredPatterns: normalizeIgnoredPatterns(raw.ignoredPatterns),
     hideAfterCopy: Boolean(raw.hideAfterCopy),
+    quickPaste: raw.quickPaste !== false,
+    savedFilters: sanitizeSavedFilters(raw.savedFilters),
     autoDeleteDays: Math.round(clamp(raw.autoDeleteDays, 0, 365, defaultSettings.autoDeleteDays)),
     verificationCodeTtlMinutes: Math.round(clamp(raw.verificationCodeTtlMinutes, 0, 1440, defaultSettings.verificationCodeTtlMinutes)),
     autoCheckUpdates: raw.autoCheckUpdates !== false,
@@ -408,6 +457,31 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' ? value as Record<string, unknown> : null
 }
 
+const MAX_COPY_TIMESTAMPS = 20
+
+function normalizeWorkspace(value: unknown) {
+  if (typeof value !== 'string') return undefined
+  const workspace = value.replace(/[\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 64)
+  return workspace || undefined
+}
+
+function normalizeCopyTimestamps(input: unknown, fallbackTimestamp: number) {
+  const timestamps = Array.isArray(input) ? input : []
+  const unique = new Set<number>()
+  for (const value of timestamps) {
+    const timestamp = Number(value)
+    if (Number.isFinite(timestamp) && timestamp > 0) unique.add(Math.round(timestamp))
+  }
+  if (unique.size === 0) unique.add(Math.round(fallbackTimestamp))
+  return [...unique].sort((a, b) => b - a).slice(0, MAX_COPY_TIMESTAMPS)
+}
+
+function recordItemCopy(item: ClipboardItem, at = Date.now()) {
+  item.timestamp = at
+  item.copyCount = Math.max(1, item.copyCount || 1) + 1
+  item.copyTimestamps = normalizeCopyTimestamps([at, ...(item.copyTimestamps || [])], at)
+}
+
 function sanitizeHistoryItem(input: unknown, allowImagePath = true): ClipboardItem | null {
   const item = asRecord(input)
   if (!item || typeof item.content !== 'string' || !item.content.trim() || !isTextWithinLimit(item.content)) return null
@@ -428,6 +502,9 @@ function sanitizeHistoryItem(input: unknown, allowImagePath = true): ClipboardIt
     firstTimestamp: Number.isFinite(Number(item.firstTimestamp)) ? Number(item.firstTimestamp) : safeTimestamp,
     imagePath: imagePath || undefined,
     tags: normalizeTags(item.tags),
+    copyTimestamps: normalizeCopyTimestamps(item.copyTimestamps, safeTimestamp),
+    workspace: normalizeWorkspace(item.workspace),
+    workspaceManual: Boolean(item.workspaceManual),
   }
 }
 
@@ -450,6 +527,11 @@ function dedupeHistory(items: ClipboardItem[]) {
     existing.firstTimestamp = Math.min(existing.firstTimestamp || existing.timestamp, item.firstTimestamp || item.timestamp)
     if (!existing.imagePath && item.imagePath) existing.imagePath = item.imagePath
     existing.tags = normalizeTags([...(existing.tags || []), ...(item.tags || [])])
+    existing.copyTimestamps = normalizeCopyTimestamps([...(existing.copyTimestamps || []), ...(item.copyTimestamps || [])], existing.timestamp)
+    if (!existing.workspace || (!existing.workspaceManual && item.workspaceManual)) {
+      existing.workspace = item.workspace
+      existing.workspaceManual = item.workspaceManual
+    }
   }
   return Array.from(byContent.values()).sort((a, b) => b.timestamp - a.timestamp)
 }
@@ -506,6 +588,17 @@ function applyLoadedData(data: Partial<AppData>) {
   const dailyCounter = normalizeDailyCounter(data.protectedDate, data.protectedToday)
   protectedDate = dailyCounter.date
   protectedToday = dailyCounter.count
+  const loadedPauseMode = data.pauseMode === 'timed' || data.pauseMode === 'until-resume' || data.pauseMode === 'application' ? data.pauseMode : null
+  const loadedPauseUntil = Number(data.pauseUntil)
+  pauseMode = loadedPauseMode
+  pauseUntil = Number.isFinite(loadedPauseUntil) && loadedPauseUntil > 0 ? loadedPauseUntil : 0
+  pausedWorkspace = normalizeWorkspace(data.pausedWorkspace) || ''
+  if (pauseMode === 'timed' && pauseUntil <= Date.now()) {
+    pauseMode = null
+    pauseUntil = 0
+    pausedWorkspace = ''
+  }
+  if (!pauseMode) pauseUntil = 0
   applyRetentionRules()
 }
 
@@ -530,7 +623,7 @@ function loadData() {
 function saveData() {
   try {
     refreshProtectedCounter()
-    const data: AppData = { history: clipboardHistory, settings, protectedToday, protectedDate }
+    const data: AppData = { history: clipboardHistory, settings, protectedToday, protectedDate, pauseUntil, pauseMode, pausedWorkspace }
     const serialized = serializePersistedData(data)
     const tmpPath = `${dataPath}.${process.pid}.tmp`
     if (fs.existsSync(dataPath)) fs.writeFileSync(backupPath, serialized, 'utf-8')
@@ -597,9 +690,63 @@ function recordProtectedItem() {
   scheduleSave()
 }
 
+const foregroundProcessScript = [
+  'Add-Type @\"',
+  'using System;',
+  'using System.Runtime.InteropServices;',
+  'public static class ClipMasterForeground {',
+  '  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();',
+  '  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);',
+  '}',
+  '\"@',
+  '$processId = 0',
+  '$window = [ClipMasterForeground]::GetForegroundWindow()',
+  '[void][ClipMasterForeground]::GetWindowThreadProcessId($window, [ref]$processId)',
+  'if ($processId) { (Get-Process -Id $processId -ErrorAction SilentlyContinue).ProcessName }',
+].join('\n')
+
+const workspaceNames: Record<string, string> = {
+  code: 'VS Code',
+  devenv: 'Visual Studio',
+  chrome: 'Chrome',
+  msedge: 'Microsoft Edge',
+  firefox: 'Firefox',
+  wechat: 'WeChat',
+}
+
+function getForegroundWorkspace() {
+  if (process.platform !== 'win32') return ''
+  try {
+    const output = execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command', foregroundProcessScript], {
+      encoding: 'utf8',
+      timeout: 1200,
+      windowsHide: true,
+      maxBuffer: 4096,
+    }).trim()
+    const key = output.toLowerCase().replace(/\.exe$/i, '')
+    if (!key || key.includes('clipmaster')) return ''
+    return workspaceNames[key] || normalizeWorkspace(output) || ''
+  } catch {
+    return ''
+  }
+}
+
+function isMonitoringPaused() {
+  return pauseMode === 'until-resume' || pauseMode === 'application' || (pauseMode === 'timed' && pauseUntil > Date.now())
+}
+
+function maybeResumeApplicationPause() {
+  if (pauseMode !== 'application' || !pausedWorkspace) return
+  const now = Date.now()
+  if (now - lastPauseWorkspaceCheckAt < 2000) return
+  lastPauseWorkspaceCheckAt = now
+  const workspace = getForegroundWorkspace()
+  if (workspace && workspace !== pausedWorkspace) resumeMonitoring()
+}
+
 function getPrivacyState() {
   refreshProtectedCounter()
-  return { paused: pauseUntil > Date.now(), pauseUntil, protectedToday }
+  return { paused: isMonitoringPaused(), pauseUntil, pauseMode, protectedToday }
 }
 
 function emitPrivacyState() {
@@ -716,7 +863,7 @@ function createTray() {
 
 function rebuildTrayMenu() {
   if (!tray) return
-  const paused = pauseUntil > Date.now()
+  const paused = isMonitoringPaused()
   tray.setToolTip(getTrayText('tooltip'))
   const contextMenu = Menu.buildFromTemplate([
     { label: getTrayText('show'), click: () => toggleWindow() },
@@ -749,16 +896,35 @@ function rebuildTrayMenu() {
   tray.setContextMenu(contextMenu)
 }
 
-function pauseMonitoring(minutes: number) {
-  pauseUntil = Date.now() + minutes * 60 * 1000
+function pauseMonitoring(mode: number | Exclude<PauseMode, null>) {
+  if (mode === 'until-resume') {
+    pauseMode = mode
+    pauseUntil = Number.MAX_SAFE_INTEGER
+    pausedWorkspace = ''
+  } else if (mode === 'application') {
+    const workspace = getForegroundWorkspace()
+    if (!workspace) return pauseMonitoring('until-resume')
+    pauseMode = mode
+    pauseUntil = Number.MAX_SAFE_INTEGER
+    pausedWorkspace = workspace
+    lastPauseWorkspaceCheckAt = Date.now()
+  } else {
+    pauseMode = 'timed'
+    pauseUntil = Date.now() + mode * 60 * 1000
+    pausedWorkspace = ''
+  }
   rebuildTrayMenu()
   emitPrivacyState()
+  scheduleSave()
 }
 
 function resumeMonitoring() {
   pauseUntil = 0
+  pauseMode = null
+  pausedWorkspace = ''
   rebuildTrayMenu()
   emitPrivacyState()
+  scheduleSave()
 }
 
 function showWindow() {
@@ -806,8 +972,9 @@ function startClipboardWatcher() {
         emitPrivacyState()
         scheduleSave()
       }
-      if (pauseUntil > 0 && pauseUntil <= Date.now()) resumeMonitoring()
-      if (pauseUntil > Date.now()) return
+      if (pauseMode === 'timed' && pauseUntil > 0 && pauseUntil <= Date.now()) resumeMonitoring()
+      maybeResumeApplicationPause()
+      if (isMonitoringPaused()) return
 
       // 错误计数器重置：如果连续成功，重置错误计数
       let hasError = false
@@ -857,8 +1024,8 @@ function startClipboardWatcher() {
         const existingIndex = clipboardHistory.findIndex(item => item.content === currentContent)
         if (existingIndex !== -1) {
           const existing = clipboardHistory.splice(existingIndex, 1)[0]
-          existing.timestamp = Date.now()
-          existing.copyCount = (existing.copyCount || 1) + 1
+          recordItemCopy(existing)
+          if (!existing.workspaceManual) existing.workspace = getForegroundWorkspace() || existing.workspace
           clipboardHistory.unshift(existing)
         } else {
           const now = Date.now()
@@ -871,6 +1038,8 @@ function startClipboardWatcher() {
             favorited: false,
             copyCount: 1,
             firstTimestamp: now,
+            copyTimestamps: [now],
+            workspace: getForegroundWorkspace() || undefined,
           })
         }
 
@@ -884,8 +1053,8 @@ function startClipboardWatcher() {
         const existingIndex = clipboardHistory.findIndex(item => item.type === 'image' && item.content === `[图片] ${imageInfo.hash}`)
         if (existingIndex !== -1) {
           const existing = clipboardHistory.splice(existingIndex, 1)[0]
-          existing.timestamp = Date.now()
-          existing.copyCount = (existing.copyCount || 1) + 1
+          recordItemCopy(existing)
+          if (!existing.workspaceManual) existing.workspace = getForegroundWorkspace() || existing.workspace
           existing.imagePath = imageInfo.path
           clipboardHistory.unshift(existing)
         } else {
@@ -900,6 +1069,8 @@ function startClipboardWatcher() {
             copyCount: 1,
             firstTimestamp: now,
             imagePath: imageInfo.path,
+            copyTimestamps: [now],
+            workspace: getForegroundWorkspace() || undefined,
           })
         }
         applyRetentionRules()
@@ -1106,7 +1277,7 @@ ipcMain.handle('create-item', (_, draft: { content?: unknown; tags?: unknown; pi
 
   if (existingIndex >= 0) {
     item = clipboardHistory.splice(existingIndex, 1)[0]
-    item.timestamp = Date.now()
+    recordItemCopy(item)
     item.tags = normalizeTags([...(item.tags || []), ...tags])
     item.pinned = item.pinned || Boolean(draft.pinned)
     item.favorited = item.favorited || Boolean(draft.favorited)
@@ -1122,6 +1293,7 @@ ipcMain.handle('create-item', (_, draft: { content?: unknown; tags?: unknown; pi
       pinned: Boolean(draft.pinned),
       favorited: Boolean(draft.favorited),
       tags,
+      copyTimestamps: [now],
     }
     created = true
   }
@@ -1142,7 +1314,7 @@ ipcMain.handle('update-item-tags', (_, id: string, tags: unknown) => {
   return clipboardHistory
 })
 
-ipcMain.handle('update-item', (_, id: string, patch: { content?: unknown; tags?: unknown }) => {
+ipcMain.handle('update-item', (_, id: string, patch: { content?: unknown; tags?: unknown; workspace?: unknown }) => {
   const item = clipboardHistory.find(entry => entry.id === id)
   if (!item || item.type === 'image') return clipboardHistory
 
@@ -1154,6 +1326,10 @@ ipcMain.handle('update-item', (_, id: string, patch: { content?: unknown; tags?:
     item.timestamp = Date.now()
   }
   if (patch && Object.prototype.hasOwnProperty.call(patch, 'tags')) item.tags = normalizeTags(patch.tags)
+  if (patch && Object.prototype.hasOwnProperty.call(patch, 'workspace')) {
+    item.workspace = normalizeWorkspace(patch.workspace)
+    item.workspaceManual = Boolean(item.workspace)
+  }
 
   clipboardHistory = dedupeHistory(clipboardHistory)
   applyRetentionRules()
@@ -1162,9 +1338,30 @@ ipcMain.handle('update-item', (_, id: string, patch: { content?: unknown; tags?:
   return clipboardHistory
 })
 
-ipcMain.handle('copy-to-clipboard', (_, itemOrContent: ClipboardItem | string) => {
+function sendPasteShortcut() {
+  if (process.platform !== 'win32') return
+  const script = "$shell = New-Object -ComObject WScript.Shell; Start-Sleep -Milliseconds 140; $shell.SendKeys('^v')"
+  try {
+    const child = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command', script], {
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: true,
+    })
+    child.unref()
+  } catch (err) {
+    console.error('Failed to send quick paste shortcut:', err)
+  }
+}
+
+ipcMain.handle('copy-to-clipboard', (_, itemOrContent: ClipboardItem | string, options?: { pasteAfterCopy?: unknown }) => {
+  const pasteAfterCopy = options?.pasteAfterCopy === true && settings.quickPaste
   const finishCopy = () => {
-    if (settings.hideAfterCopy) mainWindow?.hide()
+    if (pasteAfterCopy) {
+      mainWindow?.hide()
+      setTimeout(sendPasteShortcut, 80)
+    } else if (settings.hideAfterCopy) {
+      mainWindow?.hide()
+    }
   }
 
   if (typeof itemOrContent === 'string') {
@@ -1196,7 +1393,10 @@ ipcMain.handle('copy-to-clipboard', (_, itemOrContent: ClipboardItem | string) =
   }
 
   if (historyItem) {
-    historyItem.copyCount = Math.max(0, historyItem.copyCount || 0) + 1
+    const historyIndex = clipboardHistory.findIndex(entry => entry.id === historyItem.id)
+    if (historyIndex >= 0) clipboardHistory.splice(historyIndex, 1)
+    recordItemCopy(historyItem)
+    clipboardHistory.unshift(historyItem)
     scheduleSave()
     mainWindow?.webContents.send('history-updated', clipboardHistory)
   }
@@ -1347,8 +1547,10 @@ ipcMain.handle('update-settings', (_, newSettings: Partial<Settings>) => {
 })
 
 ipcMain.handle('get-privacy-state', () => getPrivacyState())
-ipcMain.handle('pause-monitoring', (_, minutes: number) => {
-  pauseMonitoring(clamp(minutes, 1, 1440, 5))
+ipcMain.handle('pause-monitoring', (_, requestedMode: number | 'until-resume' | 'current-application') => {
+  if (requestedMode === 'until-resume') pauseMonitoring('until-resume')
+  else if (requestedMode === 'current-application') pauseMonitoring('application')
+  else pauseMonitoring(clamp(requestedMode, 1, 1440, 5))
   return getPrivacyState()
 })
 ipcMain.handle('resume-monitoring', () => {

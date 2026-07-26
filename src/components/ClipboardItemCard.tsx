@@ -2,6 +2,7 @@ import React, { useCallback, memo } from 'react'
 import { Copy, Pin, PinOff, Trash2, ExternalLink, Mail, Hash, Code, FileText, Type, Check, Heart, Circle, CheckCircle2 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useClipboardStore, ClipboardItem } from '../store/clipboardStore'
+import { getClipboardHighlightIndexes } from '../utils/clipboard'
 import { formatDistanceToNow } from 'date-fns'
 import { enUS, zhCN } from 'date-fns/locale'
 import ImagePreview from './ImagePreview'
@@ -40,6 +41,24 @@ function getPreviewText(item: ClipboardItem, imageText: string) {
   return item.content.length > 96 ? `${item.content.slice(0, 96)}...` : item.content
 }
 
+function renderHighlightedPreview(text: string, query: string) {
+  const indexes = new Set(getClipboardHighlightIndexes(text, query))
+  if (indexes.size === 0) return text
+  const segments: React.ReactNode[] = []
+  let start = 0
+  while (start < text.length) {
+    const highlighted = indexes.has(start)
+    let end = start + 1
+    while (end < text.length && indexes.has(end) === highlighted) end += 1
+    const value = text.slice(start, end)
+    segments.push(highlighted
+      ? <mark key={start} className="rounded-sm px-px" style={{ color: 'var(--text-primary)', background: 'color-mix(in srgb, var(--color-warning) 30%, transparent)' }}>{value}</mark>
+      : <React.Fragment key={start}>{value}</React.Fragment>)
+    start = end
+  }
+  return segments
+}
+
 const ClipboardItemCard: React.FC<Props> = memo(({ item, isSelected, onSelect, selectionMode, isChecked, onToggleSelection }) => {
   const copyItem = useClipboardStore(s => s.copyItem)
   const deleteItems = useClipboardStore(s => s.deleteItems)
@@ -50,6 +69,7 @@ const ClipboardItemCard: React.FC<Props> = memo(({ item, isSelected, onSelect, s
   const fontSize = useClipboardStore(s => s.settings.fontSize)
   const showPreview = useClipboardStore(s => s.settings.showPreview)
   const copyOnSelect = useClipboardStore(s => s.settings.copyOnSelect)
+  const searchQuery = useClipboardStore(s => s.searchQuery)
   const notify = useClipboardStore(s => s.notify)
   const { t, typeLabel, language } = useI18n()
 
@@ -138,13 +158,18 @@ const ClipboardItemCard: React.FC<Props> = memo(({ item, isSelected, onSelect, s
                 #{item.tags[0]}{item.tags.length > 1 ? ` +${item.tags.length - 1}` : ''}
               </span>
             )}
+            {item.workspace && (
+              <span className="text-[9px] truncate px-1.5 py-0.5 rounded flex-shrink" title={item.workspace} style={{ color: 'var(--color-success)', background: 'color-mix(in srgb, var(--color-success) 10%, transparent)' }}>
+                {item.workspace}
+              </span>
+            )}
           </div>
 
           <p
             className={`text-[13px] leading-snug break-all ${showPreview ? 'line-clamp-2' : 'line-clamp-1'} ${isCode ? 'font-mono font-semibold' : ''}`}
             style={{ color: isCode ? 'var(--color-warning)' : 'var(--text-secondary)', fontSize: isCode ? fontSize + 2 : fontSize - 2 }}
           >
-            {preview}
+            {renderHighlightedPreview(preview, searchQuery)}
           </p>
 
           {item.type === 'color' && (

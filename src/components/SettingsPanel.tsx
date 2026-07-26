@@ -126,6 +126,8 @@ const SettingsPanel: React.FC = memo(() => {
               <div className="h-px" style={{ background: 'var(--border-divider)' }} />
               <Item label={t('settings.hideAfterCopy')} desc={t('settings.hideAfterCopyDesc')}><Toggle on={settings.hideAfterCopy} set={v => update('hideAfterCopy', v)} /></Item>
               <div className="h-px" style={{ background: 'var(--border-divider)' }} />
+              <Item label={t('settings.quickPaste')} desc={t('settings.quickPasteDesc')}><Toggle on={settings.quickPaste} set={v => update('quickPaste', v)} /></Item>
+              <div className="h-px" style={{ background: 'var(--border-divider)' }} />
               <Item label={t('settings.ignoreSensitive')} desc={t('settings.ignoreSensitiveDesc')}><Toggle on={settings.ignoreSensitive} set={v => update('ignoreSensitive', v)} /></Item>
               <div className="h-px" style={{ background: 'var(--border-divider)' }} />
               <Item label={t('settings.recordImages')} desc={t('settings.recordImagesDesc')}><Toggle on={settings.recordImages} set={v => update('recordImages', v)} /></Item>

@@ -109,7 +109,7 @@ const ClipboardList: React.FC = () => {
         scrollToIndex(prev)
       } else if (e.key === 'Enter' && selectedId && !selectionMode) {
         e.preventDefault()
-        copyItem(selectedId)
+        void copyItem(selectedId, { pasteAfterCopy: true })
       } else if (e.key === 'Delete' && selectedId && !selectionMode) {
         e.preventDefault()
         void deleteItems([selectedId]).then(count => {

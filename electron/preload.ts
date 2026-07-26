@@ -11,6 +11,9 @@ export interface ClipboardItem {
   favorited: boolean
   copyCount: number
   firstTimestamp: number
+  copyTimestamps?: number[]
+  workspace?: string
+  workspaceManual?: boolean
   imagePath?: string
   tags?: string[]
 }
@@ -37,6 +40,8 @@ export interface Settings {
   ignoreSensitive: boolean
   ignoredPatterns: string[]
   hideAfterCopy: boolean
+  quickPaste: boolean
+  savedFilters: Array<{ id: string; label: string; query: string; filterType: string | null; timeFilter: 'all' | 'today' | 'week'; sortMode: 'newest' | 'oldest' | 'most-used' }>
   autoDeleteDays: number
   verificationCodeTtlMinutes: number
   autoCheckUpdates: boolean
@@ -45,6 +50,7 @@ export interface Settings {
 export interface PrivacyState {
   paused: boolean
   pauseUntil: number
+  pauseMode: 'timed' | 'until-resume' | 'application' | null
   protectedToday: number
 }
 
@@ -93,10 +99,10 @@ const electronAPI = {
   checkForUpdates: (force = false): Promise<UpdateInfo> => ipcRenderer.invoke('check-for-updates', force),
   downloadUpdate: (): Promise<{ version: string }> => ipcRenderer.invoke('download-update'),
   installUpdate: (): Promise<{ version: string }> => ipcRenderer.invoke('install-update'),
-  copyToClipboard: (item: ClipboardItem | string): Promise<ClipboardItem[]> => ipcRenderer.invoke('copy-to-clipboard', item),
+  copyToClipboard: (item: ClipboardItem | string, options?: { pasteAfterCopy?: boolean }): Promise<ClipboardItem[]> => ipcRenderer.invoke('copy-to-clipboard', item, options),
   createItem: (draft: ClipboardItemDraft): Promise<{ history: ClipboardItem[]; itemId: string | null; created: boolean }> => ipcRenderer.invoke('create-item', draft),
   updateItemTags: (id: string, tags: string[]): Promise<ClipboardItem[]> => ipcRenderer.invoke('update-item-tags', id, tags),
-  updateItem: (id: string, patch: { content?: string; tags?: string[] }): Promise<ClipboardItem[]> => ipcRenderer.invoke('update-item', id, patch),
+  updateItem: (id: string, patch: { content?: string; tags?: string[]; workspace?: string }): Promise<ClipboardItem[]> => ipcRenderer.invoke('update-item', id, patch),
   deleteItem: (id: string): Promise<ClipboardItem[]> => ipcRenderer.invoke('delete-item', id),
   deleteItems: (ids: string[]): Promise<DeleteItemsResult> => ipcRenderer.invoke('delete-items', ids),
   restoreItems: (items: ClipboardItem[]): Promise<ClipboardItem[]> => ipcRenderer.invoke('restore-items', items),
@@ -109,7 +115,7 @@ const electronAPI = {
   getSettings: (): Promise<Settings> => ipcRenderer.invoke('get-settings'),
   updateSettings: (settings: Partial<Settings>): Promise<Settings> => ipcRenderer.invoke('update-settings', settings),
   getPrivacyState: (): Promise<PrivacyState> => ipcRenderer.invoke('get-privacy-state'),
-  pauseMonitoring: (minutes: number): Promise<PrivacyState> => ipcRenderer.invoke('pause-monitoring', minutes),
+  pauseMonitoring: (mode: number | 'until-resume' | 'current-application'): Promise<PrivacyState> => ipcRenderer.invoke('pause-monitoring', mode),
   resumeMonitoring: (): Promise<PrivacyState> => ipcRenderer.invoke('resume-monitoring'),
   minimizeWindow: (): Promise<void> => ipcRenderer.invoke('minimize-window'),
   closeWindow: (): Promise<void> => ipcRenderer.invoke('close-window'),

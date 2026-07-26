@@ -38,10 +38,10 @@ export interface ElectronAPI {
   checkForUpdates: (force?: boolean) => Promise<UpdateInfo>
   downloadUpdate: () => Promise<{ version: string }>
   installUpdate: () => Promise<{ version: string }>
-  copyToClipboard: (item: ClipboardItem | string) => Promise<ClipboardItem[]>
+  copyToClipboard: (item: ClipboardItem | string, options?: { pasteAfterCopy?: boolean }) => Promise<ClipboardItem[]>
   createItem: (draft: ClipboardItemDraft) => Promise<{ history: ClipboardItem[]; itemId: string | null; created: boolean }>
   updateItemTags: (id: string, tags: string[]) => Promise<ClipboardItem[]>
-  updateItem: (id: string, patch: { content?: string; tags?: string[] }) => Promise<ClipboardItem[]>
+  updateItem: (id: string, patch: { content?: string; tags?: string[]; workspace?: string }) => Promise<ClipboardItem[]>
   deleteItem: (id: string) => Promise<ClipboardItem[]>
   deleteItems: (ids: string[]) => Promise<{ history: ClipboardItem[]; deleted: ClipboardItem[] }>
   restoreItems: (items: ClipboardItem[]) => Promise<ClipboardItem[]>
@@ -52,7 +52,7 @@ export interface ElectronAPI {
   getSettings: () => Promise<Settings>
   updateSettings: (settings: Partial<Settings>) => Promise<Settings>
   getPrivacyState: () => Promise<PrivacyState>
-  pauseMonitoring: (minutes: number) => Promise<PrivacyState>
+  pauseMonitoring: (mode: number | 'until-resume' | 'current-application') => Promise<PrivacyState>
   resumeMonitoring: () => Promise<PrivacyState>
   minimizeWindow: () => Promise<void>
   closeWindow: () => Promise<void>

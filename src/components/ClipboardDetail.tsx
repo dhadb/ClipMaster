@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react'
-import { Copy, X, Pin, PinOff, Trash2, Heart, Check, ExternalLink, Mail, Hash, Code, FileText, Type, Pencil, Save } from 'lucide-react'
+import { Copy, X, Pin, PinOff, Trash2, Heart, Check, ExternalLink, Mail, Hash, Code, FileText, Type, Pencil, Save, Minimize2, AlignLeft } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { enUS, zhCN } from 'date-fns/locale'
@@ -32,6 +32,31 @@ function formatJsonContent(content: string) {
     return JSON.stringify(JSON.parse(content), null, 2)
   } catch {
     return content
+  }
+}
+
+function compactJsonContent(content: string) {
+  try {
+    return JSON.stringify(JSON.parse(content))
+  } catch {
+    return content
+  }
+}
+
+function normalizeCodeContent(content: string) {
+  return content.replace(/\r\n?/g, '\n').split('\n').map(line => line.replace(/[ \t]+$/g, '')).join('\n')
+}
+
+function getLinkDetails(content: string) {
+  try {
+    const url = new URL(content.trim())
+    const cleanUrl = new URL(url.toString())
+    for (const key of [...cleanUrl.searchParams.keys()]) {
+      if (/^utm_/i.test(key) || /^(fbclid|gclid|dclid|msclkid)$/i.test(key)) cleanUrl.searchParams.delete(key)
+    }
+    return { host: url.hostname, cleanUrl: cleanUrl.toString(), changed: cleanUrl.toString() !== url.toString() }
+  } catch {
+    return null
   }
 }
 
@@ -81,6 +106,7 @@ const ClipboardDetail: React.FC = () => {
   const toggleFavorite = useClipboardStore(s => s.toggleFavorite)
   const updateItemTags = useClipboardStore(s => s.updateItemTags)
   const updateItem = useClipboardStore(s => s.updateItem)
+  const updateItemWorkspace = useClipboardStore(s => s.updateItemWorkspace)
   const notify = useClipboardStore(s => s.notify)
   const setDetailItemId = useClipboardStore(s => s.setDetailItemId)
   const { t, typeLabel, language } = useI18n()
@@ -88,6 +114,7 @@ const ClipboardDetail: React.FC = () => {
   const [editing, setEditing] = useState(false)
   const [draftContent, setDraftContent] = useState('')
   const [draftTags, setDraftTags] = useState<string[]>([])
+  const [draftWorkspace, setDraftWorkspace] = useState('')
   const [saving, setSaving] = useState(false)
   const [editError, setEditError] = useState('')
 
@@ -97,6 +124,7 @@ const ClipboardDetail: React.FC = () => {
     if (!item) return
     setDraftContent(item.content)
     setDraftTags(item.tags || [])
+    setDraftWorkspace(item.workspace || '')
     setEditing(false)
     setEditError('')
   }, [item?.id])
@@ -136,6 +164,14 @@ const ClipboardDetail: React.FC = () => {
   const onShowFile = useCallback(() => {
     if (item?.type === 'file-path') window.electronAPI?.showFileInFolder(item.content)
   }, [item])
+  const onSaveWorkspace = useCallback(async () => {
+    if (!item) return
+    try {
+      await updateItemWorkspace(item.id, draftWorkspace)
+    } catch (err) {
+      console.error('updateItemWorkspace failed:', err)
+    }
+  }, [draftWorkspace, item, updateItemWorkspace])
   const onCopyText = useCallback((text: string, label = t('item.copied')) => {
     window.electronAPI?.copyToClipboard(text)
     setCopiedHint(label)
@@ -193,6 +229,9 @@ const ClipboardDetail: React.FC = () => {
   const isCode = isVerificationCode(item.content)
   const displayContent = item.type === 'json' ? formatJsonContent(item.content) : item.content
   const colorVariants = item.type === 'color' ? getColorVariants(item.content) : null
+  const linkDetails = item.type === 'link' ? getLinkDetails(item.content) : null
+  const copyTimeline = [...new Set(item.copyTimestamps || [item.timestamp])].slice(0, 6)
+  const timeFormatter = new Intl.DateTimeFormat(language, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 
   return (
     <div className="absolute inset-0 z-50 flex flex-col detail-panel" style={{ background: 'var(--bg-root)' }}>
@@ -230,6 +269,20 @@ const ClipboardDetail: React.FC = () => {
           <TagInput value={editing ? draftTags : item.tags || []} onChange={tags => editing ? setDraftTags(tags) : updateItemTags(item.id, tags)} compact />
         </div>
 
+        <div className="mb-3 rounded-lg px-3 py-2.5 slide-up" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-card)' }}>
+          <div className="text-[10px] mb-2" style={{ color: 'var(--text-ghost)' }}>{t('detail.workspace')}</div>
+          <input value={draftWorkspace} onChange={event => setDraftWorkspace(event.target.value)} onBlur={() => void onSaveWorkspace()} placeholder={t('detail.workspacePlaceholder')} className="w-full rounded-md px-2.5 py-1.5 text-[12px] outline-none" style={{ background: 'var(--bg-elevated)', color: 'var(--text-secondary)', border: '1px solid var(--border-card)' }} />
+        </div>
+
+        {copyTimeline.length > 1 && (
+          <div className="mb-3 rounded-lg px-3 py-2.5 slide-up" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-card)' }}>
+            <div className="text-[10px] mb-2" style={{ color: 'var(--text-ghost)' }}>{t('detail.copyTimeline')}</div>
+            <div className="flex flex-wrap gap-1.5">
+              {copyTimeline.map(timestamp => <span key={timestamp} className="rounded px-1.5 py-1 text-[10px] tabular-nums" style={{ color: 'var(--text-tertiary)', background: 'var(--bg-elevated)' }}>{timeFormatter.format(timestamp)}</span>)}
+            </div>
+          </div>
+        )}
+
         {isCode && (
           <div className="mb-3 p-4 rounded-lg text-center slide-up" style={{ background: 'color-mix(in srgb, var(--color-warning) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--color-warning) 24%, transparent)' }}>
             <div className="text-[10px] mb-2" style={{ color: 'var(--color-warning)' }}>{t('detail.verificationTitle')}</div>
@@ -258,10 +311,13 @@ const ClipboardDetail: React.FC = () => {
         )}
 
         {item.type === 'link' && (
-          <button onClick={onOpenLink} className="mb-3 w-full p-3 rounded-lg flex items-center justify-between interactive-chip slide-up" style={{ background: 'color-mix(in srgb, var(--type-link) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--type-link) 18%, transparent)', color: 'var(--text-secondary)' }}>
-            <span className="text-[12px] truncate">{t('detail.openLink')}</span>
-            <ExternalLink size={14} />
-          </button>
+          <div className="mb-3 rounded-lg p-3 slide-up" style={{ background: 'color-mix(in srgb, var(--type-link) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--type-link) 18%, transparent)', color: 'var(--text-secondary)' }}>
+            {linkDetails && <div className="mb-2 truncate text-[11px]" style={{ color: 'var(--type-link)' }}>{linkDetails.host}</div>}
+            <div className="flex gap-2">
+              <button onClick={onOpenLink} className="flex-1 rounded-md px-2.5 py-2 text-[11px] interactive-chip" style={{ background: 'var(--bg-elevated)' }}>{t('detail.openLink')}</button>
+              {linkDetails?.changed && <button onClick={() => onCopyText(linkDetails.cleanUrl, t('detail.copiedCleanLink'))} className="flex-1 rounded-md px-2.5 py-2 text-[11px] interactive-chip" style={{ background: 'var(--bg-elevated)' }}>{t('detail.copyCleanLink')}</button>}
+            </div>
+          </div>
         )}
 
         {item.type === 'email' && (
@@ -310,6 +366,8 @@ const ClipboardDetail: React.FC = () => {
             {copiedHint || (item.type === 'json' ? t('detail.copyJson') : isCopied ? t('item.copied') : t('detail.copyContent'))}
           </button>}
         {!editing && <>
+        {item.type === 'json' && <button onClick={() => onCopyText(compactJsonContent(item.content), t('detail.copiedCompactJson'))} className="action-btn" title={t('detail.copyCompactJson')} style={{ width: 40, height: 40 }}><Minimize2 size={15} /></button>}
+        {item.type === 'code' && <button onClick={() => onCopyText(normalizeCodeContent(item.content), t('detail.copiedNormalizedCode'))} className="action-btn" title={t('detail.copyNormalizedCode')} style={{ width: 40, height: 40 }}><AlignLeft size={15} /></button>}
         <button onClick={onPin} className={`action-btn pin ${item.pinned ? 'active' : ''}`} title={item.pinned ? t('item.unpin') : t('item.pin')} style={{ width: 40, height: 40 }}>
           {item.pinned ? <PinOff size={15} /> : <Pin size={15} />}
         </button>

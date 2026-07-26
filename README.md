@@ -23,7 +23,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.5.0-blue.svg" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.6.0-blue.svg" alt="Version">
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-green.svg" alt="Platform">
   <img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="License">
   <img src="https://img.shields.io/badge/privacy-local--first-brightgreen.svg" alt="Local first">
@@ -47,7 +47,7 @@
 ### 安装使用
 
 1. 打开 [Releases](https://github.com/dhadb/ClipMaster/releases/latest)。
-2. 下载 `ClipMaster-Setup-1.5.0.exe`，或选择 `ClipMaster-Portable-1.5.0.exe` 免安装版。
+2. 下载 `ClipMaster-Setup-1.6.0.exe`，或选择 `ClipMaster-Portable-1.6.0.exe` 免安装版。
 3. 运行安装包并按向导安装；便携版可直接运行。
 4. 复制任意内容并按 `Ctrl + Shift + V` 打开 ClipMaster。
 
@@ -56,7 +56,7 @@
 Release 页面会附带 `checksums.sha256`。下载后可以在 PowerShell 中校验：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-1.5.0.exe"
+Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-1.6.0.exe"
 ```
 
 将输出的 SHA256 与 `checksums.sha256` 中的值对比。如果不一致，请不要运行安装包，并在 [Issues](https://github.com/dhadb/ClipMaster/issues) 中反馈。
@@ -69,6 +69,8 @@ Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-1.5.0.exe"
 
 `v1.5.0` 进一步使用 Electron `safeStorage` 加密本地历史和设置，支持显示、搜索、清理三组全局快捷键，并将图片缩略图压缩为低占用 JPEG。
 
+`v1.6.0` 加入 Windows 快速粘贴：按 `Ctrl + Shift + V` 唤起后可用方向键选择，按 `Enter` 会回到原应用并自动粘贴；同时提供离线模糊与拼音搜索、关键词高亮、最近搜索、加密保存的筛选、复制时间线、前台应用工作区与手动工作区。链接可净化追踪参数，JSON 可格式化或压缩复制，代码可规范化复制；所有处理均在本地完成。
+
 ## 功能特性
 
 | 功能 | 说明 |
@@ -76,12 +78,16 @@ Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-1.5.0.exe"
 | 实时监控 | 自动捕获剪贴板内容变化 |
 | 历史记录 | 最多保存 500 条历史，支持持久化存储 |
 | 智能分类 | 自动识别文本、链接、邮箱、代码、颜色、JSON、Markdown、图片等类型 |
+| 命令式搜索 | 支持 `git pu` 模糊匹配、离线拼音、关键词高亮、最近搜索、保存筛选，以及 `#标签`、`type:`、`workspace:` 查询 |
 | 组合筛选 | 搜索内容和 `#标签`，组合类型、时间范围、最新/最早/常用排序与 `type:` 查询 |
 | 常用片段 | 手动保存常用文本、命令或回复，可直接收藏和置顶 |
 | 标签整理 | 为任意文本记录添加标签，标签随文本备份完整保留 |
-| 收藏管理 | 收藏重要内容，清空历史时保留收藏 |
+| 收藏夹与分组 | 置顶用于即时高频内容；收藏夹结合标签用于“常用回复”“开发命令”“收货信息”等长期归档 |
+| 工作区 | 自动记录前台 Windows 应用，并可在详情中手动命名“项目 A”“论文”“旅行”等工作区 |
 | 批量处理 | 多选记录后统一置顶、收藏、加标签或删除 |
 | 内容编辑 | 在详情页直接修改片段内容和标签，自动重新识别内容类型 |
+| 类型快捷操作 | 链接显示域名并可复制净化链接，JSON 支持格式化/压缩复制，颜色支持 HEX/RGB，代码支持规范化复制 |
+| 复制时间线 | 合并重复内容的同时保留近期复制时间，不污染历史列表 |
 | 删除撤销 | 批量或单条删除后可在提示消失前快速恢复 |
 | 使用统计 | 查看类型分布、时段高峰等数据 |
 | 个性化外观 | 八种主题、五种独立强调色、列表密度、字体、透明度与窗口尺寸 |
@@ -91,18 +97,19 @@ Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-1.5.0.exe"
 | 图片性能 | 生成 256px JPEG 缩略图，限制渲染层缓存，自动清理未引用图片文件 |
 | 数据导入导出 | 导出不含图片和本机路径的文本元数据 JSON，导入时可选择智能合并或完整替换 |
 | 本地隐私 | 不上传、不同步、不分析剪贴板内容 |
+| 隐私状态 | 只显示已自动跳过的敏感内容数量；可暂停 5/30/60 分钟、直到手动恢复或当前应用期间 |
 
 ## 快捷键
 
 | 快捷键 | 功能 | 范围 |
 | --- | --- | --- |
-| `Ctrl + Shift + V` | 显示 / 隐藏窗口 | 全局 |
+| `Ctrl + Shift + V` | 唤起快速粘贴面板 | 全局 |
 | `Ctrl + Shift + F` | 打开窗口并聚焦搜索 | 全局 |
 | `Ctrl + Shift + Delete` | 清理未置顶、未收藏记录 | 全局 |
 | `Ctrl + F` | 聚焦搜索框 | 应用内 |
 | `Ctrl + N` | 新建常用片段 | 应用内 |
 | `↑` / `↓` | 上下选择 | 应用内 |
-| `Enter` | 复制选中内容 | 应用内 |
+| `Enter` | 回到原 Windows 应用并自动粘贴选中内容 | 应用内 |
 | `Delete` | 删除选中内容 | 应用内 |
 | `Esc` | 清空搜索 / 关闭 | 应用内 |
 

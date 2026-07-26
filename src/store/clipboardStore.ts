@@ -13,8 +13,20 @@ export interface ClipboardItem {
   favorited: boolean
   copyCount: number
   firstTimestamp: number
+  copyTimestamps?: number[]
+  workspace?: string
+  workspaceManual?: boolean
   imagePath?: string
   tags?: string[]
+}
+
+export interface SavedFilter {
+  id: string
+  label: string
+  query: string
+  filterType: string | null
+  timeFilter: TimeFilter
+  sortMode: SortMode
 }
 
 export interface Settings {
@@ -39,6 +51,8 @@ export interface Settings {
   ignoreSensitive: boolean
   ignoredPatterns: string[]
   hideAfterCopy: boolean
+  quickPaste: boolean
+  savedFilters: SavedFilter[]
   autoDeleteDays: number
   verificationCodeTtlMinutes: number
   autoCheckUpdates: boolean
@@ -47,6 +61,7 @@ export interface Settings {
 export interface PrivacyState {
   paused: boolean
   pauseUntil: number
+  pauseMode: 'timed' | 'until-resume' | 'application' | null
   protectedToday: number
 }
 
@@ -107,6 +122,8 @@ const defaultSettings: Settings = {
   ignoreSensitive: true,
   ignoredPatterns: [],
   hideAfterCopy: false,
+  quickPaste: true,
+  savedFilters: [],
   autoDeleteDays: 30,
   verificationCodeTtlMinutes: 10,
   autoCheckUpdates: true,
@@ -120,6 +137,18 @@ function normalizeSettings(settings: Partial<Settings>): Settings {
     accentColor: isAccentSetting(merged.accentColor) ? merged.accentColor : 'theme',
     language: merged.language === 'zh-CN' || merged.language === 'en-US' ? merged.language : 'system',
     ignoredPatterns: Array.isArray(merged.ignoredPatterns) ? merged.ignoredPatterns : [],
+    quickPaste: merged.quickPaste !== false,
+    savedFilters: Array.isArray(merged.savedFilters) ? merged.savedFilters
+      .filter((filter): filter is SavedFilter => Boolean(filter) && typeof filter.id === 'string' && typeof filter.label === 'string' && typeof filter.query === 'string')
+      .slice(0, 8)
+      .map(filter => ({
+        id: filter.id.slice(0, 80),
+        label: filter.label.trim().slice(0, 32) || filter.query.trim().slice(0, 32) || 'Filter',
+        query: filter.query.trim().slice(0, 160),
+        filterType: typeof filter.filterType === 'string' ? filter.filterType : null,
+        timeFilter: filter.timeFilter === 'today' || filter.timeFilter === 'week' ? filter.timeFilter : 'all',
+        sortMode: filter.sortMode === 'oldest' || filter.sortMode === 'most-used' ? filter.sortMode : 'newest',
+      })) : [],
     opacity: Math.min(1, Math.max(0.7, merged.opacity)),
   }
 }
@@ -150,6 +179,7 @@ interface ClipboardStore {
   history: ClipboardItem[]
   filteredHistory: ClipboardItem[]
   searchQuery: string
+  recentSearches: string[]
   selectedId: string | null
   settings: Settings
   privacy: PrivacyState
@@ -175,6 +205,7 @@ interface ClipboardStore {
 
   setHistory: (history: ClipboardItem[]) => void
   setSearchQuery: (query: string) => void
+  rememberSearch: (query: string) => void
   setSelectedId: (id: string | null) => void
   setSettings: (settings: Settings) => void
   setPrivacy: (privacy: PrivacyState) => void
@@ -201,6 +232,7 @@ interface ClipboardStore {
   addItem: (draft: ClipboardItemDraft) => Promise<{ itemId: string | null; created: boolean }>
   updateItemTags: (id: string, tags: string[]) => Promise<void>
   updateItem: (id: string, content: string, tags: string[]) => Promise<void>
+  updateItemWorkspace: (id: string, workspace: string) => Promise<void>
   deleteItem: (id: string) => Promise<void>
   deleteItems: (ids: string[]) => Promise<number>
   restoreLastDeleted: () => Promise<number>
@@ -210,8 +242,8 @@ interface ClipboardStore {
   clearHistory: () => Promise<void>
   clearAllHistory: () => Promise<void>
   importHistory: (payload: unknown, mode?: 'merge' | 'replace') => Promise<number>
-  copyItem: (id: string) => Promise<void>
-  pauseMonitoring: (minutes: number) => Promise<void>
+  copyItem: (id: string, options?: { pasteAfterCopy?: boolean }) => Promise<void>
+  pauseMonitoring: (mode: number | 'until-resume' | 'current-application') => Promise<void>
   resumeMonitoring: () => Promise<void>
 }
 
@@ -219,9 +251,10 @@ export const useClipboardStore = create<ClipboardStore>((set, get) => ({
   history: [],
   filteredHistory: [],
   searchQuery: '',
+  recentSearches: [],
   selectedId: null,
   settings: defaultSettings,
-  privacy: { paused: false, pauseUntil: 0, protectedToday: 0 },
+  privacy: { paused: false, pauseUntil: 0, pauseMode: null, protectedToday: 0 },
   showSettings: false,
   quickAddOpen: false,
   appVersion: '',
@@ -251,6 +284,12 @@ export const useClipboardStore = create<ClipboardStore>((set, get) => ({
   setSearchQuery: (searchQuery) => {
     const { history, activeTab, filterType, sortMode, timeFilter } = get()
     set({ searchQuery, filteredHistory: filterHistory(history, activeTab, searchQuery, filterType, sortMode, timeFilter) })
+  },
+
+  rememberSearch: (query) => {
+    const normalized = query.trim().replace(/\s+/g, ' ').slice(0, 160)
+    if (normalized.length < 2) return
+    set({ recentSearches: [normalized, ...get().recentSearches.filter(value => value.toLowerCase() !== normalized.toLowerCase())].slice(0, 5) })
   },
 
   setSelectedId: (selectedId) => set({ selectedId }),
@@ -399,6 +438,20 @@ export const useClipboardStore = create<ClipboardStore>((set, get) => ({
     }
   },
 
+  updateItemWorkspace: async (id, workspace) => {
+    const normalized = workspace.replace(/\s+/g, ' ').trim().slice(0, 64)
+    const previous = get().history
+    get().setHistory(previous.map(item => item.id === id ? { ...item, workspace: normalized || undefined, workspaceManual: Boolean(normalized) } : item))
+    try {
+      if (!window.electronAPI) return
+      const history = await window.electronAPI.updateItem(id, { workspace: normalized })
+      get().setHistory(history)
+    } catch (err) {
+      get().setHistory(previous)
+      throw err
+    }
+  },
+
   deleteItem: async (id) => {
     try {
       if (window.electronAPI) {
@@ -496,13 +549,13 @@ export const useClipboardStore = create<ClipboardStore>((set, get) => ({
     }
   },
 
-  copyItem: async (id) => {
+  copyItem: async (id, options) => {
     const { history, _copiedTimer, settings } = get()
     const item = history.find(h => h.id === id)
     if (!item || !window.electronAPI) return
     try {
       if (_copiedTimer) clearTimeout(_copiedTimer)
-      const updatedHistory = await window.electronAPI.copyToClipboard(item)
+      const updatedHistory = await window.electronAPI.copyToClipboard(item, options)
       get().setHistory(updatedHistory)
       if (settings.soundEnabled) {
         try {
@@ -516,10 +569,10 @@ export const useClipboardStore = create<ClipboardStore>((set, get) => ({
     } catch (err) { console.error('copyItem failed:', err) }
   },
 
-  pauseMonitoring: async (minutes) => {
+  pauseMonitoring: async (mode) => {
     try {
       if (window.electronAPI) {
-        const state = await window.electronAPI.pauseMonitoring(minutes)
+        const state = await window.electronAPI.pauseMonitoring(mode)
         set({ privacy: state })
       }
     } catch (err) { console.error('pauseMonitoring failed:', err) }

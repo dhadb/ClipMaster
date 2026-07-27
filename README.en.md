@@ -23,7 +23,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.6.0-blue.svg" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.7.0-blue.svg" alt="Version">
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-green.svg" alt="Platform">
   <img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="License">
   <img src="https://img.shields.io/badge/privacy-local--first-brightgreen.svg" alt="Local first">
@@ -45,7 +45,7 @@
 ## Quick Start
 
 1. Open [Releases](https://github.com/dhadb/ClipMaster/releases/latest).
-2. Download `ClipMaster-Setup-1.6.0.exe`, or choose `ClipMaster-Portable-1.6.0.exe`.
+2. Download `ClipMaster-Setup-1.7.0.exe`, or choose `ClipMaster-Portable-1.7.0.exe`.
 3. Run the installer, or launch the portable build directly.
 4. Copy anything, press `Ctrl + Shift + V`, select an entry with the arrow keys, and press `Enter` to paste it back into the previous app.
 
@@ -54,7 +54,7 @@
 Release assets include `checksums.sha256`. After downloading the installer, verify it in PowerShell:
 
 ```powershell
-Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-1.6.0.exe"
+Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-1.7.0.exe"
 ```
 
 Compare the SHA256 output with `checksums.sha256`. If it does not match, do not run the installer and report it in [Issues](https://github.com/dhadb/ClipMaster/issues).
@@ -69,6 +69,8 @@ Starting with `v1.4.1`, ClipMaster can download the official Windows installer i
 
 `v1.6.0` adds Windows quick paste, offline fuzzy and pinyin search with highlights, recent searches and encrypted saved filters, copy timelines, automatic foreground-app workspaces with manual workspace labels, richer content actions, and clearer privacy pause states. Quick paste, pinyin lookup, and workspace detection run locally; clipboard content is never uploaded.
 
+`v1.7.0` makes quick paste deterministic: it records the foreground window handle (HWND) when opened, then restores and pastes only into that target when you press `Enter`. If the target cannot be confirmed, the item remains copied without a blind paste. Foreground app and workspace detection now use an asynchronous cache to keep high-frequency captures responsive, and "Pause for this app" correctly uses the app active before ClipMaster opened. The last five searches now persist through encrypted settings, and English terminology now correctly labels saved items as Favorites.
+
 ## Features
 
 | Feature | Description |
@@ -79,7 +81,7 @@ Starting with `v1.4.1`, ClipMaster can download the official Windows installer i
 | Command-style search | Fuzzy matches such as `git pu`, offline pinyin search, highlights, recent searches, saved filters, plus `#tags`, `type:`, and `workspace:` queries |
 | Reusable snippets | Save frequently used text, commands, and replies manually |
 | Tags | Organize any entry with tags preserved across import and export |
-| Collections | Use pinning for immediate access and collections plus tags for durable grouping such as replies, commands, and addresses |
+| Favorites | Use pinning for immediate access; keep longer-lived replies, commands, and addresses in Favorites, then organize them with tags |
 | Workspaces | Automatically label captures by the foreground Windows app; add a manual workspace such as Project A, thesis, or travel in details |
 | Batch actions | Pin, favorite, tag, or delete multiple selected records |
 | Content editing | Edit snippet content and tags in details with automatic type detection |

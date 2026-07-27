@@ -52,6 +52,7 @@ export interface Settings {
   ignoredPatterns: string[]
   hideAfterCopy: boolean
   quickPaste: boolean
+  recentSearches: string[]
   savedFilters: SavedFilter[]
   autoDeleteDays: number
   verificationCodeTtlMinutes: number
@@ -123,10 +124,28 @@ const defaultSettings: Settings = {
   ignoredPatterns: [],
   hideAfterCopy: false,
   quickPaste: true,
+  recentSearches: [],
   savedFilters: [],
   autoDeleteDays: 30,
   verificationCodeTtlMinutes: 10,
   autoCheckUpdates: true,
+}
+
+function normalizeRecentSearches(searches: unknown): string[] {
+  if (!Array.isArray(searches)) return []
+
+  const seen = new Set<string>()
+  const normalized: string[] = []
+  for (const search of searches) {
+    if (typeof search !== 'string') continue
+    const value = search.trim().replace(/\s+/g, ' ').slice(0, 160)
+    const key = value.toLowerCase()
+    if (!value || seen.has(key)) continue
+    seen.add(key)
+    normalized.push(value)
+    if (normalized.length === 5) break
+  }
+  return normalized
 }
 
 function normalizeSettings(settings: Partial<Settings>): Settings {
@@ -138,6 +157,7 @@ function normalizeSettings(settings: Partial<Settings>): Settings {
     language: merged.language === 'zh-CN' || merged.language === 'en-US' ? merged.language : 'system',
     ignoredPatterns: Array.isArray(merged.ignoredPatterns) ? merged.ignoredPatterns : [],
     quickPaste: merged.quickPaste !== false,
+    recentSearches: normalizeRecentSearches(merged.recentSearches),
     savedFilters: Array.isArray(merged.savedFilters) ? merged.savedFilters
       .filter((filter): filter is SavedFilter => Boolean(filter) && typeof filter.id === 'string' && typeof filter.label === 'string' && typeof filter.query === 'string')
       .slice(0, 8)
@@ -289,11 +309,18 @@ export const useClipboardStore = create<ClipboardStore>((set, get) => ({
   rememberSearch: (query) => {
     const normalized = query.trim().replace(/\s+/g, ' ').slice(0, 160)
     if (normalized.length < 2) return
-    set({ recentSearches: [normalized, ...get().recentSearches.filter(value => value.toLowerCase() !== normalized.toLowerCase())].slice(0, 5) })
+    const recentSearches = normalizeRecentSearches([normalized, ...get().recentSearches])
+    set({ recentSearches })
+    void get().updateSettings({ recentSearches }).catch((err) => {
+      console.error('persist recent searches failed:', err)
+    })
   },
 
   setSelectedId: (selectedId) => set({ selectedId }),
-  setSettings: (settings) => set({ settings: normalizeSettings(settings) }),
+  setSettings: (settings) => {
+    const normalized = normalizeSettings(settings)
+    set({ settings: normalized, recentSearches: normalized.recentSearches })
+  },
   setPrivacy: (privacy) => set({ privacy }),
   setShowSettings: (showSettings) => set({ showSettings }),
   setQuickAddOpen: (quickAddOpen) => set({ quickAddOpen }),
@@ -301,15 +328,15 @@ export const useClipboardStore = create<ClipboardStore>((set, get) => ({
   updateSettings: async (patch) => {
     const previous = get().settings
     const optimistic = normalizeSettings({ ...previous, ...patch })
-    set({ settings: optimistic })
+    set({ settings: optimistic, recentSearches: optimistic.recentSearches })
     try {
       if (!window.electronAPI) return optimistic
       const applied = await window.electronAPI.updateSettings(patch)
       const normalized = normalizeSettings(applied)
-      set({ settings: normalized })
+      set({ settings: normalized, recentSearches: normalized.recentSearches })
       return normalized
     } catch (err) {
-      set({ settings: previous })
+      set({ settings: previous, recentSearches: previous.recentSearches })
       throw err
     }
   },

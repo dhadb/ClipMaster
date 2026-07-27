@@ -1,7 +1,7 @@
 import { app, BrowserWindow, Tray, Menu, clipboard, globalShortcut, nativeImage, ipcMain, screen, shell, net, safeStorage } from 'electron'
 import path from 'path'
 import fs from 'fs'
-import { execFileSync, spawn } from 'child_process'
+import { execFile } from 'child_process'
 import { normalizeTags } from '../src/utils/clipboard'
 import { compareVersions } from '../src/utils/version'
 import { parseClipMasterReleasePage, parseClipMasterReleaseUrl } from '../src/utils/update'
@@ -42,13 +42,21 @@ let pauseUntil = 0
 type PauseMode = 'timed' | 'until-resume' | 'application' | null
 let pauseMode: PauseMode = null
 let pausedWorkspace = ''
-let lastPauseWorkspaceCheckAt = 0
+let pausedApplicationKey = ''
 let protectedToday = 0
 let protectedDate = getLocalDateKey()
 type HotkeyAction = 'toggle' | 'search' | 'clear'
 const currentHotkeys = new Map<HotkeyAction, string>()
 const pendingImageDeletes = new Map<string, ReturnType<typeof setTimeout>>()
 let storageEncryptionState: 'encrypted' | 'plain' | 'unknown' = 'unknown'
+let foregroundTracker: ReturnType<typeof setInterval> | null = null
+let foregroundTrackerRequestInFlight = false
+let foregroundSampleSequence = 0
+let lastAppliedForegroundSample = 0
+let currentForegroundTarget: ForegroundTarget | null = null
+let lastExternalForegroundTarget: ForegroundTarget | null = null
+let quickPasteTarget: ForegroundTarget | null = null
+let showWindowPromise: Promise<void> | null = null
 const hasSingleInstanceLock = app.requestSingleInstanceLock()
 
 if (!hasSingleInstanceLock) app.quit()
@@ -91,6 +99,15 @@ interface ClipboardItem {
   tags?: string[]  // 智能标签
 }
 
+interface ForegroundTarget {
+  hwnd: string
+  processId: number
+  processName: string
+  applicationKey: string
+  workspace: string
+  capturedAt: number
+}
+
 const defaultSettings = {
   maxHistory: 200,
   hotkey: 'CommandOrControl+Shift+V',
@@ -114,6 +131,7 @@ const defaultSettings = {
   ignoredPatterns: [] as string[],
   hideAfterCopy: false,
   quickPaste: true,
+  recentSearches: [] as string[],
   savedFilters: [] as SavedFilter[],
   autoDeleteDays: 30,
   verificationCodeTtlMinutes: 10,
@@ -156,6 +174,7 @@ interface AppData {
   pauseUntil?: number
   pauseMode?: PauseMode
   pausedWorkspace?: string
+  pausedApplicationKey?: string
 }
 
 let clipboardHistory: ClipboardItem[] = []
@@ -192,6 +211,22 @@ function sanitizeSavedFilters(input: unknown): SavedFilter[] {
   return filters
 }
 
+function sanitizeRecentSearches(input: unknown): string[] {
+  if (!Array.isArray(input)) return []
+  const seen = new Set<string>()
+  const searches: string[] = []
+  for (const candidate of input) {
+    if (typeof candidate !== 'string') continue
+    const value = candidate.trim().replace(/\s+/g, ' ').slice(0, 160)
+    const key = value.toLocaleLowerCase()
+    if (!value || seen.has(key)) continue
+    seen.add(key)
+    searches.push(value)
+    if (searches.length === 5) break
+  }
+  return searches
+}
+
 function sanitizeSettings(input: Partial<Settings> | undefined): Settings {
   const raw = { ...defaultSettings, ...(input || {}) }
   return {
@@ -217,6 +252,7 @@ function sanitizeSettings(input: Partial<Settings> | undefined): Settings {
     ignoredPatterns: normalizeIgnoredPatterns(raw.ignoredPatterns),
     hideAfterCopy: Boolean(raw.hideAfterCopy),
     quickPaste: raw.quickPaste !== false,
+    recentSearches: sanitizeRecentSearches(raw.recentSearches),
     savedFilters: sanitizeSavedFilters(raw.savedFilters),
     autoDeleteDays: Math.round(clamp(raw.autoDeleteDays, 0, 365, defaultSettings.autoDeleteDays)),
     verificationCodeTtlMinutes: Math.round(clamp(raw.verificationCodeTtlMinutes, 0, 1440, defaultSettings.verificationCodeTtlMinutes)),
@@ -593,12 +629,19 @@ function applyLoadedData(data: Partial<AppData>) {
   pauseMode = loadedPauseMode
   pauseUntil = Number.isFinite(loadedPauseUntil) && loadedPauseUntil > 0 ? loadedPauseUntil : 0
   pausedWorkspace = normalizeWorkspace(data.pausedWorkspace) || ''
+  pausedApplicationKey = typeof data.pausedApplicationKey === 'string'
+    ? data.pausedApplicationKey.trim().toLowerCase().replace(/\.exe$/i, '').slice(0, 120)
+    : ''
   if (pauseMode === 'timed' && pauseUntil <= Date.now()) {
     pauseMode = null
     pauseUntil = 0
     pausedWorkspace = ''
+    pausedApplicationKey = ''
   }
-  if (!pauseMode) pauseUntil = 0
+  if (!pauseMode) {
+    pauseUntil = 0
+    pausedApplicationKey = ''
+  }
   applyRetentionRules()
 }
 
@@ -623,7 +666,7 @@ function loadData() {
 function saveData() {
   try {
     refreshProtectedCounter()
-    const data: AppData = { history: clipboardHistory, settings, protectedToday, protectedDate, pauseUntil, pauseMode, pausedWorkspace }
+    const data: AppData = { history: clipboardHistory, settings, protectedToday, protectedDate, pauseUntil, pauseMode, pausedWorkspace, pausedApplicationKey }
     const serialized = serializePersistedData(data)
     const tmpPath = `${dataPath}.${process.pid}.tmp`
     if (fs.existsSync(dataPath)) fs.writeFileSync(backupPath, serialized, 'utf-8')
@@ -691,6 +734,7 @@ function recordProtectedItem() {
 }
 
 const foregroundProcessScript = [
+  '[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)',
   'Add-Type @\"',
   'using System;',
   'using System.Runtime.InteropServices;',
@@ -699,10 +743,14 @@ const foregroundProcessScript = [
   '  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);',
   '}',
   '\"@',
-  '$processId = 0',
+  '$processId = [uint32]0',
   '$window = [ClipMasterForeground]::GetForegroundWindow()',
+  'if ($window -eq [IntPtr]::Zero) { return }',
   '[void][ClipMasterForeground]::GetWindowThreadProcessId($window, [ref]$processId)',
-  'if ($processId) { (Get-Process -Id $processId -ErrorAction SilentlyContinue).ProcessName }',
+  'if (!$processId) { return }',
+  '$process = Get-Process -Id $processId -ErrorAction SilentlyContinue',
+  'if ($null -eq $process) { return }',
+  '[PSCustomObject]@{ hwnd = $window.ToInt64().ToString([System.Globalization.CultureInfo]::InvariantCulture); processId = [int64]$processId; processName = [string]$process.ProcessName } | ConvertTo-Json -Compress',
 ].join('\n')
 
 const workspaceNames: Record<string, string> = {
@@ -714,34 +762,128 @@ const workspaceNames: Record<string, string> = {
   wechat: 'WeChat',
 }
 
-function getForegroundWorkspace() {
-  if (process.platform !== 'win32') return ''
+function parseForegroundTarget(output: string): ForegroundTarget | null {
   try {
-    const output = execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command', foregroundProcessScript], {
-      encoding: 'utf8',
-      timeout: 1200,
-      windowsHide: true,
-      maxBuffer: 4096,
-    }).trim()
-    const key = output.toLowerCase().replace(/\.exe$/i, '')
-    if (!key || key.includes('clipmaster')) return ''
-    return workspaceNames[key] || normalizeWorkspace(output) || ''
+    const raw = asRecord(JSON.parse(output))
+    const hwnd = typeof raw?.hwnd === 'string' ? raw.hwnd.trim() : ''
+    const processName = typeof raw?.processName === 'string' ? raw.processName.trim().slice(0, 120) : ''
+    const processId = typeof raw?.processId === 'number' ? raw.processId : Number(raw?.processId)
+    const applicationKey = processName.toLowerCase().replace(/\.exe$/i, '')
+    if (!/^\d{1,20}$/.test(hwnd) || !Number.isSafeInteger(processId) || processId <= 0 || !applicationKey) return null
+    return {
+      hwnd,
+      processId,
+      processName,
+      applicationKey,
+      workspace: workspaceNames[applicationKey] || normalizeWorkspace(processName) || applicationKey,
+      capturedAt: Date.now(),
+    }
   } catch {
-    return ''
+    return null
   }
+}
+
+function isClipMasterTarget(target: ForegroundTarget | null) {
+  if (!target) return false
+  return target.applicationKey.includes('clipmaster') || (!app.isPackaged && target.applicationKey === 'electron')
+}
+
+function cloneForegroundTarget(target: ForegroundTarget) {
+  return { ...target }
+}
+
+function maybeResumeApplicationPause() {
+  if (pauseMode !== 'application') return
+  const target = currentForegroundTarget
+  if (!target || isClipMasterTarget(target)) return
+  if (pausedApplicationKey) {
+    if (target.applicationKey !== pausedApplicationKey) resumeMonitoring()
+    return
+  }
+  if (pausedWorkspace && target.workspace !== pausedWorkspace) resumeMonitoring()
+}
+
+function updateForegroundTarget(target: ForegroundTarget | null) {
+  currentForegroundTarget = target
+  if (!target || isClipMasterTarget(target)) return
+  lastExternalForegroundTarget = cloneForegroundTarget(target)
+  maybeResumeApplicationPause()
+}
+
+function sampleForegroundTarget(): Promise<ForegroundTarget | null> {
+  if (process.platform !== 'win32' || isQuitting) return Promise.resolve(null)
+  const sampleId = ++foregroundSampleSequence
+  return new Promise(resolve => {
+    try {
+      execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command', foregroundProcessScript], {
+        encoding: 'utf8',
+        timeout: 1200,
+        windowsHide: true,
+        maxBuffer: 4096,
+      }, (error, stdout) => {
+        const target = error ? null : parseForegroundTarget(stdout.trim())
+        if (!error && sampleId >= lastAppliedForegroundSample) {
+          lastAppliedForegroundSample = sampleId
+          updateForegroundTarget(target)
+        }
+        resolve(target)
+      })
+    } catch {
+      resolve(null)
+    }
+  })
+}
+
+function runForegroundTrackerSample() {
+  if (foregroundTrackerRequestInFlight || isQuitting) return
+  foregroundTrackerRequestInFlight = true
+  void sampleForegroundTarget().finally(() => {
+    foregroundTrackerRequestInFlight = false
+  })
+}
+
+function startForegroundTracker() {
+  if (foregroundTracker || process.platform !== 'win32' || isQuitting) return
+  runForegroundTrackerSample()
+  foregroundTracker = setInterval(runForegroundTrackerSample, 1200)
+}
+
+function stopForegroundTracker() {
+  if (foregroundTracker) {
+    clearInterval(foregroundTracker)
+    foregroundTracker = null
+  }
+}
+
+function getCachedWorkspace() {
+  const target = currentForegroundTarget
+  if (!target || isClipMasterTarget(target) || Date.now() - target.capturedAt > 2500) return ''
+  return target.workspace
+}
+
+function getPauseTarget() {
+  const target = quickPasteTarget || lastExternalForegroundTarget
+  if (!target || isClipMasterTarget(target)) return null
+  return cloneForegroundTarget(target)
+}
+
+async function captureQuickPasteTarget() {
+  quickPasteTarget = null
+  if (process.platform !== 'win32') return
+
+  const requestedAt = Date.now()
+  let timeoutId: ReturnType<typeof setTimeout> | null = null
+  const timeout = new Promise<null>(resolve => {
+    timeoutId = setTimeout(() => resolve(null), 180)
+  })
+  const target = await Promise.race([sampleForegroundTarget(), timeout])
+  if (timeoutId) clearTimeout(timeoutId)
+  if (!target || target.capturedAt < requestedAt || isClipMasterTarget(target)) return
+  quickPasteTarget = cloneForegroundTarget(target)
 }
 
 function isMonitoringPaused() {
   return pauseMode === 'until-resume' || pauseMode === 'application' || (pauseMode === 'timed' && pauseUntil > Date.now())
-}
-
-function maybeResumeApplicationPause() {
-  if (pauseMode !== 'application' || !pausedWorkspace) return
-  const now = Date.now()
-  if (now - lastPauseWorkspaceCheckAt < 2000) return
-  lastPauseWorkspaceCheckAt = now
-  const workspace = getForegroundWorkspace()
-  if (workspace && workspace !== pausedWorkspace) resumeMonitoring()
 }
 
 function getPrivacyState() {
@@ -783,8 +925,7 @@ function registerHotkeys(nextSettings = settings) {
   const callbacks: Record<HotkeyAction, () => void> = {
     toggle: () => toggleWindow(),
     search: () => {
-      showWindow()
-      setTimeout(() => mainWindow?.webContents.send('focus-search'), 0)
+      void showWindow().then(() => mainWindow?.webContents.send('focus-search'))
     },
     clear: () => {
       removeHistoryItems(item => !item.pinned && !item.favorited)
@@ -836,6 +977,7 @@ function createWindow() {
   }
 
   mainWindow.on('blur', () => {
+    quickPasteTarget = null
     if (settings.minimizeToTray && mainWindow && !mainWindow.webContents.isDevToolsOpened()) {
       mainWindow.hide()
     }
@@ -844,6 +986,7 @@ function createWindow() {
   mainWindow.on('close', (e) => {
     if (!isQuitting && settings.minimizeToTray) {
       e.preventDefault()
+      quickPasteTarget = null
       mainWindow?.hide()
     }
   })
@@ -868,8 +1011,7 @@ function rebuildTrayMenu() {
   const contextMenu = Menu.buildFromTemplate([
     { label: getTrayText('show'), click: () => toggleWindow() },
     { label: getTrayText('search'), click: () => {
-      showWindow()
-      setTimeout(() => mainWindow?.webContents.send('focus-search'), 0)
+      void showWindow().then(() => mainWindow?.webContents.send('focus-search'))
     } },
     { type: 'separator' },
     { label: paused ? getTrayText('resume') : getTrayText('pause5'), click: () => paused ? resumeMonitoring() : pauseMonitoring(5) },
@@ -889,6 +1031,7 @@ function rebuildTrayMenu() {
     { label: getTrayText('quit'), click: () => {
       isQuitting = true
       stopClipboardWatcher()
+      stopForegroundTracker()
       flushPendingSave()
       app.quit()
     }}
@@ -901,17 +1044,19 @@ function pauseMonitoring(mode: number | Exclude<PauseMode, null>) {
     pauseMode = mode
     pauseUntil = Number.MAX_SAFE_INTEGER
     pausedWorkspace = ''
+    pausedApplicationKey = ''
   } else if (mode === 'application') {
-    const workspace = getForegroundWorkspace()
-    if (!workspace) return pauseMonitoring('until-resume')
+    const target = getPauseTarget()
+    if (!target) return pauseMonitoring('until-resume')
     pauseMode = mode
     pauseUntil = Number.MAX_SAFE_INTEGER
-    pausedWorkspace = workspace
-    lastPauseWorkspaceCheckAt = Date.now()
+    pausedWorkspace = target.workspace
+    pausedApplicationKey = target.applicationKey
   } else {
     pauseMode = 'timed'
     pauseUntil = Date.now() + mode * 60 * 1000
     pausedWorkspace = ''
+    pausedApplicationKey = ''
   }
   rebuildTrayMenu()
   emitPrivacyState()
@@ -922,22 +1067,36 @@ function resumeMonitoring() {
   pauseUntil = 0
   pauseMode = null
   pausedWorkspace = ''
+  pausedApplicationKey = ''
   rebuildTrayMenu()
   emitPrivacyState()
   scheduleSave()
 }
 
-function showWindow() {
+async function showWindow() {
+  if (mainWindow?.isVisible()) {
+    mainWindow.focus()
+    return
+  }
+  if (showWindowPromise) return showWindowPromise
   if (!mainWindow) createWindow()
-  mainWindow?.show()
-  mainWindow?.focus()
+
+  showWindowPromise = (async () => {
+    await captureQuickPasteTarget()
+    mainWindow?.show()
+    mainWindow?.focus()
+  })().finally(() => {
+    showWindowPromise = null
+  })
+  return showWindowPromise
 }
 
 function toggleWindow() {
   if (mainWindow?.isVisible()) {
+    quickPasteTarget = null
     mainWindow.hide()
   } else {
-    showWindow()
+    void showWindow()
   }
 }
 
@@ -1025,7 +1184,7 @@ function startClipboardWatcher() {
         if (existingIndex !== -1) {
           const existing = clipboardHistory.splice(existingIndex, 1)[0]
           recordItemCopy(existing)
-          if (!existing.workspaceManual) existing.workspace = getForegroundWorkspace() || existing.workspace
+          if (!existing.workspaceManual) existing.workspace = getCachedWorkspace() || existing.workspace
           clipboardHistory.unshift(existing)
         } else {
           const now = Date.now()
@@ -1039,7 +1198,7 @@ function startClipboardWatcher() {
             copyCount: 1,
             firstTimestamp: now,
             copyTimestamps: [now],
-            workspace: getForegroundWorkspace() || undefined,
+            workspace: getCachedWorkspace() || undefined,
           })
         }
 
@@ -1054,7 +1213,7 @@ function startClipboardWatcher() {
         if (existingIndex !== -1) {
           const existing = clipboardHistory.splice(existingIndex, 1)[0]
           recordItemCopy(existing)
-          if (!existing.workspaceManual) existing.workspace = getForegroundWorkspace() || existing.workspace
+          if (!existing.workspaceManual) existing.workspace = getCachedWorkspace() || existing.workspace
           existing.imagePath = imageInfo.path
           clipboardHistory.unshift(existing)
         } else {
@@ -1070,7 +1229,7 @@ function startClipboardWatcher() {
             firstTimestamp: now,
             imagePath: imageInfo.path,
             copyTimestamps: [now],
-            workspace: getForegroundWorkspace() || undefined,
+            workspace: getCachedWorkspace() || undefined,
           })
         }
         applyRetentionRules()
@@ -1261,6 +1420,7 @@ ipcMain.handle('install-update', async () => {
   isQuitting = true
   flushPendingSave()
   stopClipboardWatcher()
+  stopForegroundTracker()
   app.quit()
   return { version: downloadedInstallerVersion }
 })
@@ -1338,18 +1498,79 @@ ipcMain.handle('update-item', (_, id: string, patch: { content?: unknown; tags?:
   return clipboardHistory
 })
 
-function sendPasteShortcut() {
-  if (process.platform !== 'win32') return
-  const script = "$shell = New-Object -ComObject WScript.Shell; Start-Sleep -Milliseconds 140; $shell.SendKeys('^v')"
+const targetedPasteScript = [
+  'Add-Type @\"',
+  'using System;',
+  'using System.Runtime.InteropServices;',
+  'public static class ClipMasterPaste {',
+  '  [StructLayout(LayoutKind.Sequential)] public struct INPUT { public uint type; public InputUnion U; }',
+  '  [StructLayout(LayoutKind.Explicit)] public struct InputUnion { [FieldOffset(0)] public KEYBDINPUT ki; }',
+  '  [StructLayout(LayoutKind.Sequential)] public struct KEYBDINPUT { public ushort wVk; public ushort wScan; public uint dwFlags; public uint time; public IntPtr dwExtraInfo; }',
+  '  [DllImport("user32.dll", SetLastError = true)] public static extern bool IsWindow(IntPtr hWnd);',
+  '  [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr hWnd);',
+  '  [DllImport("user32.dll", SetLastError = true)] public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);',
+  '  [DllImport("user32.dll", SetLastError = true)] public static extern bool SetForegroundWindow(IntPtr hWnd);',
+  '  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();',
+  '  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);',
+  '  [DllImport("user32.dll", SetLastError = true)] public static extern uint SendInput(uint nInputs, [In] INPUT[] pInputs, int cbSize);',
+  '  public static INPUT CreateKeyInput(ushort virtualKey, bool keyUp) {',
+  '    return new INPUT { type = 1, U = new InputUnion { ki = new KEYBDINPUT { wVk = virtualKey, dwFlags = keyUp ? 0x0002u : 0u } } };',
+  '  }',
+  '}',
+  '\"@',
+  '$rawHandle = $env:CLIPMASTER_TARGET_HWND',
+  '$rawPid = $env:CLIPMASTER_TARGET_PID',
+  '$ok = $false',
+  'try {',
+  '  if ($rawHandle -notmatch "^\\d{1,20}$" -or $rawPid -notmatch "^\\d{1,10}$") { throw "Invalid target" }',
+  '  $target = [IntPtr]::new([Int64]$rawHandle)',
+  '  $expectedPid = [uint32]$rawPid',
+  '  if (-not [ClipMasterPaste]::IsWindow($target)) { throw "Closed target" }',
+  '  $actualPid = [uint32]0',
+  '  [void][ClipMasterPaste]::GetWindowThreadProcessId($target, [ref]$actualPid)',
+  '  if ($actualPid -ne $expectedPid) { throw "Changed target" }',
+  '  if ([ClipMasterPaste]::IsIconic($target)) { [void][ClipMasterPaste]::ShowWindowAsync($target, 9) }',
+  '  if (-not [ClipMasterPaste]::SetForegroundWindow($target)) { throw "Foreground denied" }',
+  '  Start-Sleep -Milliseconds 50',
+  '  if ([ClipMasterPaste]::GetForegroundWindow() -ne $target) { throw "Foreground changed" }',
+  '  $inputs = [ClipMasterPaste+INPUT[]]@(',
+  '    [ClipMasterPaste]::CreateKeyInput(0x11, $false),',
+  '    [ClipMasterPaste]::CreateKeyInput(0x56, $false),',
+  '    [ClipMasterPaste]::CreateKeyInput(0x56, $true),',
+  '    [ClipMasterPaste]::CreateKeyInput(0x11, $true)',
+  '  )',
+  '  $sent = [ClipMasterPaste]::SendInput([uint32]4, $inputs, [Runtime.InteropServices.Marshal]::SizeOf([type][ClipMasterPaste+INPUT]))',
+  '  $ok = $sent -eq 4',
+  '} catch {}',
+  'if ($ok) { [Console]::Out.Write("ok") } else { [Console]::Out.Write("failed") }',
+].join('\n')
+
+function isUsableQuickPasteTarget(target: ForegroundTarget | null): target is ForegroundTarget {
+  return Boolean(target
+    && !isClipMasterTarget(target)
+    && /^\d{1,20}$/.test(target.hwnd)
+    && Number.isSafeInteger(target.processId)
+    && target.processId > 0)
+}
+
+function sendTargetedPaste(target: ForegroundTarget | null) {
+  if (process.platform !== 'win32' || !isUsableQuickPasteTarget(target)) return
   try {
-    const child = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command', script], {
-      detached: true,
-      stdio: 'ignore',
+    execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command', targetedPasteScript], {
+      encoding: 'utf8',
+      timeout: 3000,
       windowsHide: true,
+      maxBuffer: 1024,
+      env: {
+        ...process.env,
+        CLIPMASTER_TARGET_HWND: target.hwnd,
+        CLIPMASTER_TARGET_PID: String(target.processId),
+      },
+    }, (error, stdout) => {
+      if (error || stdout.trim() !== 'ok') console.warn('Quick paste did not reach its saved target; content remains copied.')
     })
-    child.unref()
   } catch (err) {
-    console.error('Failed to send quick paste shortcut:', err)
+    console.error('Failed to target quick paste:', err)
   }
 }
 
@@ -1357,9 +1578,12 @@ ipcMain.handle('copy-to-clipboard', (_, itemOrContent: ClipboardItem | string, o
   const pasteAfterCopy = options?.pasteAfterCopy === true && settings.quickPaste
   const finishCopy = () => {
     if (pasteAfterCopy) {
+      const target = quickPasteTarget ? cloneForegroundTarget(quickPasteTarget) : null
+      quickPasteTarget = null
       mainWindow?.hide()
-      setTimeout(sendPasteShortcut, 80)
+      setTimeout(() => sendTargetedPaste(target), 80)
     } else if (settings.hideAfterCopy) {
+      quickPasteTarget = null
       mainWindow?.hide()
     }
   }
@@ -1594,6 +1818,7 @@ if (hasSingleInstanceLock) {
     applyAutoStart()
     createWindow()
     createTray()
+    startForegroundTracker()
     startClipboardWatcher()
     registerHotkeys()
   })
@@ -1610,6 +1835,7 @@ if (hasSingleInstanceLock) {
     isQuitting = true
     flushPendingSave()
     stopClipboardWatcher()
+    stopForegroundTracker()
     unregisterHotkeys()
     pendingImageDeletes.forEach(timer => clearTimeout(timer))
     pendingImageDeletes.clear()

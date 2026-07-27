@@ -41,6 +41,7 @@ export interface Settings {
   ignoredPatterns: string[]
   hideAfterCopy: boolean
   quickPaste: boolean
+  recentSearches: string[]
   savedFilters: Array<{ id: string; label: string; query: string; filterType: string | null; timeFilter: 'all' | 'today' | 'week'; sortMode: 'newest' | 'oldest' | 'most-used' }>
   autoDeleteDays: number
   verificationCodeTtlMinutes: number

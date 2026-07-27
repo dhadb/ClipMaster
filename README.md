@@ -23,7 +23,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.6.0-blue.svg" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.7.0-blue.svg" alt="Version">
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-green.svg" alt="Platform">
   <img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="License">
   <img src="https://img.shields.io/badge/privacy-local--first-brightgreen.svg" alt="Local first">
@@ -47,7 +47,7 @@
 ### 安装使用
 
 1. 打开 [Releases](https://github.com/dhadb/ClipMaster/releases/latest)。
-2. 下载 `ClipMaster-Setup-1.6.0.exe`，或选择 `ClipMaster-Portable-1.6.0.exe` 免安装版。
+2. 下载 `ClipMaster-Setup-1.7.0.exe`，或选择 `ClipMaster-Portable-1.7.0.exe` 免安装版。
 3. 运行安装包并按向导安装；便携版可直接运行。
 4. 复制任意内容并按 `Ctrl + Shift + V` 打开 ClipMaster。
 
@@ -56,7 +56,7 @@
 Release 页面会附带 `checksums.sha256`。下载后可以在 PowerShell 中校验：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-1.6.0.exe"
+Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-1.7.0.exe"
 ```
 
 将输出的 SHA256 与 `checksums.sha256` 中的值对比。如果不一致，请不要运行安装包，并在 [Issues](https://github.com/dhadb/ClipMaster/issues) 中反馈。
@@ -71,6 +71,8 @@ Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-1.6.0.exe"
 
 `v1.6.0` 加入 Windows 快速粘贴：按 `Ctrl + Shift + V` 唤起后可用方向键选择，按 `Enter` 会回到原应用并自动粘贴；同时提供离线模糊与拼音搜索、关键词高亮、最近搜索、加密保存的筛选、复制时间线、前台应用工作区与手动工作区。链接可净化追踪参数，JSON 可格式化或压缩复制，代码可规范化复制；所有处理均在本地完成。
 
+`v1.7.0` 让快速粘贴更可靠：唤起时记录前台窗口句柄（HWND），按 `Enter` 后只会恢复并向该窗口发送粘贴；无法确认目标时仅保留“已复制”，不会盲目粘贴到其他窗口。前台应用与工作区改为异步缓存，避免高频复制阻塞主进程；“当前应用期间暂停”会正确引用打开 ClipMaster 前的应用。最近 5 条搜索会通过加密设置持久化保存，英文界面的收藏术语也已统一为 Favorites。
+
 ## 功能特性
 
 | 功能 | 说明 |
@@ -82,7 +84,7 @@ Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-1.6.0.exe"
 | 组合筛选 | 搜索内容和 `#标签`，组合类型、时间范围、最新/最早/常用排序与 `type:` 查询 |
 | 常用片段 | 手动保存常用文本、命令或回复，可直接收藏和置顶 |
 | 标签整理 | 为任意文本记录添加标签，标签随文本备份完整保留 |
-| 收藏夹与分组 | 置顶用于即时高频内容；收藏夹结合标签用于“常用回复”“开发命令”“收货信息”等长期归档 |
+| 收藏与标签 | 置顶用于即时高频内容；收藏结合标签用于“常用回复”“开发命令”“收货信息”等长期归档 |
 | 工作区 | 自动记录前台 Windows 应用，并可在详情中手动命名“项目 A”“论文”“旅行”等工作区 |
 | 批量处理 | 多选记录后统一置顶、收藏、加标签或删除 |
 | 内容编辑 | 在详情页直接修改片段内容和标签，自动重新识别内容类型 |

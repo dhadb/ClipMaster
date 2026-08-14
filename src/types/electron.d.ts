@@ -1,4 +1,5 @@
-import { ClipboardItem, Settings, PrivacyState } from '../store/clipboardStore'
+import type { ClipboardItem } from './clipboard'
+import type { Settings, PrivacyState } from '../store/clipboardStore'
 
 export interface ClipboardItemDraft {
   content: string

@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { parseClipMasterReleasePage, parseClipMasterReleaseUrl } from './update'
+import { parseClipMasterReleasePage, parseClipMasterReleaseUrl, parseReleaseChecksum } from './update'
+
+describe('parseReleaseChecksum', () => {
+  it('finds the checksum for the requested release asset', () => {
+    expect(parseReleaseChecksum('abc\n0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef  *ClipMaster-Setup-2.0.0.exe', 'ClipMaster-Setup-2.0.0.exe')).toBe('0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef')
+  })
+
+  it('rejects malformed or unrelated checksum entries', () => {
+    expect(parseReleaseChecksum('0123  ClipMaster-Setup-2.0.0.exe', 'ClipMaster-Setup-2.0.0.exe')).toBeNull()
+    expect(parseReleaseChecksum('0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef  other.exe', 'ClipMaster-Setup-2.0.0.exe')).toBeNull()
+  })
+})
 
 describe('parseClipMasterReleaseUrl', () => {
   it('extracts stable and prerelease versions from ClipMaster release URLs', () => {

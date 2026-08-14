@@ -2,6 +2,8 @@
 
 ClipMaster is a local-first Windows clipboard manager. It does not include a cloud service and does not upload, sync, sell, or analyze your clipboard content.
 
+When Windows provides Electron `safeStorage`, ClipMaster encrypts the persisted history and settings. If the operating system cannot provide that facility, the app reports the degraded storage state and local files may remain unencrypted.
+
 ## What ClipMaster Stores
 
 ClipMaster stores the data needed to provide clipboard history and app preferences:

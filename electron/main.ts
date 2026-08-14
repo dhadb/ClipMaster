@@ -1,10 +1,11 @@
-import { app, BrowserWindow, Tray, Menu, clipboard, globalShortcut, nativeImage, ipcMain, screen, shell, net, safeStorage } from 'electron'
+import { app, BrowserWindow, Tray, Menu, clipboard, globalShortcut, nativeImage, ipcMain, screen, shell, net, safeStorage, type IpcMainInvokeEvent } from 'electron'
 import path from 'path'
 import fs from 'fs'
+import { createHash } from 'crypto'
 import { execFile } from 'child_process'
 import { normalizeTags } from '../src/utils/clipboard'
 import { compareVersions } from '../src/utils/version'
-import { parseClipMasterReleasePage, parseClipMasterReleaseUrl } from '../src/utils/update'
+import { parseClipMasterReleasePage, parseClipMasterReleaseUrl, parseReleaseChecksum } from '../src/utils/update'
 import { getLocalDateKey, normalizeDailyCounter } from '../src/utils/dailyCounter'
 import { compileIgnoredRules, matchesIgnoredRules, normalizeIgnoredPatterns, type CompiledIgnoredRule } from '../src/utils/ignoredRules'
 import { isSensitiveClipboardContent } from '../src/utils/privacy'
@@ -25,6 +26,7 @@ import {
 } from '../src/utils/limits'
 import { isThemeSetting, type ThemeSetting } from '../src/theme'
 import { isAccentSetting, type AccentSetting } from '../src/personalization'
+import { clipboardTypes as CLIPBOARD_TYPES, type ClipboardItem, type ClipboardType, type SavedFilter } from '../src/types/clipboard'
 
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
@@ -32,6 +34,7 @@ let clipboardWatcher: ReturnType<typeof setInterval> | null = null
 let clipboardWatcherRestartTimer: ReturnType<typeof setTimeout> | null = null
 let clipboardWatcherErrorCount = 0
 let lastClipboardContent = ''
+let lastClipboardFormatHash = ''
 let lastClipboardImageHash = ''  // 用于图片去重
 let lastImageCheckAt = 0
 let isQuitting = false
@@ -69,34 +72,6 @@ const imagesDir = path.join(app.getPath('userData'), 'images')  // 图片存储�
 // 确保图片目录存在
 if (!fs.existsSync(imagesDir)) {
   fs.mkdirSync(imagesDir, { recursive: true })
-}
-
-const CLIPBOARD_TYPES = ['text', 'link', 'email', 'color', 'number', 'code', 'long-text', 'json', 'markdown', 'file-path', 'phone', 'image'] as const
-type ClipboardType = typeof CLIPBOARD_TYPES[number]
-
-interface SavedFilter {
-  id: string
-  label: string
-  query: string
-  filterType: string | null
-  timeFilter: 'all' | 'today' | 'week'
-  sortMode: 'newest' | 'oldest' | 'most-used'
-}
-
-interface ClipboardItem {
-  id: string
-  content: string
-  type: ClipboardType
-  timestamp: number
-  pinned: boolean
-  favorited: boolean
-  copyCount: number
-  firstTimestamp: number
-  copyTimestamps?: number[]
-  workspace?: string
-  workspaceManual?: boolean
-  imagePath?: string  // 图片路径
-  tags?: string[]  // 智能标签
 }
 
 interface ForegroundTarget {
@@ -167,6 +142,7 @@ const trayTranslations: Record<ResolvedLanguage, Record<string, string>> = {
 }
 
 interface AppData {
+  schemaVersion?: number
   history: ClipboardItem[]
   settings: Settings
   protectedToday?: number
@@ -288,7 +264,11 @@ function getClipboardContentType(text: string): ClipboardType {
 
 // 生成图片哈希用于去重
 function getImageHash(buffer: Buffer): string {
-  return require('crypto').createHash('sha256').update(buffer).digest('hex').substring(0, 24)
+  return createHash('sha256').update(buffer).digest('hex').substring(0, 24)
+}
+
+function getClipboardFormatHash(content: string, html = '', rtf = '') {
+  return createHash('sha256').update(`${content}\u0000${html}\u0000${rtf}`).digest('hex')
 }
 
 function isImageHistoryItem(item: ClipboardItem | undefined): item is ClipboardItem & { imagePath: string } {
@@ -501,6 +481,12 @@ function normalizeWorkspace(value: unknown) {
   return workspace || undefined
 }
 
+function normalizeSourceApplication(value: unknown) {
+  if (typeof value !== 'string') return undefined
+  const application = value.replace(/[\u0000-\u001f]/g, '').trim().replace(/\.exe$/i, '').slice(0, 120)
+  return application || undefined
+}
+
 function normalizeCopyTimestamps(input: unknown, fallbackTimestamp: number) {
   const timestamps = Array.isArray(input) ? input : []
   const unique = new Set<number>()
@@ -525,11 +511,15 @@ function sanitizeHistoryItem(input: unknown, allowImagePath = true): ClipboardIt
   const safeTimestamp = Number.isFinite(timestamp) && timestamp > 0 ? timestamp : Date.now()
   const rawType = typeof item.type === 'string' ? item.type : getClipboardContentType(item.content)
   const type = (CLIPBOARD_TYPES as readonly string[]).includes(rawType) ? rawType as ClipboardType : getClipboardContentType(item.content)
+  const html = typeof item.html === 'string' && isTextWithinLimit(item.html) ? item.html : undefined
+  const rtf = typeof item.rtf === 'string' && isTextWithinLimit(item.rtf) ? item.rtf : undefined
   const imagePath = allowImagePath && typeof item.imagePath === 'string' ? resolveSafeImagePath(item.imagePath) : null
   if (type === 'image' && !imagePath) return null
   return {
     id: typeof item.id === 'string' && item.id ? item.id : generateId(),
     content: item.content,
+    html,
+    rtf,
     type,
     timestamp: safeTimestamp,
     pinned: Boolean(item.pinned),
@@ -541,11 +531,12 @@ function sanitizeHistoryItem(input: unknown, allowImagePath = true): ClipboardIt
     copyTimestamps: normalizeCopyTimestamps(item.copyTimestamps, safeTimestamp),
     workspace: normalizeWorkspace(item.workspace),
     workspaceManual: Boolean(item.workspaceManual),
+    sourceApplication: normalizeSourceApplication(item.sourceApplication),
   }
 }
 
 function getHistoryDedupeKey(item: ClipboardItem) {
-  return `${item.type}:${item.content}`
+  return `${item.type}:${item.content}:${item.html || ''}:${item.rtf || ''}`
 }
 
 function dedupeHistory(items: ClipboardItem[]) {
@@ -568,6 +559,7 @@ function dedupeHistory(items: ClipboardItem[]) {
       existing.workspace = item.workspace
       existing.workspaceManual = item.workspaceManual
     }
+    if (!existing.sourceApplication && item.sourceApplication) existing.sourceApplication = item.sourceApplication
   }
   return Array.from(byContent.values()).sort((a, b) => b.timestamp - a.timestamp)
 }
@@ -599,6 +591,14 @@ function serializePersistedData(data: AppData) {
   return JSON.stringify({ format: encryptedStorageFormat, payload: encrypted })
 }
 
+function validatePersistedData(value: unknown): Partial<AppData> {
+  if (!value || Array.isArray(value) || typeof value !== 'object') throw new Error('Persisted data must be an object')
+  const data = value as Partial<AppData>
+  const schemaVersion = data.schemaVersion === undefined ? 1 : Number(data.schemaVersion)
+  if (!Number.isInteger(schemaVersion) || schemaVersion < 1 || schemaVersion > 2) throw new Error('Unsupported persisted data version')
+  return data
+}
+
 function readPersistedData(filePath: string): Partial<AppData> {
   const stat = fs.statSync(filePath)
   if (!stat.isFile() || stat.size > MAX_PERSISTED_DATA_BYTES) throw new Error('Persisted data file exceeds the safety limit')
@@ -609,13 +609,15 @@ function readPersistedData(filePath: string): Partial<AppData> {
     const decrypted = safeStorage.decryptString(Buffer.from(envelope.payload, 'base64'))
     if (Buffer.byteLength(decrypted, 'utf8') > MAX_PERSISTED_DATA_BYTES) throw new Error('Decrypted data exceeds the safety limit')
     storageEncryptionState = 'encrypted'
-    return parseJsonDocument<Partial<AppData>>(decrypted)
+    return validatePersistedData(parseJsonDocument<Partial<AppData>>(decrypted))
   }
   storageEncryptionState = 'plain'
-  return envelope as Partial<AppData>
+  return validatePersistedData(envelope)
 }
 
 function applyLoadedData(data: Partial<AppData>) {
+  const schemaVersion = data.schemaVersion === undefined ? 1 : Number(data.schemaVersion)
+  if (!Number.isInteger(schemaVersion) || schemaVersion < 1 || schemaVersion > 2) throw new Error('Unsupported persisted data version')
   clipboardHistory = getBoundedImportSource({ history: data.history })
     .map(item => sanitizeHistoryItem(item, true))
     .filter(Boolean) as ClipboardItem[]
@@ -666,11 +668,11 @@ function loadData() {
 function saveData() {
   try {
     refreshProtectedCounter()
-    const data: AppData = { history: clipboardHistory, settings, protectedToday, protectedDate, pauseUntil, pauseMode, pausedWorkspace, pausedApplicationKey }
+    const data: AppData = { schemaVersion: 2, history: clipboardHistory, settings, protectedToday, protectedDate, pauseUntil, pauseMode, pausedWorkspace, pausedApplicationKey }
     const serialized = serializePersistedData(data)
     const tmpPath = `${dataPath}.${process.pid}.tmp`
-    if (fs.existsSync(dataPath)) fs.writeFileSync(backupPath, serialized, 'utf-8')
     fs.writeFileSync(tmpPath, serialized, 'utf-8')
+    if (fs.existsSync(dataPath)) fs.copyFileSync(dataPath, backupPath)
     fs.renameSync(tmpPath, dataPath)
   } catch (err) {
     console.error('Failed to save data:', err)
@@ -694,6 +696,16 @@ function flushPendingSave() {
 }
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
+
+function isTrustedRenderer(event: IpcMainInvokeEvent) {
+  const url = event.senderFrame?.url || ''
+  if (isDev) return url === 'http://localhost:5173' || url.startsWith('http://localhost:5173/')
+  return url.startsWith('file://')
+}
+
+function assertTrustedRenderer(event: IpcMainInvokeEvent) {
+  if (!isTrustedRenderer(event)) throw new Error('Untrusted renderer')
+}
 
 function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).substring(2)
@@ -861,6 +873,12 @@ function getCachedWorkspace() {
   return target.workspace
 }
 
+function getCachedApplication() {
+  const target = currentForegroundTarget
+  if (!target || isClipMasterTarget(target) || Date.now() - target.capturedAt > 2500) return undefined
+  return normalizeSourceApplication(target.processName)
+}
+
 function getPauseTarget() {
   const target = quickPasteTarget || lastExternalForegroundTarget
   if (!target || isClipMasterTarget(target)) return null
@@ -967,7 +985,17 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
+      sandbox: true,
     },
+  })
+
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (canOpenExternalUrl(url)) void shell.openExternal(url)
+    return { action: 'deny' }
+  })
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    const allowed = isDev ? url === 'http://localhost:5173' || url.startsWith('http://localhost:5173/') : url.startsWith('file://')
+    if (!allowed) event.preventDefault()
   })
 
   if (isDev) {
@@ -1140,6 +1168,8 @@ function startClipboardWatcher() {
 
       // 检查文本内容
       let currentContent = ''
+      let currentHtml = ''
+      let currentRtf = ''
       try {
         currentContent = clipboard.readText()
       } catch (readErr) {
@@ -1147,19 +1177,30 @@ function startClipboardWatcher() {
         hasError = true
       }
 
+      try { currentHtml = clipboard.readHTML() } catch {}
+      try { currentRtf = clipboard.readRTF() } catch {}
+      if (!isTextWithinLimit(currentHtml)) currentHtml = ''
+      if (!isTextWithinLimit(currentRtf)) currentRtf = ''
+      const clipboardFormatHash = getClipboardFormatHash(currentContent, currentHtml, currentRtf)
+
       if (currentContent && currentContent !== lastClipboardContent && !isTextWithinLimit(currentContent)) {
         lastClipboardContent = currentContent
+        lastClipboardFormatHash = clipboardFormatHash
         currentContent = ''
+        currentHtml = ''
+        currentRtf = ''
       }
 
-      if (currentContent && currentContent !== lastClipboardContent && matchesIgnoredPattern(currentContent)) {
+      if (currentContent && clipboardFormatHash !== lastClipboardFormatHash && matchesIgnoredPattern(currentContent)) {
         lastClipboardContent = currentContent
+        lastClipboardFormatHash = clipboardFormatHash
         recordProtectedItem()
         return
       }
 
-      if (settings.ignoreSensitive && currentContent && currentContent !== lastClipboardContent && isSensitiveClipboardContent(currentContent)) {
+      if (settings.ignoreSensitive && currentContent && clipboardFormatHash !== lastClipboardFormatHash && isSensitiveClipboardContent(currentContent)) {
         lastClipboardContent = currentContent
+        lastClipboardFormatHash = clipboardFormatHash
         recordProtectedItem()
         return
       }
@@ -1177,20 +1218,24 @@ function startClipboardWatcher() {
       }
 
       // 处理文本内容
-      if (currentContent && currentContent !== lastClipboardContent) {
+      if ((currentContent || currentHtml || currentRtf) && clipboardFormatHash !== lastClipboardFormatHash) {
         lastClipboardContent = currentContent
+        lastClipboardFormatHash = clipboardFormatHash
 
-        const existingIndex = clipboardHistory.findIndex(item => item.content === currentContent)
+        const existingIndex = clipboardHistory.findIndex(item => item.content === currentContent && (item.html || '') === currentHtml && (item.rtf || '') === currentRtf)
         if (existingIndex !== -1) {
           const existing = clipboardHistory.splice(existingIndex, 1)[0]
           recordItemCopy(existing)
           if (!existing.workspaceManual) existing.workspace = getCachedWorkspace() || existing.workspace
+          existing.sourceApplication = getCachedApplication() || existing.sourceApplication
           clipboardHistory.unshift(existing)
         } else {
           const now = Date.now()
           clipboardHistory.unshift({
             id: generateId(),
             content: currentContent,
+            html: currentHtml || undefined,
+            rtf: currentRtf || undefined,
             type: getClipboardContentType(currentContent),
             timestamp: now,
             pinned: false,
@@ -1199,6 +1244,7 @@ function startClipboardWatcher() {
             firstTimestamp: now,
             copyTimestamps: [now],
             workspace: getCachedWorkspace() || undefined,
+            sourceApplication: getCachedApplication(),
           })
         }
 
@@ -1214,6 +1260,7 @@ function startClipboardWatcher() {
           const existing = clipboardHistory.splice(existingIndex, 1)[0]
           recordItemCopy(existing)
           if (!existing.workspaceManual) existing.workspace = getCachedWorkspace() || existing.workspace
+          existing.sourceApplication = getCachedApplication() || existing.sourceApplication
           existing.imagePath = imageInfo.path
           clipboardHistory.unshift(existing)
         } else {
@@ -1230,6 +1277,7 @@ function startClipboardWatcher() {
             imagePath: imageInfo.path,
             copyTimestamps: [now],
             workspace: getCachedWorkspace() || undefined,
+            sourceApplication: getCachedApplication(),
           })
         }
         applyRetentionRules()
@@ -1264,12 +1312,14 @@ function startClipboardWatcher() {
 ipcMain.handle('get-image-data-url', (_, imagePath: string | undefined, size: 'thumb' | 'detail' = 'thumb') => getSafeImageDataUrl(imagePath, size === 'detail' ? 'detail' : 'thumb'))
 ipcMain.handle('get-image-info', (_, imagePath: string | undefined) => getImageInfo(imagePath))
 ipcMain.handle('cleanup-image-cache', () => cleanupImageCache())
-ipcMain.handle('open-external-url', async (_, url: string) => {
+ipcMain.handle('open-external-url', async (event, url: string) => {
+  assertTrustedRenderer(event)
   if (!canOpenExternalUrl(url)) return false
   await shell.openExternal(url.trim())
   return true
 })
-ipcMain.handle('show-file-in-folder', async (_, filePath: string) => {
+ipcMain.handle('show-file-in-folder', async (event, filePath: string) => {
+  assertTrustedRenderer(event)
   if (!canShowFilePath(filePath)) return false
   shell.showItemInFolder(filePath.trim())
   return true
@@ -1312,6 +1362,38 @@ function getUpdateDownloadUrl(version: string) {
   return `https://github.com/dhadb/ClipMaster/releases/download/v${encodedVersion}/ClipMaster-Setup-${encodedVersion}.exe`
 }
 
+function getUpdateChecksumsUrl(version: string) {
+  const encodedVersion = encodeURIComponent(version)
+  return `https://github.com/dhadb/ClipMaster/releases/download/v${encodedVersion}/checksums.sha256`
+}
+
+async function calculateFileSha256(filePath: string) {
+  const hash = createHash('sha256')
+  return new Promise<string>((resolve, reject) => {
+    const stream = fs.createReadStream(filePath)
+    stream.on('data', chunk => hash.update(chunk))
+    stream.on('error', reject)
+    stream.on('end', () => resolve(hash.digest('hex')))
+  })
+}
+
+async function getExpectedUpdateHash(info: UpdateInfo, installerPath: string) {
+  const response = await net.fetch(getUpdateChecksumsUrl(info.latestVersion), {
+    method: 'GET',
+    redirect: 'follow',
+    signal: AbortSignal.timeout(30_000),
+    headers: {
+      Accept: 'text/plain',
+      'User-Agent': `ClipMaster/${info.currentVersion}`,
+    },
+  })
+  if (!response.ok) throw new Error(`Checksum request failed with status ${response.status}`)
+  const fileName = path.basename(installerPath)
+  const checksum = parseReleaseChecksum(await response.text(), fileName)
+  if (!checksum) throw new Error(`Checksum for ${fileName} was not found`)
+  return checksum
+}
+
 function emitUpdateDownloadProgress(progress: UpdateDownloadProgress) {
   mainWindow?.webContents.send('update-download-progress', progress)
 }
@@ -1319,10 +1401,19 @@ function emitUpdateDownloadProgress(progress: UpdateDownloadProgress) {
 async function downloadInstaller(info: UpdateInfo): Promise<{ version: string }> {
   const installerPath = path.join(app.getPath('temp'), `ClipMaster-Setup-${info.latestVersion}.exe`)
   const partialPath = `${installerPath}.download`
+  const expectedHash = await getExpectedUpdateHash(info, installerPath)
 
   if (downloadedInstallerPath && downloadedInstallerVersion === info.latestVersion && fs.existsSync(downloadedInstallerPath)) {
-    emitUpdateDownloadProgress({ receivedBytes: fs.statSync(downloadedInstallerPath).size, totalBytes: fs.statSync(downloadedInstallerPath).size, percent: 100 })
-    return { version: info.latestVersion }
+    const cachedHash = await calculateFileSha256(downloadedInstallerPath)
+    if (cachedHash !== expectedHash) {
+      await fs.promises.rm(downloadedInstallerPath, { force: true })
+      downloadedInstallerPath = null
+      downloadedInstallerVersion = null
+    } else {
+      const cachedSize = fs.statSync(downloadedInstallerPath).size
+      emitUpdateDownloadProgress({ receivedBytes: cachedSize, totalBytes: cachedSize, percent: 100 })
+      return { version: info.latestVersion }
+    }
   }
 
   await fs.promises.rm(partialPath, { force: true })
@@ -1347,6 +1438,7 @@ async function downloadInstaller(info: UpdateInfo): Promise<{ version: string }>
   let receivedBytes = 0
   const reader = response.body.getReader()
   const file = await fs.promises.open(partialPath, 'w')
+  let downloadError: unknown = null
   try {
     while (true) {
       const { done, value } = await reader.read()
@@ -1358,21 +1450,33 @@ async function downloadInstaller(info: UpdateInfo): Promise<{ version: string }>
       const percent = totalBytes ? Math.min(100, Math.round((receivedBytes / totalBytes) * 100)) : null
       emitUpdateDownloadProgress({ receivedBytes, totalBytes, percent })
     }
+  } catch (error) {
+    downloadError = error
   } finally {
     await file.close()
     await reader.cancel().catch(() => undefined)
+  }
+  if (downloadError) {
+    await fs.promises.rm(partialPath, { force: true })
+    throw downloadError
   }
 
   if (receivedBytes === 0) throw new Error('Update download returned an empty file')
   await fs.promises.rm(installerPath, { force: true })
   await fs.promises.rename(partialPath, installerPath)
+  const actualHash = await calculateFileSha256(installerPath)
+  if (actualHash !== expectedHash) {
+    await fs.promises.rm(installerPath, { force: true })
+    throw new Error('Downloaded update failed checksum verification')
+  }
   downloadedInstallerPath = installerPath
   downloadedInstallerVersion = info.latestVersion
   emitUpdateDownloadProgress({ receivedBytes, totalBytes: totalBytes || receivedBytes, percent: 100 })
   return { version: info.latestVersion }
 }
 
-ipcMain.handle('check-for-updates', async (_, force = false): Promise<UpdateInfo> => {
+ipcMain.handle('check-for-updates', async (event, force = false): Promise<UpdateInfo> => {
+  assertTrustedRenderer(event)
   if (!force && updateCache && Date.now() - updateCache.checkedAt < 10 * 60 * 1000) return updateCache.info
 
   const currentVersion = app.getVersion()
@@ -1402,7 +1506,8 @@ ipcMain.handle('check-for-updates', async (_, force = false): Promise<UpdateInfo
   return info
 })
 
-ipcMain.handle('download-update', async () => {
+ipcMain.handle('download-update', async event => {
+  assertTrustedRenderer(event)
   const info = updateCache?.info
   if (!info?.hasUpdate) throw new Error('No update is available')
   if (!updateDownloadPromise) {
@@ -1411,7 +1516,8 @@ ipcMain.handle('download-update', async () => {
   return updateDownloadPromise
 })
 
-ipcMain.handle('install-update', async () => {
+ipcMain.handle('install-update', async event => {
+  assertTrustedRenderer(event)
   if (!downloadedInstallerPath || !downloadedInstallerVersion || !fs.existsSync(downloadedInstallerPath)) {
     throw new Error('Update package has not been downloaded')
   }
@@ -1425,7 +1531,8 @@ ipcMain.handle('install-update', async () => {
   return { version: downloadedInstallerVersion }
 })
 
-ipcMain.handle('create-item', (_, draft: { content?: unknown; tags?: unknown; pinned?: unknown; favorited?: unknown }) => {
+ipcMain.handle('create-item', (event, draft: { content?: unknown; tags?: unknown; pinned?: unknown; favorited?: unknown }) => {
+  assertTrustedRenderer(event)
   const content = typeof draft?.content === 'string' ? draft.content : ''
   if (!content.trim()) return { history: clipboardHistory, itemId: null, created: false }
   if (!isTextWithinLimit(content)) throw new Error('Clipboard item is too large')
@@ -1465,7 +1572,8 @@ ipcMain.handle('create-item', (_, draft: { content?: unknown; tags?: unknown; pi
   return { history: clipboardHistory, itemId: item.id, created }
 })
 
-ipcMain.handle('update-item-tags', (_, id: string, tags: unknown) => {
+ipcMain.handle('update-item-tags', (event, id: string, tags: unknown) => {
+  assertTrustedRenderer(event)
   const item = clipboardHistory.find(item => item.id === id)
   if (!item) return clipboardHistory
   item.tags = normalizeTags(tags)
@@ -1474,7 +1582,8 @@ ipcMain.handle('update-item-tags', (_, id: string, tags: unknown) => {
   return clipboardHistory
 })
 
-ipcMain.handle('update-item', (_, id: string, patch: { content?: unknown; tags?: unknown; workspace?: unknown }) => {
+ipcMain.handle('update-item', (event, id: string, patch: { content?: unknown; tags?: unknown; workspace?: unknown }) => {
+  assertTrustedRenderer(event)
   const item = clipboardHistory.find(entry => entry.id === id)
   if (!item || item.type === 'image') return clipboardHistory
 
@@ -1482,6 +1591,8 @@ ipcMain.handle('update-item', (_, id: string, patch: { content?: unknown; tags?:
     if (!patch.content.trim()) throw new Error('Clipboard item cannot be empty')
     if (!isTextWithinLimit(patch.content)) throw new Error('Clipboard item is too large')
     item.content = patch.content
+    item.html = undefined
+    item.rtf = undefined
     item.type = getClipboardContentType(patch.content)
     item.timestamp = Date.now()
   }
@@ -1574,7 +1685,8 @@ function sendTargetedPaste(target: ForegroundTarget | null) {
   }
 }
 
-ipcMain.handle('copy-to-clipboard', (_, itemOrContent: ClipboardItem | string, options?: { pasteAfterCopy?: unknown }) => {
+ipcMain.handle('copy-to-clipboard', (event, itemOrContent: ClipboardItem | string, options?: { pasteAfterCopy?: unknown }) => {
+  assertTrustedRenderer(event)
   const pasteAfterCopy = options?.pasteAfterCopy === true && settings.quickPaste
   const finishCopy = () => {
     if (pasteAfterCopy) {
@@ -1592,6 +1704,7 @@ ipcMain.handle('copy-to-clipboard', (_, itemOrContent: ClipboardItem | string, o
     if (!isTextWithinLimit(itemOrContent)) throw new Error('Clipboard item is too large')
     clipboard.writeText(itemOrContent)
     lastClipboardContent = itemOrContent
+    lastClipboardFormatHash = getClipboardFormatHash(itemOrContent)
     finishCopy()
     return clipboardHistory
   }
@@ -1608,12 +1721,14 @@ ipcMain.handle('copy-to-clipboard', (_, itemOrContent: ClipboardItem | string, o
       lastClipboardImageHash = path.basename(safeImagePath, path.extname(safeImagePath))
       lastImageCheckAt = Date.now()
     } else {
-      clipboard.writeText(item.content)
+      clipboard.write({ text: item.content, ...(item.html ? { html: item.html } : {}), ...(item.rtf ? { rtf: item.rtf } : {}) })
       lastClipboardContent = item.content
+      lastClipboardFormatHash = getClipboardFormatHash(item.content, item.html, item.rtf)
     }
   } else {
-    clipboard.writeText(item.content)
+    clipboard.write({ text: item.content, ...(item.html ? { html: item.html } : {}), ...(item.rtf ? { rtf: item.rtf } : {}) })
     lastClipboardContent = item.content
+    lastClipboardFormatHash = getClipboardFormatHash(item.content, item.html, item.rtf)
   }
 
   if (historyItem) {
@@ -1628,14 +1743,16 @@ ipcMain.handle('copy-to-clipboard', (_, itemOrContent: ClipboardItem | string, o
   return clipboardHistory
 })
 
-ipcMain.handle('delete-item', (_, id: string) => {
+ipcMain.handle('delete-item', (event, id: string) => {
+  assertTrustedRenderer(event)
   removeHistoryItems(item => item.id === id)
   mainWindow?.webContents.send('history-updated', clipboardHistory)
   scheduleSave()
   return clipboardHistory
 })
 
-ipcMain.handle('delete-items', (_, ids: unknown) => {
+ipcMain.handle('delete-items', (event, ids: unknown) => {
+  assertTrustedRenderer(event)
   const safeIds = new Set(Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string').slice(0, 500) : [])
   const deleted = removeHistoryItems(item => safeIds.has(item.id), 8000)
   mainWindow?.webContents.send('history-updated', clipboardHistory)
@@ -1643,7 +1760,8 @@ ipcMain.handle('delete-items', (_, ids: unknown) => {
   return { history: clipboardHistory, deleted }
 })
 
-ipcMain.handle('restore-items', (_, items: unknown) => {
+ipcMain.handle('restore-items', (event, items: unknown) => {
+  assertTrustedRenderer(event)
   const restored = (Array.isArray(items) ? items : [])
     .slice(0, 500)
     .map(sanitizeHistoryItem)
@@ -1657,7 +1775,8 @@ ipcMain.handle('restore-items', (_, items: unknown) => {
   return clipboardHistory
 })
 
-ipcMain.handle('batch-update-items', (_, ids: unknown, patch: { pinned?: unknown; favorited?: unknown; addTags?: unknown }) => {
+ipcMain.handle('batch-update-items', (event, ids: unknown, patch: { pinned?: unknown; favorited?: unknown; addTags?: unknown }) => {
+  assertTrustedRenderer(event)
   const safeIds = new Set(Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string').slice(0, 500) : [])
   const tags = normalizeTags(patch?.addTags)
   for (const item of clipboardHistory) {
@@ -1672,7 +1791,8 @@ ipcMain.handle('batch-update-items', (_, ids: unknown, patch: { pinned?: unknown
   return clipboardHistory
 })
 
-ipcMain.handle('toggle-pin', (_, id: string) => {
+ipcMain.handle('toggle-pin', (event, id: string) => {
+  assertTrustedRenderer(event)
   const item = clipboardHistory.find(item => item.id === id)
   if (item) {
     item.pinned = !item.pinned
@@ -1683,7 +1803,8 @@ ipcMain.handle('toggle-pin', (_, id: string) => {
   return clipboardHistory
 })
 
-ipcMain.handle('toggle-favorite', (_, id: string) => {
+ipcMain.handle('toggle-favorite', (event, id: string) => {
+  assertTrustedRenderer(event)
   const item = clipboardHistory.find(item => item.id === id)
   if (item) {
     item.favorited = !item.favorited
@@ -1694,21 +1815,24 @@ ipcMain.handle('toggle-favorite', (_, id: string) => {
   return clipboardHistory
 })
 
-ipcMain.handle('clear-history', () => {
+ipcMain.handle('clear-history', event => {
+  assertTrustedRenderer(event)
   removeHistoryItems(item => !item.pinned && !item.favorited)
   mainWindow?.webContents.send('history-updated', clipboardHistory)
   scheduleSave()
   return clipboardHistory
 })
 
-ipcMain.handle('clear-all-history', () => {
+ipcMain.handle('clear-all-history', event => {
+  assertTrustedRenderer(event)
   removeHistoryItems(() => true)
   mainWindow?.webContents.send('history-updated', clipboardHistory)
   scheduleSave()
   return clipboardHistory
 })
 
-ipcMain.handle('import-history', (_, payload: unknown, mode: 'merge' | 'replace' = 'merge') => {
+ipcMain.handle('import-history', (event, payload: unknown, mode: 'merge' | 'replace' = 'merge') => {
+  assertTrustedRenderer(event)
   const imported = getImportedItems(payload)
   if (imported.length === 0) return { history: clipboardHistory, imported: 0 }
 
@@ -1741,7 +1865,8 @@ ipcMain.handle('import-history', (_, payload: unknown, mode: 'merge' | 'replace'
 
 ipcMain.handle('get-settings', () => settings)
 
-ipcMain.handle('update-settings', (_, newSettings: Partial<Settings>) => {
+ipcMain.handle('update-settings', (event, newSettings: Partial<Settings>) => {
+  assertTrustedRenderer(event)
   const oldSettings = settings
   let nextSettings = sanitizeSettings({ ...settings, ...newSettings })
 
@@ -1771,24 +1896,31 @@ ipcMain.handle('update-settings', (_, newSettings: Partial<Settings>) => {
 })
 
 ipcMain.handle('get-privacy-state', () => getPrivacyState())
-ipcMain.handle('pause-monitoring', (_, requestedMode: number | 'until-resume' | 'current-application') => {
+ipcMain.handle('pause-monitoring', (event, requestedMode: number | 'until-resume' | 'current-application') => {
+  assertTrustedRenderer(event)
   if (requestedMode === 'until-resume') pauseMonitoring('until-resume')
   else if (requestedMode === 'current-application') pauseMonitoring('application')
   else pauseMonitoring(clamp(requestedMode, 1, 1440, 5))
   return getPrivacyState()
 })
-ipcMain.handle('resume-monitoring', () => {
+ipcMain.handle('resume-monitoring', event => {
+  assertTrustedRenderer(event)
   resumeMonitoring()
   return getPrivacyState()
 })
 
-ipcMain.handle('minimize-window', () => {
+ipcMain.handle('minimize-window', event => {
+  assertTrustedRenderer(event)
   if (!mainWindow) return
   if (settings.minimizeToTray) mainWindow.hide()
   else mainWindow.minimize()
 })
-ipcMain.handle('close-window', () => mainWindow?.close())
-ipcMain.handle('toggle-maximize', () => {
+ipcMain.handle('close-window', event => {
+  assertTrustedRenderer(event)
+  mainWindow?.close()
+})
+ipcMain.handle('toggle-maximize', event => {
+  assertTrustedRenderer(event)
   if (!mainWindow) return
   if (isMaximized) {
     if (savedBounds) {

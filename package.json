@@ -1,7 +1,7 @@
 {
   "name": "clipmaster",
-  "version": "1.7.0",
-  "description": "Local-first Windows clipboard manager with search, favorites, privacy filters, and image history.",
+  "version": "2.0.0",
+  "description": "Local-first Windows clipboard knowledge manager with secure search, quick paste, privacy controls, and image history.",
   "author": "ClipMaster Team",
   "license": "MIT",
   "keywords": [
@@ -23,6 +23,10 @@
     "url": "https://github.com/dhadb/ClipMaster/issues"
   },
   "homepage": "https://github.com/dhadb/ClipMaster#readme",
+  "engines": {
+    "node": ">=22.12.0",
+    "npm": ">=10.9.0"
+  },
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",

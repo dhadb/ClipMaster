@@ -3,6 +3,16 @@ export interface ClipMasterRelease {
   releaseUrl: string
 }
 
+export function parseReleaseChecksum(value: unknown, fileName: string): string | null {
+  if (typeof value !== 'string' || typeof fileName !== 'string' || !fileName.trim()) return null
+  const expectedName = fileName.trim()
+  for (const line of value.split(/\r?\n/)) {
+    const match = line.trim().match(/^([a-f0-9]{64})\s+\*?(.+)$/i)
+    if (match?.[2].trim() === expectedName) return match[1].toLowerCase()
+  }
+  return null
+}
+
 const releasePathPattern = /^\/dhadb\/ClipMaster\/releases\/tag\/([^/]+)\/?$/i
 const versionPattern = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$/
 

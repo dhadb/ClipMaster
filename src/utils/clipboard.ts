@@ -23,6 +23,12 @@ export function normalizeTags(input: unknown): string[] {
 interface SearchableClipboardItem {
   content: string
   type: string
+  pinned?: boolean
+  favorited?: boolean
+  imagePath?: string
+  html?: string
+  rtf?: string
+  sourceApplication?: string
   tags?: string[]
   workspace?: string
 }
@@ -61,7 +67,8 @@ export function matchesClipboardQuery(item: SearchableClipboardItem, rawQuery: s
   const content = item.content.toLowerCase()
   const tags = normalizeTags(item.tags).map(tag => tag.toLowerCase())
   const workspace = item.workspace?.toLowerCase() || ''
-  const searchable = `${content}\n${tags.join('\n')}\n${workspace}`
+  const sourceApplication = item.sourceApplication?.toLowerCase() || ''
+  const searchable = `${content}\n${tags.join('\n')}\n${workspace}\n${sourceApplication}`
 
   return tokens.every(token => {
     if (token.startsWith('#') && token.length > 1) {
@@ -74,6 +81,15 @@ export function matchesClipboardQuery(item: SearchableClipboardItem, rawQuery: s
     if (token.startsWith('workspace:') && token.length > 10) {
       return matchesFuzzyToken(workspace, token.slice(10))
     }
+    if (token.startsWith('app:') && token.length > 4) {
+      return matchesFuzzyToken(sourceApplication, token.slice(4))
+    }
+    if (token === 'is:pinned') return item.pinned === true
+    if (token === 'is:favorite' || token === 'is:favorited') return item.favorited === true
+    if (token === 'has:image') return Boolean(item.imagePath)
+    if (token === 'has:html') return Boolean(item.html)
+    if (token === 'has:rtf') return Boolean(item.rtf)
+    if (token === 'has:rich') return Boolean(item.html || item.rtf)
     return matchesFuzzyToken(searchable, token)
   })
 }
@@ -83,7 +99,7 @@ export function getClipboardHighlightIndexes(content: string, rawQuery: string):
   const indexes = new Set<number>()
 
   for (const token of getSearchTokens(rawQuery)) {
-    if (token.startsWith('#') || token.startsWith('type:') || token.startsWith('workspace:')) continue
+    if (token.startsWith('#') || token.startsWith('type:') || token.startsWith('workspace:') || token.startsWith('app:') || token.startsWith('is:') || token.startsWith('has:')) continue
     const exactIndex = normalized.indexOf(token)
     if (exactIndex >= 0) {
       for (let index = exactIndex; index < exactIndex + token.length; index += 1) indexes.add(index)

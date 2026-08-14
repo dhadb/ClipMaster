@@ -31,6 +31,12 @@ jobs:
         shell: powershell
         run: ./scripts/install-dependencies.ps1
 
+      - name: Verify release tag
+        shell: powershell
+        run: |
+          $packageVersion = node -p "require('./package.json').version"
+          if ("v$packageVersion" -ne "$env:GITHUB_REF_NAME") { throw "Tag $env:GITHUB_REF_NAME does not match package version $packageVersion" }
+
       - name: Audit runtime dependencies
         run: npm audit --omit=dev --audit-level=high --registry=https://registry.npmjs.org
 
@@ -39,6 +45,9 @@ jobs:
 
       - name: Run tests
         run: npm test
+
+      - name: Typecheck and frontend build check
+        run: npm run check
 
       - name: Build installer
         run: npm run build

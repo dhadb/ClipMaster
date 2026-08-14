@@ -1,22 +1,7 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import type { ThemeSetting } from '../src/theme'
 import type { AccentSetting } from '../src/personalization'
-
-export interface ClipboardItem {
-  id: string
-  content: string
-  type: 'text' | 'link' | 'email' | 'color' | 'number' | 'code' | 'long-text' | 'json' | 'markdown' | 'file-path' | 'phone' | 'image'
-  timestamp: number
-  pinned: boolean
-  favorited: boolean
-  copyCount: number
-  firstTimestamp: number
-  copyTimestamps?: number[]
-  workspace?: string
-  workspaceManual?: boolean
-  imagePath?: string
-  tags?: string[]
-}
+import type { ClipboardItem } from '../src/types/clipboard'
 
 export interface Settings {
   maxHistory: number

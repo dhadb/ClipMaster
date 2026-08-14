@@ -29,6 +29,12 @@ jobs:
         shell: powershell
         run: ./scripts/install-dependencies.ps1
 
+      - name: Verify project metadata
+        shell: powershell
+        run: |
+          $packageVersion = node -p "require('./package.json').version"
+          if ($packageVersion -ne '2.0.0') { throw "Expected v2.0.0, found $packageVersion" }
+
       - name: Audit runtime dependencies
         run: npm audit --omit=dev --audit-level=high --registry=https://registry.npmjs.org
 
@@ -37,6 +43,9 @@ jobs:
 
       - name: Run tests
         run: npm test
+
+      - name: Typecheck and frontend build check
+        run: npm run check
 
       - name: Build app
         run: npm run build

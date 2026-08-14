@@ -6,7 +6,8 @@ Security fixes are provided for the latest public release.
 
 | Version | Supported |
 | --- | --- |
-| 1.x | Yes |
+| 2.x | Yes |
+| 1.x | Security fixes only |
 
 ## Reporting a Vulnerability
 
@@ -35,8 +36,10 @@ https://github.com/dhadb/ClipMaster/releases
 Each release should include `checksums.sha256`. After downloading the installer, verify it in PowerShell:
 
 ```powershell
-Get-FileHash -Algorithm SHA256 ".\ClipMaster Setup 1.0.0.exe"
+Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-2.0.0.exe"
 ```
+
+The in-app updater also verifies the SHA256 value against the checksum asset for the same release before allowing installation. Production releases should additionally use Windows Authenticode signing.
 
 Compare the output with `checksums.sha256`. If the hash does not match, do not run the installer.
 

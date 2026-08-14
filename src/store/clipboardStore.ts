@@ -3,31 +3,9 @@ import type { LanguageSetting } from '../i18n'
 import { matchesClipboardQuery, normalizeTags } from '../utils/clipboard'
 import { isThemeSetting, type ThemeSetting } from '../theme'
 import { isAccentSetting, type AccentSetting } from '../personalization'
+import type { ClipboardItem, SavedFilter } from '../types/clipboard'
 
-export interface ClipboardItem {
-  id: string
-  content: string
-  type: 'text' | 'link' | 'email' | 'color' | 'number' | 'code' | 'long-text' | 'json' | 'markdown' | 'file-path' | 'phone' | 'image'
-  timestamp: number
-  pinned: boolean
-  favorited: boolean
-  copyCount: number
-  firstTimestamp: number
-  copyTimestamps?: number[]
-  workspace?: string
-  workspaceManual?: boolean
-  imagePath?: string
-  tags?: string[]
-}
-
-export interface SavedFilter {
-  id: string
-  label: string
-  query: string
-  filterType: string | null
-  timeFilter: TimeFilter
-  sortMode: SortMode
-}
+export type { ClipboardItem, SavedFilter }
 
 export interface Settings {
   maxHistory: number

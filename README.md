@@ -23,7 +23,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.7.0-blue.svg" alt="Version">
+  <img src="https://img.shields.io/badge/version-2.0.0-blue.svg" alt="Version">
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-green.svg" alt="Platform">
   <img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="License">
   <img src="https://img.shields.io/badge/privacy-local--first-brightgreen.svg" alt="Local first">
@@ -47,7 +47,7 @@
 ### 安装使用
 
 1. 打开 [Releases](https://github.com/dhadb/ClipMaster/releases/latest)。
-2. 下载 `ClipMaster-Setup-1.7.0.exe`，或选择 `ClipMaster-Portable-1.7.0.exe` 免安装版。
+2. 下载 `ClipMaster-Setup-2.0.0.exe`，或选择 `ClipMaster-Portable-2.0.0.exe` 免安装版。
 3. 运行安装包并按向导安装；便携版可直接运行。
 4. 复制任意内容并按 `Ctrl + Shift + V` 打开 ClipMaster。
 
@@ -56,7 +56,7 @@
 Release 页面会附带 `checksums.sha256`。下载后可以在 PowerShell 中校验：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-1.7.0.exe"
+Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-2.0.0.exe"
 ```
 
 将输出的 SHA256 与 `checksums.sha256` 中的值对比。如果不一致，请不要运行安装包，并在 [Issues](https://github.com/dhadb/ClipMaster/issues) 中反馈。
@@ -73,14 +73,17 @@ Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-1.7.0.exe"
 
 `v1.7.0` 让快速粘贴更可靠：唤起时记录前台窗口句柄（HWND），按 `Enter` 后只会恢复并向该窗口发送粘贴；无法确认目标时仅保留“已复制”，不会盲目粘贴到其他窗口。前台应用与工作区改为异步缓存，避免高频复制阻塞主进程；“当前应用期间暂停”会正确引用打开 ClipMaster 前的应用。最近 5 条搜索会通过加密设置持久化保存，英文界面的收藏术语也已统一为 Favorites。
 
+`v2.0.0` 建立新的安全与可靠性基础：渲染层启用沙箱和内容安全策略，敏感 IPC 仅接受受信渲染器请求；历史数据带版本号并以最后已知正常快照作为备份；剪贴板记录保留 HTML、RTF 和来源应用；应用内更新在安装前强制校验发布校验和。
+
 ## 功能特性
 
 | 功能 | 说明 |
 | --- | --- |
 | 实时监控 | 自动捕获剪贴板内容变化 |
+| 多格式剪贴板 | 保留文本、HTML 和 RTF 格式，复制时尽量恢复原始格式 |
 | 历史记录 | 最多保存 500 条历史，支持持久化存储 |
 | 智能分类 | 自动识别文本、链接、邮箱、代码、颜色、JSON、Markdown、图片等类型 |
-| 命令式搜索 | 支持 `git pu` 模糊匹配、离线拼音、关键词高亮、最近搜索、保存筛选，以及 `#标签`、`type:`、`workspace:` 查询 |
+| 命令式搜索 | 支持 `git pu` 模糊匹配、离线拼音、关键词高亮、最近搜索、保存筛选，以及 `#标签`、`type:`、`workspace:`、`app:`、`is:pinned`、`has:rich` 查询 |
 | 组合筛选 | 搜索内容和 `#标签`，组合类型、时间范围、最新/最早/常用排序与 `type:` 查询 |
 | 常用片段 | 手动保存常用文本、命令或回复，可直接收藏和置顶 |
 | 标签整理 | 为任意文本记录添加标签，标签随文本备份完整保留 |
@@ -161,6 +164,11 @@ npm run build -- --publish never
 
 ## 路线图
 
+- [x] 发布 `v2.0.0` 安全与可靠性基础
+- [ ] 支持 HTML、RTF、文件列表等多格式剪贴板
+- [ ] 使用索引存储支持大规模历史搜索
+- [ ] 增加应用级隐私策略与集合管理
+- [ ] 为安装包增加代码签名
 - [ ] 增加更多隐私规则开关
 - [x] 支持自定义快捷键
 - [x] 增加便携版下载

@@ -37,4 +37,16 @@ describe('matchesClipboardQuery', () => {
     expect(matchesClipboardQuery({ content: 'git push origin main', type: 'code' }, 'git pu')).toBe(true)
     expect(matchesClipboardQuery({ content: '部署文档', type: 'text' }, 'bswd')).toBe(true)
   })
+
+  it('supports source application qualifiers', () => {
+    expect(matchesClipboardQuery({ content: 'npm run build', type: 'code', sourceApplication: 'WindowsTerminal.exe' }, 'app:terminal')).toBe(true)
+    expect(matchesClipboardQuery({ content: 'npm run build', type: 'code', sourceApplication: 'WindowsTerminal.exe' }, 'app:notepad')).toBe(false)
+  })
+
+  it('supports state and format qualifiers', () => {
+    const richItem = { content: 'Release note', type: 'text', pinned: true, favorited: true, html: '<strong>Release note</strong>' }
+    expect(matchesClipboardQuery(richItem, 'is:pinned is:favorite has:html has:rich')).toBe(true)
+    expect(matchesClipboardQuery(richItem, 'has:rtf')).toBe(false)
+    expect(matchesClipboardQuery({ content: 'image', type: 'image', imagePath: 'C:\\image.png' }, 'has:image')).toBe(true)
+  })
 })

@@ -31,6 +31,22 @@ gh secret set WIN_CSC_KEY_PASSWORD --repo dhadb/ClipMaster
 gh secret list --repo dhadb/ClipMaster
 ```
 
+写入前建议在本机完成一次 Base64 往返验证，确认 Secret 内容确实来自包含私钥的 PFX，而不是 `.cer`、证书路径或截图文字：
+
+```powershell
+$pfxPath = 'D:\证书\ClipMaster-CodeSigning.pfx'
+$encoded = [Convert]::ToBase64String([IO.File]::ReadAllBytes($pfxPath))
+$roundTripPath = Join-Path $env:TEMP 'clipmaster-codesigning-roundtrip.pfx'
+[IO.File]::WriteAllBytes($roundTripPath, [Convert]::FromBase64String($encoded))
+$certificate = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2
+$certificate.Import($roundTripPath, (Read-Host 'PFX password'), [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet)
+if (-not $certificate.HasPrivateKey) { throw 'PFX does not contain a private key.' }
+Remove-Item -LiteralPath $roundTripPath -Force
+$encoded | gh secret set WIN_CSC_LINK --repo dhadb/ClipMaster
+```
+
+发布工作流还会在 Runner 中检查 PFX 格式、私钥和 `Code Signing` 用途；检查失败时不会开始构建或创建 Release。
+
 也可以在 GitHub 仓库的 **Settings → Secrets and variables → Actions** 中创建同名 Repository secrets。
 
 ## 发布流程

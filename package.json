@@ -36,7 +36,8 @@
     "test": "vitest run",
     "check": "tsc --noEmit && vitest run && vite build",
     "pack": "electron-builder --dir",
-    "dist": "electron-builder"
+    "dist": "electron-builder",
+    "build:release": "tsc && vite build && electron-builder --publish=never -c.forceCodeSigning=true"
   },
   "build": {
     "appId": "com.clipmaster.app",

@@ -37,6 +37,34 @@ jobs:
           $packageVersion = node -p "require('./package.json').version"
           if ("v$packageVersion" -ne "$env:GITHUB_REF_NAME") { throw "Tag $env:GITHUB_REF_NAME does not match package version $packageVersion" }
 
+      - name: Prepare Authenticode certificate
+        shell: powershell
+        env:
+          WIN_CSC_LINK_BASE64: ${{ secrets.WIN_CSC_LINK }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:WIN_CSC_LINK_BASE64)) {
+            throw "Missing repository secret WIN_CSC_LINK. Store the base64-encoded PFX certificate in this secret."
+          }
+
+          try {
+            $certificateBytes = [Convert]::FromBase64String($env:WIN_CSC_LINK_BASE64)
+          } catch {
+            throw "WIN_CSC_LINK is not valid base64: $($_.Exception.Message)"
+          }
+
+          $certificatePath = Join-Path $env:RUNNER_TEMP 'clipmaster-codesigning.pfx'
+          [IO.File]::WriteAllBytes($certificatePath, $certificateBytes)
+          "WIN_CSC_LINK=$certificatePath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Check signing password is configured
+        shell: powershell
+        env:
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:WIN_CSC_KEY_PASSWORD)) {
+            throw "Missing repository secret WIN_CSC_KEY_PASSWORD."
+          }
+
       - name: Audit runtime dependencies
         run: npm audit --omit=dev --audit-level=high --registry=https://registry.npmjs.org
 
@@ -50,7 +78,13 @@ jobs:
         run: npm run check
 
       - name: Build installer
-        run: npm run build
+        env:
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+        run: npm run build:release
+
+      - name: Verify Authenticode signatures
+        shell: powershell
+        run: ./scripts/verify-authenticode.ps1 -Path release
 
       - name: Generate SHA256 checksums
         shell: powershell
@@ -68,3 +102,8 @@ jobs:
             release/*.exe
             release/*.blockmap
             release/checksums.sha256
+
+      - name: Remove signing certificate
+        if: ${{ always() }}
+        shell: powershell
+        run: Remove-Item -LiteralPath (Join-Path $env:RUNNER_TEMP 'clipmaster-codesigning.pfx') -Force -ErrorAction SilentlyContinue

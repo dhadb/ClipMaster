@@ -39,12 +39,12 @@ Each release should include `checksums.sha256`. After downloading the installer,
 Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-2.0.0.exe"
 ```
 
-The in-app updater also verifies the SHA256 value against the checksum asset for the same release before allowing installation. Production releases should additionally use Windows Authenticode signing.
+The in-app updater also verifies the SHA256 value against the checksum asset for the same release before allowing installation. Production releases additionally use Windows Authenticode signing. See [docs/CODE_SIGNING.md](docs/CODE_SIGNING.md) for certificate and GitHub Actions setup.
 
 Compare the output with `checksums.sha256`. If the hash does not match, do not run the installer.
 
 ## Known Limitations
 
-- Current Windows installers may be unsigned, so Windows SmartScreen can show a warning.
+- Releases created before Authenticode secrets are configured may be unsigned, so Windows SmartScreen can show a warning.
 - Clipboard managers process sensitive user data by nature. ClipMaster skips common sensitive patterns by default, but no pattern-based detection can be perfect.
 - Only download installers from this repository's GitHub Releases.

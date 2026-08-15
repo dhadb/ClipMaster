@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.0.2 - 2026-08-15
+
+### Performance
+
+- Deferred loading of settings, statistics, clipboard detail, and quick-add panels to reduce the initial renderer bundle.
+
+### Release engineering
+
+- Upgraded GitHub Actions runtime dependencies to their Node 24-compatible major versions.
+
 ## 2.0.1 - 2026-08-15
 
 ### Release engineering

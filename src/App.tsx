@@ -1,13 +1,9 @@
-import React, { useEffect, useState, useMemo, useRef } from 'react'
+import React, { Suspense, useEffect, useState, useMemo, useRef } from 'react'
 import TitleBar from './components/TitleBar'
 import SearchBar from './components/SearchBar'
 import TabBar from './components/TabBar'
 import ClipboardList from './components/ClipboardList'
-import ClipboardDetail from './components/ClipboardDetail'
-import SettingsPanel from './components/SettingsPanel'
-import StatsPanel from './components/StatsPanel'
 import EmptyState from './components/EmptyState'
-import QuickAddDialog from './components/QuickAddDialog'
 import UpdateBanner from './components/UpdateBanner'
 import { Clipboard } from 'lucide-react'
 import { useClipboardStore } from './store/clipboardStore'
@@ -18,9 +14,24 @@ import BulkActionBar from './components/BulkActionBar'
 import ToastCenter from './components/ToastCenter'
 import PrivacyStatusBar from './components/PrivacyStatusBar'
 
+const ClipboardDetail = React.lazy(() => import('./components/ClipboardDetail'))
+const SettingsPanel = React.lazy(() => import('./components/SettingsPanel'))
+const StatsPanel = React.lazy(() => import('./components/StatsPanel'))
+const QuickAddDialog = React.lazy(() => import('./components/QuickAddDialog'))
+
+function PanelLoading() {
+  return (
+    <div className="h-full flex items-center justify-center" style={{ color: 'var(--text-tertiary)' }}>
+      <div className="w-7 h-7 rounded-lg shimmer" style={{ background: 'var(--bg-elevated)' }} />
+    </div>
+  )
+}
+
 function App() {
   const activeTab = useClipboardStore(s => s.activeTab)
   const showSettings = useClipboardStore(s => s.showSettings)
+  const detailItemId = useClipboardStore(s => s.detailItemId)
+  const quickAddOpen = useClipboardStore(s => s.quickAddOpen)
   const filteredHistory = useClipboardStore(s => s.filteredHistory)
   const settings = useClipboardStore(s => s.settings)
   const setHistory = useClipboardStore(s => s.setHistory)
@@ -178,8 +189,8 @@ function App() {
   const showSearch = activeTab !== 'settings' && activeTab !== 'stats'
 
   const content = useMemo(() => {
-    if (activeTab === 'settings' || showSettings) return <SettingsPanel />
-    if (activeTab === 'stats') return <StatsPanel />
+    if (activeTab === 'settings' || showSettings) return <Suspense fallback={<PanelLoading />}><SettingsPanel /></Suspense>
+    if (activeTab === 'stats') return <Suspense fallback={<PanelLoading />}><StatsPanel /></Suspense>
     if (filteredHistory.length === 0) return <EmptyState />
     return <ClipboardList />
   }, [activeTab, showSettings, filteredHistory.length])
@@ -232,8 +243,8 @@ function App() {
       {!showSettings && activeTab !== 'settings' && <TabBar />}
       {showSearch && <BulkActionBar />}
       <div key={`${activeTab}-${showSettings ? 'settings' : 'content'}`} className="flex-1 overflow-hidden content-fade">{content}</div>
-      <ClipboardDetail />
-      <QuickAddDialog />
+      <Suspense fallback={null}>{detailItemId && <ClipboardDetail />}</Suspense>
+      <Suspense fallback={null}>{quickAddOpen && <QuickAddDialog />}</Suspense>
       <ToastCenter />
       <PrivacyStatusBar />
     </div>

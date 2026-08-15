@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseClipMasterReleasePage, parseClipMasterReleaseUrl, parseReleaseChecksum } from './update'
+import { MAX_RELEASE_NOTES_LENGTH, normalizeReleaseNotes, parseClipMasterReleaseApiPayload, parseClipMasterReleasePage, parseClipMasterReleaseUrl, parseReleaseChecksum } from './update'
 
 describe('parseReleaseChecksum', () => {
   it('finds the checksum for the requested release asset', () => {
@@ -43,5 +43,46 @@ describe('parseClipMasterReleasePage', () => {
   it('rejects unrelated or incomplete metadata', () => {
     expect(parseClipMasterReleasePage('<meta property="og:url" content="/other/ClipMaster/releases/tag/v9.0.0">')).toBeNull()
     expect(parseClipMasterReleasePage('<meta property="og:title" content="ClipMaster">')).toBeNull()
+  })
+})
+
+describe('parseClipMasterReleaseApiPayload', () => {
+  it('extracts validated release details from the GitHub API payload', () => {
+    expect(parseClipMasterReleaseApiPayload({
+      tag_name: 'v2.1.0',
+      html_url: 'https://github.com/dhadb/ClipMaster/releases/tag/v2.1.0',
+      body: '\r\n## Highlights\r\n- Faster updates\r\n',
+      published_at: '2026-08-15T08:30:00Z',
+    })).toEqual({
+      latestVersion: '2.1.0',
+      releaseUrl: 'https://github.com/dhadb/ClipMaster/releases/tag/v2.1.0',
+      releaseNotes: '## Highlights\n- Faster updates',
+      publishedAt: '2026-08-15T08:30:00Z',
+    })
+  })
+
+  it('rejects untrusted, mismatched, and incomplete release payloads', () => {
+    expect(parseClipMasterReleaseApiPayload({
+      tag_name: 'v2.1.0',
+      html_url: 'https://github.com/other/ClipMaster/releases/tag/v2.1.0',
+      body: 'Notes',
+    })).toBeNull()
+    expect(parseClipMasterReleaseApiPayload({
+      tag_name: 'v2.1.0',
+      html_url: 'https://github.com/dhadb/ClipMaster/releases/tag/v2.1.1',
+      body: 'Notes',
+    })).toBeNull()
+    expect(parseClipMasterReleaseApiPayload({
+      tag_name: 'v2.1.0',
+      html_url: 'https://github.com/dhadb/ClipMaster/releases/tag/v2.1.0',
+      body: null,
+    })).toBeNull()
+  })
+})
+
+describe('normalizeReleaseNotes', () => {
+  it('normalizes newlines and bounds the displayed release notes', () => {
+    expect(normalizeReleaseNotes('  first\r\nsecond\rthird  ')).toBe('first\nsecond\nthird')
+    expect(normalizeReleaseNotes('x'.repeat(MAX_RELEASE_NOTES_LENGTH + 1))).toHaveLength(MAX_RELEASE_NOTES_LENGTH)
   })
 })

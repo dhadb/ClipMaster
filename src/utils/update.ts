@@ -3,6 +3,13 @@ export interface ClipMasterRelease {
   releaseUrl: string
 }
 
+export interface ClipMasterReleaseDetails extends ClipMasterRelease {
+  releaseNotes: string
+  publishedAt: string | null
+}
+
+export const MAX_RELEASE_NOTES_LENGTH = 20_000
+
 export function parseReleaseChecksum(value: unknown, fileName: string): string | null {
   if (typeof value !== 'string' || typeof fileName !== 'string' || !fileName.trim()) return null
   const expectedName = fileName.trim()
@@ -15,6 +22,11 @@ export function parseReleaseChecksum(value: unknown, fileName: string): string |
 
 const releasePathPattern = /^\/dhadb\/ClipMaster\/releases\/tag\/([^/]+)\/?$/i
 const versionPattern = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$/
+
+export function normalizeReleaseNotes(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  return value.replace(/\r\n?/g, '\n').trim().slice(0, MAX_RELEASE_NOTES_LENGTH)
+}
 
 export function parseClipMasterReleaseUrl(value: unknown): ClipMasterRelease | null {
   if (typeof value !== 'string') return null
@@ -51,4 +63,25 @@ export function parseClipMasterReleasePage(value: unknown): ClipMasterRelease | 
   } catch {
     return null
   }
+}
+
+export function parseClipMasterReleaseApiPayload(value: unknown): ClipMasterReleaseDetails | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+
+  const payload = value as { tag_name?: unknown; html_url?: unknown; body?: unknown; published_at?: unknown }
+  const tagName = typeof payload.tag_name === 'string' ? payload.tag_name.trim() : ''
+  const tagVersion = tagName.replace(/^v/i, '')
+  if (!versionPattern.test(tagVersion)) return null
+
+  const release = parseClipMasterReleaseUrl(payload.html_url)
+  const releaseNotes = normalizeReleaseNotes(payload.body)
+  if (!release || release.latestVersion !== tagVersion || releaseNotes === null) return null
+
+  const publishedAt = typeof payload.published_at === 'string'
+    && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/i.test(payload.published_at)
+    && !Number.isNaN(Date.parse(payload.published_at))
+    ? payload.published_at
+    : null
+
+  return { ...release, releaseNotes, publishedAt }
 }

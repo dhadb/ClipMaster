@@ -5,7 +5,7 @@ import { createHash } from 'crypto'
 import { execFile } from 'child_process'
 import { normalizeTags } from '../src/utils/clipboard'
 import { compareVersions } from '../src/utils/version'
-import { parseClipMasterReleasePage, parseClipMasterReleaseUrl, parseReleaseChecksum } from '../src/utils/update'
+import { parseClipMasterReleaseApiPayload, parseClipMasterReleasePage, parseClipMasterReleaseUrl, parseReleaseChecksum } from '../src/utils/update'
 import { getLocalDateKey, normalizeDailyCounter } from '../src/utils/dailyCounter'
 import { compileIgnoredRules, matchesIgnoredRules, normalizeIgnoredPatterns, type CompiledIgnoredRule } from '../src/utils/ignoredRules'
 import { isSensitiveClipboardContent } from '../src/utils/privacy'
@@ -1341,6 +1341,7 @@ interface UpdateInfo {
   hasUpdate: boolean
   releaseUrl: string
   downloadUrl: string
+  releaseNotes: string
   publishedAt: string | null
 }
 
@@ -1352,6 +1353,7 @@ interface UpdateDownloadProgress {
 
 let updateCache: { checkedAt: number; info: UpdateInfo } | null = null
 const latestReleaseUrl = 'https://github.com/dhadb/ClipMaster/releases/latest'
+const latestReleaseApiUrl = 'https://api.github.com/repos/dhadb/ClipMaster/releases/latest'
 const maxUpdateDownloadBytes = 300 * 1024 * 1024
 let downloadedInstallerPath: string | null = null
 let downloadedInstallerVersion: string | null = null
@@ -1480,27 +1482,60 @@ ipcMain.handle('check-for-updates', async (event, force = false): Promise<Update
   if (!force && updateCache && Date.now() - updateCache.checkedAt < 10 * 60 * 1000) return updateCache.info
 
   const currentVersion = app.getVersion()
-  const response = await net.fetch(latestReleaseUrl, {
-    method: 'GET',
-    redirect: 'follow',
-    signal: AbortSignal.timeout(10_000),
-    headers: {
-      Accept: 'text/html',
-      'User-Agent': `ClipMaster/${currentVersion}`,
-    },
-  })
-  if (!response.ok) throw new Error(`Update request failed with status ${response.status}`)
+  let info: UpdateInfo | null = null
 
-  const releasePage = await response.text()
-  const release = parseClipMasterReleaseUrl(response.url) || parseClipMasterReleasePage(releasePage)
-  if (!release) throw new Error('Update response did not resolve to a valid release')
-  const info: UpdateInfo = {
-    currentVersion,
-    latestVersion: release.latestVersion,
-    hasUpdate: compareVersions(release.latestVersion, currentVersion) > 0,
-    releaseUrl: release.releaseUrl,
-    downloadUrl: getUpdateDownloadUrl(release.latestVersion),
-    publishedAt: null,
+  try {
+    const response = await net.fetch(latestReleaseApiUrl, {
+      method: 'GET',
+      redirect: 'follow',
+      signal: AbortSignal.timeout(10_000),
+      headers: {
+        Accept: 'application/vnd.github+json',
+        'User-Agent': `ClipMaster/${currentVersion}`,
+      },
+    })
+    if (response.ok) {
+      const release = parseClipMasterReleaseApiPayload(await response.json())
+      if (release) {
+        info = {
+          currentVersion,
+          latestVersion: release.latestVersion,
+          hasUpdate: compareVersions(release.latestVersion, currentVersion) > 0,
+          releaseUrl: release.releaseUrl,
+          downloadUrl: getUpdateDownloadUrl(release.latestVersion),
+          releaseNotes: release.releaseNotes,
+          publishedAt: release.publishedAt,
+        }
+      }
+    }
+  } catch {
+    info = null
+  }
+
+  if (!info) {
+    const response = await net.fetch(latestReleaseUrl, {
+      method: 'GET',
+      redirect: 'follow',
+      signal: AbortSignal.timeout(10_000),
+      headers: {
+        Accept: 'text/html',
+        'User-Agent': `ClipMaster/${currentVersion}`,
+      },
+    })
+    if (!response.ok) throw new Error(`Update request failed with status ${response.status}`)
+
+    const releasePage = await response.text()
+    const release = parseClipMasterReleaseUrl(response.url) || parseClipMasterReleasePage(releasePage)
+    if (!release) throw new Error('Update response did not resolve to a valid release')
+    info = {
+      currentVersion,
+      latestVersion: release.latestVersion,
+      hasUpdate: compareVersions(release.latestVersion, currentVersion) > 0,
+      releaseUrl: release.releaseUrl,
+      downloadUrl: getUpdateDownloadUrl(release.latestVersion),
+      releaseNotes: '',
+      publishedAt: null,
+    }
   }
   updateCache = { checkedAt: Date.now(), info }
   return info

@@ -59,12 +59,14 @@ $encoded | gh secret set WIN_CSC_LINK --repo dhadb/ClipMaster
 4. 对 `release/*.exe` 逐个运行 `Get-AuthenticodeSignature`，状态不是 `Valid` 就停止发布。
 5. 发布完成后删除 Runner 临时目录中的 PFX。
 
-当前 `package.json` 已准备为 `2.0.2`。证书配置完成后创建新标签 `v2.0.2`；此前的 `v2.0.1` 已发布，不要覆盖已有 Release 资产：
+当前 `package.json` 已准备为 `2.1.0`。本版本可继续使用默认的未签名发布模式，无需配置证书；不要覆盖此前已经发布的 `v2.0.2` Release 资产：
 
 ```powershell
-git tag v2.0.2
-git push origin v2.0.2
+git tag v2.1.0
+git push origin v2.1.0
 ```
+
+以后准备好正式代码签名证书时，再将 `ENABLE_WINDOWS_CODE_SIGNING` 设置为 `true`，并使用新的版本标签发布。
 
 ## 本地验证
 

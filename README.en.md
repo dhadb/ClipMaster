@@ -23,7 +23,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.0.2-blue.svg" alt="Version">
+  <img src="https://img.shields.io/badge/version-2.1.0-blue.svg" alt="Version">
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-green.svg" alt="Platform">
   <img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="License">
   <img src="https://img.shields.io/badge/privacy-local--first-brightgreen.svg" alt="Local first">
@@ -45,7 +45,7 @@
 ## Quick Start
 
 1. Open [Releases](https://github.com/dhadb/ClipMaster/releases/latest).
-2. Download `ClipMaster-Setup-2.0.2.exe`, or choose `ClipMaster-Portable-2.0.2.exe`.
+2. Download `ClipMaster-Setup-2.1.0.exe`, or choose `ClipMaster-Portable-2.1.0.exe`.
 3. Run the installer, or launch the portable build directly.
 4. Copy anything, press `Ctrl + Shift + V`, select an entry with the arrow keys, and press `Enter` to paste it back into the previous app.
 
@@ -54,7 +54,7 @@
 Release assets include `checksums.sha256`. After downloading the installer, verify it in PowerShell:
 
 ```powershell
-Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-2.0.2.exe"
+Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-2.1.0.exe"
 ```
 
 Compare the SHA256 output with `checksums.sha256`. If it does not match, do not run the installer and report it in [Issues](https://github.com/dhadb/ClipMaster/issues).
@@ -63,7 +63,7 @@ Windows may show a SmartScreen warning for unsigned open-source installers. Down
 
 ### In-app updates
 
-Starting with `v1.4.1`, ClipMaster can download the official Windows installer inside the app after finding a new release, show live progress, and install it with a restart. If the download fails, the GitHub Release page remains available as a fallback.
+Starting with `v1.4.1`, ClipMaster can download the official Windows installer inside the app after finding a new release, show live progress, and install it with a restart. Starting with `v2.1.0`, the settings page also displays the GitHub Release notes for the detected version. If the download fails, the Release page remains available as a fallback.
 
 `v1.5.0` adds Electron `safeStorage` encryption for local history and settings, separate global shortcuts for showing history, focusing search, and clearing unprotected records, plus compact JPEG thumbnails with bounded renderer cache usage.
 

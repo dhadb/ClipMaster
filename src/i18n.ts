@@ -306,6 +306,8 @@ const zh = {
   'settings.techStack': '技术栈',
 
   'update.available': '发现新版本 v{version}',
+  'update.notesTitle': '更新内容',
+  'update.notesUnavailable': '此版本暂无可显示的更新说明。',
   'update.current': '当前已是最新版本',
   'update.failed': '暂时无法检查更新',
   'update.ready': '可以检查 GitHub 上的最新版本',
@@ -635,6 +637,8 @@ const en: Record<keyof typeof zh, string> = {
   'settings.techStack': 'Tech Stack',
 
   'update.available': 'Version v{version} is available',
+  'update.notesTitle': 'What’s new',
+  'update.notesUnavailable': 'No release notes are available for this version.',
   'update.current': 'You are up to date',
   'update.failed': 'Could not check for updates',
   'update.ready': 'Check GitHub for the latest version',

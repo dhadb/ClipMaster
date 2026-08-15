@@ -1,5 +1,5 @@
 import React from 'react'
-import { AlertCircle, CheckCircle2, Download, ExternalLink, RefreshCw, RotateCw } from 'lucide-react'
+import { AlertCircle, CheckCircle2, Download, ExternalLink, FileText, RefreshCw, RotateCw } from 'lucide-react'
 import { useClipboardStore } from '../store/clipboardStore'
 import { useI18n } from '../i18n'
 
@@ -81,6 +81,21 @@ const UpdateStatus: React.FC = () => {
           </div>
         )}
       </div>
+      {updateInfo?.hasUpdate && (
+        <div className="rounded-lg p-3" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-card)' }}>
+          <div className="flex items-center gap-2">
+            <FileText size={14} style={{ color: 'var(--color-primary-light)' }} />
+            <p className="text-[12px] font-medium" style={{ color: 'var(--text-secondary)' }}>{t('update.notesTitle')}</p>
+          </div>
+          {updateInfo.releaseNotes ? (
+            <div className="mt-2 max-h-52 overflow-y-auto whitespace-pre-wrap break-words text-[11px] leading-5" style={{ color: 'var(--text-tertiary)' }}>
+              {updateInfo.releaseNotes}
+            </div>
+          ) : (
+            <p className="mt-2 text-[11px]" style={{ color: 'var(--text-ghost)' }}>{t('update.notesUnavailable')}</p>
+          )}
+        </div>
+      )}
       {status === 'downloading' && (
         <div className="space-y-1.5 px-1">
           <div className="h-1.5 overflow-hidden rounded-full" style={{ background: 'var(--bg-elevated)' }}>

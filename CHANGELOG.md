@@ -1,5 +1,23 @@
 # Changelog
 
+## 2.1.0 - 2026-08-15
+
+### Updates
+
+- Added in-app release notes after update checks, sourced from validated official GitHub Release metadata.
+- Added bounded plain-text release notes rendering with Chinese and English fallback messages.
+
+### Reliability
+
+- Added a GitHub Release API parser that validates repository URLs, tag/version consistency, publication timestamps, and release-note size limits.
+- Preserved the existing public Release page as an automatic fallback when the GitHub API is unavailable, rate-limited, or returns an invalid payload.
+- Added tests for trusted release payloads, rejected repository/version mismatches, newline normalization, and release-note length limits.
+
+### Release engineering
+
+- Updated application metadata, CI version gates, documentation, and download examples for `v2.1.0`.
+- Kept Windows Authenticode signing opt-in so this release can ship unsigned while certificate provisioning remains deferred.
+
 ## 2.0.2 - 2026-08-15
 
 ### Performance

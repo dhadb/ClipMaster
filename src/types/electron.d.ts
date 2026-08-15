@@ -14,6 +14,7 @@ export interface UpdateInfo {
   hasUpdate: boolean
   releaseUrl: string
   downloadUrl: string
+  releaseNotes: string
   publishedAt: string | null
 }
 

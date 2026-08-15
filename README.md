@@ -23,7 +23,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.0.2-blue.svg" alt="Version">
+  <img src="https://img.shields.io/badge/version-2.1.0-blue.svg" alt="Version">
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-green.svg" alt="Platform">
   <img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="License">
   <img src="https://img.shields.io/badge/privacy-local--first-brightgreen.svg" alt="Local first">
@@ -47,7 +47,7 @@
 ### 安装使用
 
 1. 打开 [Releases](https://github.com/dhadb/ClipMaster/releases/latest)。
-2. 下载 `ClipMaster-Setup-2.0.2.exe`，或选择 `ClipMaster-Portable-2.0.2.exe` 免安装版。
+2. 下载 `ClipMaster-Setup-2.1.0.exe`，或选择 `ClipMaster-Portable-2.1.0.exe` 免安装版。
 3. 运行安装包并按向导安装；便携版可直接运行。
 4. 复制任意内容并按 `Ctrl + Shift + V` 打开 ClipMaster。
 
@@ -56,7 +56,7 @@
 Release 页面会附带 `checksums.sha256`。下载后可以在 PowerShell 中校验：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-2.0.2.exe"
+Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-2.1.0.exe"
 ```
 
 将输出的 SHA256 与 `checksums.sha256` 中的值对比。如果不一致，请不要运行安装包，并在 [Issues](https://github.com/dhadb/ClipMaster/issues) 中反馈。
@@ -65,7 +65,7 @@ Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-2.0.2.exe"
 
 ### 应用内更新
 
-从 `v1.4.1` 开始，ClipMaster 检查到新版本后可以直接在应用内下载官方 Windows 安装包，显示下载进度，并在完成后安装并重启。下载失败时仍可打开 GitHub Release 页面手动处理。
+从 `v1.4.1` 开始，ClipMaster 检查到新版本后可以直接在应用内下载官方 Windows 安装包，显示下载进度，并在完成后安装并重启。从 `v2.1.0` 开始，设置页还会显示该版本的 GitHub Release 更新说明；下载失败时仍可打开 Release 页面手动处理。
 
 `v1.5.0` 进一步使用 Electron `safeStorage` 加密本地历史和设置，支持显示、搜索、清理三组全局快捷键，并将图片缩略图压缩为低占用 JPEG。
 

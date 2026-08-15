@@ -33,7 +33,7 @@ jobs:
         shell: powershell
         run: |
           $packageVersion = node -p "require('./package.json').version"
-          if ($packageVersion -ne '2.0.0') { throw "Expected v2.0.0, found $packageVersion" }
+          if ($packageVersion -ne '2.0.1') { throw "Expected v2.0.1, found $packageVersion" }
 
       - name: Audit runtime dependencies
         run: npm audit --omit=dev --audit-level=high --registry=https://registry.npmjs.org

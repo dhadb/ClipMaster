@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.0.1 - 2026-08-15
+
+### Release engineering
+
+- Added mandatory Windows Authenticode signing and signature verification to production releases.
+- Added secure GitHub Actions PFX handling with temporary runner cleanup.
+- Added code-signing setup and certificate rotation documentation.
+
 ## 2.0.0 - 2026-08-14
 
 ### Security

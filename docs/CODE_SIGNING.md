@@ -1,6 +1,6 @@
 # Windows Authenticode 签名
 
-正式发布必须使用受信任的 Windows 代码签名证书。ClipMaster 的发布工作流会在 GitHub Actions 的 `windows-latest` Runner 中临时还原 PFX，使用 Electron Builder 签名，并在发布前验证每个 `.exe`。证书和密码不会写入仓库。
+ClipMaster 已准备 Windows Authenticode 签名工具链。发布工作流默认以未签名方式构建；只有将仓库 Actions variable `ENABLE_WINDOWS_CODE_SIGNING` 设置为 `true` 时，才会还原 PFX、强制签名并验证每个 `.exe`。证书和密码不会写入仓库。
 
 ## 证书要求
 
@@ -45,13 +45,13 @@ Remove-Item -LiteralPath $roundTripPath -Force
 $encoded | gh secret set WIN_CSC_LINK --repo dhadb/ClipMaster
 ```
 
-发布工作流还会在 Runner 中检查 PFX 格式、私钥和 `Code Signing` 用途；检查失败时不会开始构建或创建 Release。
+启用签名时，发布工作流会在 Runner 中检查 PFX 格式、私钥和 `Code Signing` 用途；检查失败时不会开始构建或创建 Release。
 
 也可以在 GitHub 仓库的 **Settings → Secrets and variables → Actions** 中创建同名 Repository secrets。
 
 ## 发布流程
 
-发布工作流只响应 `v*` 标签，并要求标签版本与 `package.json` 一致。发布前会：
+发布工作流只响应 `v*` 标签，并要求标签版本与 `package.json` 一致。默认构建未签名安装包；启用签名前，请在 GitHub **Settings → Secrets and variables → Actions → Variables** 中创建 `ENABLE_WINDOWS_CODE_SIGNING` 并设为 `true`。启用后，发布前会：
 
 1. 检查两个 Secrets 是否存在。
 2. 将 `WIN_CSC_LINK` 的 Base64 内容写入 Runner 临时目录。

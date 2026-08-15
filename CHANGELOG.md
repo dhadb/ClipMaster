@@ -4,9 +4,8 @@
 
 ### Release engineering
 
-- Added mandatory Windows Authenticode signing and signature verification to production releases.
-- Added secure GitHub Actions PFX handling with temporary runner cleanup.
-- Added code-signing setup and certificate rotation documentation.
+- Added reusable Windows Authenticode signing and signature-verification tooling for a future signed release.
+- Published this release unsigned while certificate provisioning is deferred.
 
 ## 2.0.0 - 2026-08-14
 

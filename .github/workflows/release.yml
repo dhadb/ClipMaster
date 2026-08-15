@@ -37,7 +37,17 @@ jobs:
           $packageVersion = node -p "require('./package.json').version"
           if ("v$packageVersion" -ne "$env:GITHUB_REF_NAME") { throw "Tag $env:GITHUB_REF_NAME does not match package version $packageVersion" }
 
+      - name: Report code-signing mode
+        shell: powershell
+        run: |
+          if ('${{ vars.ENABLE_WINDOWS_CODE_SIGNING }}' -eq 'true') {
+            Write-Host 'Windows Authenticode signing is enabled for this release.'
+          } else {
+            Write-Warning 'Windows Authenticode signing is disabled for this release.'
+          }
+
       - name: Prepare Authenticode certificate
+        if: ${{ vars.ENABLE_WINDOWS_CODE_SIGNING == 'true' }}
         shell: powershell
         env:
           WIN_CSC_LINK_BASE64: ${{ secrets.WIN_CSC_LINK }}
@@ -81,6 +91,7 @@ jobs:
           "WIN_CSC_LINK=$certificatePath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Check signing password is configured
+        if: ${{ vars.ENABLE_WINDOWS_CODE_SIGNING == 'true' }}
         shell: powershell
         env:
           WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
@@ -101,12 +112,18 @@ jobs:
       - name: Typecheck and frontend build check
         run: npm run check
 
-      - name: Build installer
+      - name: Build signed installer
+        if: ${{ vars.ENABLE_WINDOWS_CODE_SIGNING == 'true' }}
         env:
           WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
         run: npm run build:release
 
+      - name: Build unsigned installer
+        if: ${{ vars.ENABLE_WINDOWS_CODE_SIGNING != 'true' }}
+        run: npm run build
+
       - name: Verify Authenticode signatures
+        if: ${{ vars.ENABLE_WINDOWS_CODE_SIGNING == 'true' }}
         shell: powershell
         run: ./scripts/verify-authenticode.ps1 -Path release
 
@@ -128,6 +145,6 @@ jobs:
             release/checksums.sha256
 
       - name: Remove signing certificate
-        if: ${{ always() }}
+        if: ${{ always() && vars.ENABLE_WINDOWS_CODE_SIGNING == 'true' }}
         shell: powershell
         run: Remove-Item -LiteralPath (Join-Path $env:RUNNER_TEMP 'clipmaster-codesigning.pfx') -Force -ErrorAction SilentlyContinue

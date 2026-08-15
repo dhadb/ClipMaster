@@ -5,20 +5,6 @@ import electronRenderer from 'vite-plugin-electron-renderer'
 import path from 'path'
 
 export default defineConfig({
-  build: {
-    rollupOptions: {
-      output: {
-        manualChunks(id) {
-          if (!id.includes('node_modules')) return
-          if (id.includes('lucide-react')) return 'icons'
-          if (id.includes('pinyin-pro')) return 'pinyin'
-          if (id.includes('date-fns')) return 'date'
-          if (id.includes('react-dom') || id.includes('react/') || id.includes('scheduler') || id.includes('zustand')) return 'framework'
-          return 'vendor'
-        }
-      }
-    }
-  },
   plugins: [
     react(),
     electron([

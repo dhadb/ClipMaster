@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.1.2 - 2026-08-15
+
+### Fixed
+
+- Removed renderer manual chunking that created a React initialization cycle and left the application window transparent with an empty root element.
+
 ## 2.1.1 - 2026-08-15
 
 ### Fixed

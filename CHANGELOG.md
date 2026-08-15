@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.1.1 - 2026-08-15
+
+### Fixed
+
+- Show and focus the main window after the first renderer-ready startup instead of leaving a newly launched app hidden in the tray.
+
 ## 2.1.0 - 2026-08-15
 
 ### Features

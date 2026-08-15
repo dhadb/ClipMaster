@@ -36,7 +36,7 @@ https://github.com/dhadb/ClipMaster/releases
 Each release should include `checksums.sha256`. After downloading the installer, verify it in PowerShell:
 
 ```powershell
-Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-2.1.0.exe"
+Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-2.1.1.exe"
 ```
 
 The in-app updater also verifies the SHA256 value against the checksum asset for the same release before allowing installation. Authenticode signing is prepared for a future release; see [docs/CODE_SIGNING.md](docs/CODE_SIGNING.md) for certificate and GitHub Actions setup.

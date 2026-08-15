@@ -2029,6 +2029,9 @@ if (hasSingleInstanceLock) {
     startForegroundTracker()
     startClipboardWatcher()
     registerHotkeys()
+    mainWindow?.once('ready-to-show', () => {
+      void showWindow()
+    })
   })
 
   app.on('window-all-closed', () => {

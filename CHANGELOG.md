@@ -5,6 +5,7 @@
 ### Performance
 
 - Deferred loading of settings, statistics, clipboard detail, and quick-add panels to reduce the initial renderer bundle.
+- Split framework, icon, pinyin-search, and date dependencies into cacheable renderer chunks.
 
 ### Release engineering
 

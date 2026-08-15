@@ -1,5 +1,5 @@
 export const MAX_TEXT_BYTES = 2 * 1024 * 1024
-export const MAX_IMPORT_ITEMS = 500
+export const MAX_IMPORT_ITEMS = 5000
 export const MAX_IMPORT_FILE_BYTES = 32 * 1024 * 1024
 export const MAX_PERSISTED_DATA_BYTES = 96 * 1024 * 1024
 export const MAX_HISTORY_TEXT_BYTES = 64 * 1024 * 1024

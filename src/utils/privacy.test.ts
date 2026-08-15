@@ -14,4 +14,10 @@ describe('sensitive clipboard detection', () => {
     expect(isSensitiveClipboardContent('Timestamp 20260721184400123')).toBe(false)
     expect(isValidChineseId('110105202613400021')).toBe(false)
   })
+
+  it('allows individual sensitive-content protections to be disabled', () => {
+    expect(isSensitiveClipboardContent('password=hunter2', { credentials: false, paymentCards: true, identityNumbers: true })).toBe(false)
+    expect(isSensitiveClipboardContent('4111 1111 1111 1111', { credentials: true, paymentCards: false, identityNumbers: true })).toBe(false)
+    expect(isSensitiveClipboardContent('11010519491231002X', { credentials: true, paymentCards: true, identityNumbers: false })).toBe(false)
+  })
 })

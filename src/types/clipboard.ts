@@ -9,6 +9,7 @@ export const clipboardTypes = [
   'json',
   'markdown',
   'file-path',
+  'file-list',
   'phone',
   'image',
 ] as const
@@ -31,6 +32,7 @@ export interface ClipboardItem {
   workspaceManual?: boolean
   sourceApplication?: string
   imagePath?: string
+  files?: string[]
   tags?: string[]
 }
 

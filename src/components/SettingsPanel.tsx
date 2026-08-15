@@ -20,6 +20,7 @@ const SettingsPanel: React.FC = memo(() => {
   const [hotkeyDrafts, setHotkeyDrafts] = useState<Record<HotkeySettingKey, string>>({ hotkey: settings.hotkey, searchHotkey: settings.searchHotkey, clearHotkey: settings.clearHotkey })
   const [hotkeyMessage, setHotkeyMessage] = useState('')
   const [ignoredDraft, setIgnoredDraft] = useState(settings.ignoredPatterns.join('\n'))
+  const [blockedApplicationsDraft, setBlockedApplicationsDraft] = useState(settings.blockedApplications.join('\n'))
   const [cacheMessage, setCacheMessage] = useState('')
   const [securityStatus, setSecurityStatus] = useState<{ available: boolean; active: boolean; migrating: boolean } | null>(null)
 
@@ -29,7 +30,8 @@ const SettingsPanel: React.FC = memo(() => {
   useEffect(() => {
     setHotkeyDrafts({ hotkey: settings.hotkey, searchHotkey: settings.searchHotkey, clearHotkey: settings.clearHotkey })
     setIgnoredDraft(settings.ignoredPatterns.join('\n'))
-  }, [settings.hotkey, settings.searchHotkey, settings.clearHotkey, settings.ignoredPatterns])
+    setBlockedApplicationsDraft(settings.blockedApplications.join('\n'))
+  }, [settings.hotkey, settings.searchHotkey, settings.clearHotkey, settings.ignoredPatterns, settings.blockedApplications])
 
   useEffect(() => {
     window.electronAPI?.getDataSecurityStatus().then(setSecurityStatus).catch(() => setSecurityStatus(null))
@@ -59,6 +61,15 @@ const SettingsPanel: React.FC = memo(() => {
     const patterns = ignoredDraft.split(/\r?\n/).map(v => v.trim()).filter(Boolean)
     update('ignoredPatterns', patterns)
   }, [ignoredDraft, update])
+
+  const saveBlockedApplications = useCallback(() => {
+    const applications = blockedApplicationsDraft.split(/\r?\n/).map(value => value.trim()).filter(Boolean)
+    update('blockedApplications', applications)
+  }, [blockedApplicationsDraft, update])
+
+  const updateSensitiveRule = useCallback((rule: keyof ClipboardSettings['sensitiveRules'], enabled: boolean) => {
+    update('sensitiveRules', { ...settings.sensitiveRules, [rule]: enabled })
+  }, [settings.sensitiveRules, update])
 
   const cleanupCache = useCallback(async () => {
     try {
@@ -153,9 +164,30 @@ const SettingsPanel: React.FC = memo(() => {
                 </button>
               </div>
             </Card>
+            <Card title={t('settings.applicationPrivacy')} icon={<Shield size={14} color="var(--color-warning)" />}>
+              <p className="text-[11px] leading-relaxed" style={{ color: 'var(--text-ghost)' }}>{t('settings.applicationPrivacyDesc')}</p>
+              <textarea
+                value={blockedApplicationsDraft}
+                onChange={event => setBlockedApplicationsDraft(event.target.value)}
+                onBlur={saveBlockedApplications}
+                placeholder={t('settings.applicationPrivacyPlaceholder')}
+                className="h-20 w-full resize-none rounded-lg px-3 py-2 text-[12px] font-mono outline-none"
+                style={{ background: 'var(--bg-elevated)', color: 'var(--text-secondary)', border: '1px solid var(--border-card)' }}
+              />
+              <button onClick={saveBlockedApplications} className="rounded-lg px-3 py-1.5 text-[11px] interactive-chip" style={{ background: 'var(--color-primary)', color: 'white' }}>
+                {t('settings.saveApplications')}
+              </button>
+            </Card>
+            <Card title={t('settings.sensitiveRuleTypes')} icon={<Shield size={14} color="var(--color-success)" />}>
+              <Item label={t('settings.protectCredentials')} desc={t('settings.protectCredentialsDesc')}><Toggle on={settings.sensitiveRules.credentials} set={value => updateSensitiveRule('credentials', value)} /></Item>
+              <div className="h-px" style={{ background: 'var(--border-divider)' }} />
+              <Item label={t('settings.protectPaymentCards')} desc={t('settings.protectPaymentCardsDesc')}><Toggle on={settings.sensitiveRules.paymentCards} set={value => updateSensitiveRule('paymentCards', value)} /></Item>
+              <div className="h-px" style={{ background: 'var(--border-divider)' }} />
+              <Item label={t('settings.protectIdentityNumbers')} desc={t('settings.protectIdentityNumbersDesc')}><Toggle on={settings.sensitiveRules.identityNumbers} set={value => updateSensitiveRule('identityNumbers', value)} /></Item>
+            </Card>
             <Card title={t('settings.history')} icon={<Database size={14} color="var(--color-primary-light)" />}>
               <Item label={t('settings.maxHistory')}><span className="text-[13px] tabular-nums" style={{ color: 'var(--text-secondary)' }}>{t('settings.countUnit', { count: settings.maxHistory })}</span></Item>
-              <Slider value={settings.maxHistory} min={50} max={500} step={10} set={v => update('maxHistory', v)} />
+              <Slider value={settings.maxHistory} min={50} max={5000} step={50} set={v => update('maxHistory', v)} />
               <div className="h-px" style={{ background: 'var(--border-divider)' }} />
               <Item label={t('settings.retentionDays')} desc={t('settings.zeroNever')}><span className="text-[13px] tabular-nums" style={{ color: 'var(--text-secondary)' }}>{t('settings.daysUnit', { count: settings.autoDeleteDays })}</span></Item>
               <Slider value={settings.autoDeleteDays} min={0} max={365} step={1} set={v => update('autoDeleteDays', v)} unit={t('settings.daysUnit', { count: '' }).trim()} />

@@ -1,5 +1,5 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { BarChart3, CheckSquare, Clock3, Download, MoreHorizontal, Sparkles, Star, Trash2, Upload, X } from 'lucide-react'
+import { BarChart3, CheckSquare, Clock3, Download, FolderOpen, MoreHorizontal, Sparkles, Star, Trash2, Upload, X } from 'lucide-react'
 import { useClipboardStore } from '../store/clipboardStore'
 import { useI18n } from '../i18n'
 import { createTextMetadataBackup } from '../utils/backup'
@@ -31,8 +31,9 @@ const TabBar: React.FC = memo(() => {
   const tabs = useMemo(() => [
     { id: 'history' as const, label: t('tabs.history'), Icon: Clock3, count: history.length },
     { id: 'favorites' as const, label: t('tabs.favorites'), Icon: Star, count: favoriteCount },
+    { id: 'collections' as const, label: t('tabs.collections'), Icon: FolderOpen, count: settings.savedFilters.length },
     { id: 'stats' as const, label: t('tabs.stats'), Icon: BarChart3, count: null },
-  ], [favoriteCount, history.length, t])
+  ], [favoriteCount, history.length, settings.savedFilters.length, t])
 
   useEffect(() => {
     if (!menuOpen) return

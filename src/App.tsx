@@ -17,6 +17,7 @@ import PrivacyStatusBar from './components/PrivacyStatusBar'
 const ClipboardDetail = React.lazy(() => import('./components/ClipboardDetail'))
 const SettingsPanel = React.lazy(() => import('./components/SettingsPanel'))
 const StatsPanel = React.lazy(() => import('./components/StatsPanel'))
+const CollectionsPanel = React.lazy(() => import('./components/CollectionsPanel'))
 const QuickAddDialog = React.lazy(() => import('./components/QuickAddDialog'))
 
 function PanelLoading() {
@@ -186,10 +187,11 @@ function App() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [setQuickAddOpen])
 
-  const showSearch = activeTab !== 'settings' && activeTab !== 'stats'
+  const showSearch = activeTab !== 'settings' && activeTab !== 'stats' && activeTab !== 'collections'
 
   const content = useMemo(() => {
     if (activeTab === 'settings' || showSettings) return <Suspense fallback={<PanelLoading />}><SettingsPanel /></Suspense>
+    if (activeTab === 'collections') return <Suspense fallback={<PanelLoading />}><CollectionsPanel /></Suspense>
     if (activeTab === 'stats') return <Suspense fallback={<PanelLoading />}><StatsPanel /></Suspense>
     if (filteredHistory.length === 0) return <EmptyState />
     return <ClipboardList />

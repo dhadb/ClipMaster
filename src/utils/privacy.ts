@@ -6,6 +6,27 @@ const secretPatterns = [
   /\b(?:password|passwd|pwd|token|secret|api[_-]?key)\s*[:=]\s*\S+/i,
 ]
 
+export interface SensitiveContentRules {
+  credentials: boolean
+  paymentCards: boolean
+  identityNumbers: boolean
+}
+
+export const defaultSensitiveContentRules: SensitiveContentRules = {
+  credentials: true,
+  paymentCards: true,
+  identityNumbers: true,
+}
+
+export function normalizeSensitiveContentRules(value: unknown): SensitiveContentRules {
+  const input = value && typeof value === 'object' && !Array.isArray(value) ? value as Partial<SensitiveContentRules> : {}
+  return {
+    credentials: input.credentials !== false,
+    paymentCards: input.paymentCards !== false,
+    identityNumbers: input.identityNumbers !== false,
+  }
+}
+
 export function passesLuhnCheck(value: string): boolean {
   const digits = value.replace(/[^\d]/g, '')
   if (digits.length < 15 || digits.length > 19) return false
@@ -38,10 +59,11 @@ export function isValidChineseId(value: string): boolean {
   return checks[sum % 11] === value[17].toUpperCase()
 }
 
-export function isSensitiveClipboardContent(text: string): boolean {
+export function isSensitiveClipboardContent(text: string, rules: SensitiveContentRules = defaultSensitiveContentRules): boolean {
   const trimmed = text.trim()
   if (!trimmed) return false
-  if (secretPatterns.some(pattern => pattern.test(trimmed))) return true
-  if ((trimmed.match(/\b\d{17}[\dXx]\b/g) || []).some(isValidChineseId)) return true
-  return (trimmed.match(/\b(?:\d[ -]?){15,19}\b/g) || []).some(passesLuhnCheck)
+  const normalizedRules = normalizeSensitiveContentRules(rules)
+  if (normalizedRules.credentials && secretPatterns.some(pattern => pattern.test(trimmed))) return true
+  if (normalizedRules.identityNumbers && (trimmed.match(/\b\d{17}[\dXx]\b/g) || []).some(isValidChineseId)) return true
+  return normalizedRules.paymentCards && (trimmed.match(/\b(?:\d[ -]?){15,19}\b/g) || []).some(passesLuhnCheck)
 }

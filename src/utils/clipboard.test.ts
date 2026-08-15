@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MAX_TAGS, matchesClipboardQuery, normalizeTags } from './clipboard'
+import { createClipboardSearchIndex, MAX_TAGS, matchesClipboardQuery, normalizeTags, searchClipboardIndex } from './clipboard'
 
 describe('normalizeTags', () => {
   it('trims, de-duplicates, and removes leading hashes', () => {
@@ -48,5 +48,26 @@ describe('matchesClipboardQuery', () => {
     expect(matchesClipboardQuery(richItem, 'is:pinned is:favorite has:html has:rich')).toBe(true)
     expect(matchesClipboardQuery(richItem, 'has:rtf')).toBe(false)
     expect(matchesClipboardQuery({ content: 'image', type: 'image', imagePath: 'C:\\image.png' }, 'has:image')).toBe(true)
+  })
+})
+describe('clipboard search index', () => {
+  const items = [
+    { id: 'one', content: '发布检查清单', type: 'text', tags: ['工作'], workspace: 'ClipMaster', sourceApplication: 'Code.exe' },
+    { id: 'two', content: 'C:\\Docs\\report.pdf', type: 'file-list', files: ['C:\\Docs\\report.pdf'] },
+    { id: 'three', content: 'hello world', type: 'text', favorited: true },
+  ]
+
+  it('returns operator and pinyin matches from the reusable index', () => {
+    const index = createClipboardSearchIndex(items)
+    expect([...searchClipboardIndex(index, 'fabu workspace:clip')]).toEqual(['one'])
+    expect([...searchClipboardIndex(index, 'has:files')]).toEqual(['two'])
+    expect([...searchClipboardIndex(index, 'is:favorite')]).toEqual(['three'])
+  })
+
+  it('reuses cached query result sets', () => {
+    const index = createClipboardSearchIndex(items)
+    const first = searchClipboardIndex(index, 'hello')
+    const second = searchClipboardIndex(index, '  HELLO  ')
+    expect(second).toBe(first)
   })
 })

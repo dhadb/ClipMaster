@@ -1,5 +1,5 @@
 import React, { useCallback, memo } from 'react'
-import { Copy, Pin, PinOff, Trash2, ExternalLink, Mail, Hash, Code, FileText, Type, Check, Heart, Circle, CheckCircle2 } from 'lucide-react'
+import { Copy, Pin, PinOff, Trash2, ExternalLink, Mail, Hash, Code, FileText, FolderOpen, Type, Check, Heart, Circle, CheckCircle2 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useClipboardStore, ClipboardItem } from '../store/clipboardStore'
 import { getClipboardHighlightIndexes } from '../utils/clipboard'
@@ -28,6 +28,7 @@ const TYPE_CFG: Record<string, { Icon: LucideIcon; bar: string; cssVar: string }
   markdown: { Icon: FileText, bar: 'type-long-text', cssVar: 'var(--type-long-text)' },
   'long-text': { Icon: FileText, bar: 'type-long-text', cssVar: 'var(--type-long-text)' },
   'file-path': { Icon: FileText, bar: 'type-text', cssVar: 'var(--type-text)' },
+  'file-list': { Icon: FolderOpen, bar: 'type-text', cssVar: 'var(--type-text)' },
   phone: { Icon: Hash, bar: 'type-number', cssVar: 'var(--type-number)' },
   image: { Icon: FileText, bar: 'type-long-text', cssVar: 'var(--type-long-text)' },
 }

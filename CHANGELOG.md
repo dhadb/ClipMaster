@@ -2,6 +2,14 @@
 
 ## 2.1.0 - 2026-08-15
 
+### Features
+
+- Added Windows file-list clipboard history, `has:files` search, per-file Explorer reveal actions, and local-file exclusion from text metadata backups.
+- Raised the default history capacity to 1000 entries and the configurable/import limit to 5000 entries; added a reusable search index and bounded query-result cache.
+- Added application privacy policies that prevent text, image, and file captures from configured Windows applications.
+- Added independent credential, payment-card, and Chinese identity-number privacy controls.
+- Added smart collections for saved search, type, time, and sort combinations with dynamic result counts.
+
 ### Updates
 
 - Added in-app release notes after update checks, sourced from validated official GitHub Release metadata.

@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import type { ThemeSetting } from '../src/theme'
 import type { AccentSetting } from '../src/personalization'
 import type { ClipboardItem } from '../src/types/clipboard'
+import type { SensitiveContentRules } from '../src/utils/privacy'
 
 export interface Settings {
   maxHistory: number
@@ -23,6 +24,8 @@ export interface Settings {
   recordImages: boolean
   soundEnabled: boolean
   ignoreSensitive: boolean
+  sensitiveRules: SensitiveContentRules
+  blockedApplications: string[]
   ignoredPatterns: string[]
   hideAfterCopy: boolean
   quickPaste: boolean

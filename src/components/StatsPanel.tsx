@@ -15,6 +15,7 @@ const TYPE_MAP: Record<string, { Icon: LucideIcon; cssVar: string }> = {
   markdown: { Icon: FileText, cssVar: 'var(--type-long-text)' },
   'long-text': { Icon: FileText, cssVar: 'var(--type-long-text)' },
   'file-path': { Icon: FolderOpen, cssVar: 'var(--type-text)' },
+  'file-list': { Icon: FolderOpen, cssVar: 'var(--type-text)' },
   phone: { Icon: Phone, cssVar: 'var(--type-number)' },
   image: { Icon: ImageIcon, cssVar: 'var(--type-long-text)' },
 }

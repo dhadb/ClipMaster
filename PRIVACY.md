@@ -8,11 +8,13 @@ When Windows provides Electron `safeStorage`, ClipMaster encrypts the persisted 
 
 ClipMaster stores the data needed to provide clipboard history and app preferences:
 
-- Clipboard history entries
+- Clipboard history entries, including local file-list paths when you copy files
 - Favorite status
-- App settings
+- App settings, including optional blocked-application names and privacy rule choices
 - Image cache files
 - Local usage statistics shown inside the app
+
+Text metadata exports intentionally exclude images and local file-list records.
 
 By default, this data is stored locally under:
 
@@ -32,9 +34,9 @@ ClipMaster does not:
 
 ## Sensitive Content
 
-ClipMaster includes default safeguards that skip high-risk content such as suspected passwords, tokens, private keys, and card numbers. These rules are best-effort protections and should not replace your own security practices.
+ClipMaster includes default safeguards that skip suspected credentials, tokens, private keys, payment-card numbers, and Chinese identity numbers. You can independently toggle credential, payment-card, and identity-number detection in Settings. These rules are best-effort protections and should not replace your own security practices.
 
-If you need to copy highly sensitive temporary content, you can pause clipboard monitoring or clear recent history after use.
+You can also add Windows process names to the application privacy policy. While a listed application is active, its text, images, and file lists are not added to history. If you need to copy highly sensitive temporary content, pause clipboard monitoring or clear recent history after use.
 
 ## Clearing Data
 

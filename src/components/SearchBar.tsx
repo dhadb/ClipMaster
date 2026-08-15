@@ -8,6 +8,7 @@ import {
   Code2,
   FileImage,
   FileText,
+  FolderOpen,
   Hash,
   Link2,
   ListFilter,
@@ -86,7 +87,7 @@ const SearchBar: React.FC = () => {
     const query = local.trim().replace(/\s+/g, ' ').slice(0, 160)
     const label = query || filterType || (timeFilter === 'today' ? t('search.timeToday') : timeFilter === 'week' ? t('search.timeWeek') : t('search.savedFilter'))
     const filter = { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, label: label.slice(0, 32), query, filterType, timeFilter, sortMode }
-    void updateSettings({ savedFilters: [...savedFilters, filter].slice(-8) })
+    void updateSettings({ savedFilters: [...savedFilters, filter].slice(-24) })
   }, [filterType, local, savedFilters, sortMode, t, timeFilter, updateSettings])
 
   const removeSavedFilter = useCallback((id: string) => {
@@ -125,6 +126,7 @@ const SearchBar: React.FC = () => {
     { id: 'json', label: t('type.json'), Icon: Braces },
     { id: 'markdown', label: t('type.markdown'), Icon: FileText },
     { id: 'file-path', label: t('type.file-path'), Icon: MapPin },
+    { id: 'file-list', label: t('type.file-list'), Icon: FolderOpen },
     { id: 'phone', label: t('type.phone'), Icon: Phone },
     { id: 'image', label: t('type.image'), Icon: FileImage },
   ], [t])

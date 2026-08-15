@@ -8,11 +8,13 @@ import { compareVersions } from '../src/utils/version'
 import { parseClipMasterReleaseApiPayload, parseClipMasterReleasePage, parseClipMasterReleaseUrl, parseReleaseChecksum } from '../src/utils/update'
 import { getLocalDateKey, normalizeDailyCounter } from '../src/utils/dailyCounter'
 import { compileIgnoredRules, matchesIgnoredRules, normalizeIgnoredPatterns, type CompiledIgnoredRule } from '../src/utils/ignoredRules'
-import { isSensitiveClipboardContent } from '../src/utils/privacy'
+import { defaultSensitiveContentRules, isSensitiveClipboardContent, normalizeSensitiveContentRules } from '../src/utils/privacy'
+import { matchesBlockedApplication, normalizeBlockedApplications } from '../src/utils/applicationPrivacy'
 import { isResolvedPathInside } from '../src/utils/pathSafety'
 import { retainHistoryItems } from '../src/utils/retention'
 import { parseJsonDocument, recoverWithBackup } from '../src/utils/recovery'
 import { getConstrainedImageSize } from '../src/utils/imageLimits'
+import { normalizeClipboardFilePaths, parseFileNameWBuffer, parseFileUriList } from '../src/utils/fileClipboard'
 import {
   getBoundedImportSource,
   isTextWithinLimit,
@@ -84,7 +86,7 @@ interface ForegroundTarget {
 }
 
 const defaultSettings = {
-  maxHistory: 200,
+  maxHistory: 1000,
   hotkey: 'CommandOrControl+Shift+V',
   searchHotkey: 'CommandOrControl+Shift+F',
   clearHotkey: 'CommandOrControl+Shift+Delete',
@@ -103,6 +105,8 @@ const defaultSettings = {
   recordImages: true,
   soundEnabled: false,
   ignoreSensitive: true,
+  sensitiveRules: { ...defaultSensitiveContentRules },
+  blockedApplications: [] as string[],
   ignoredPatterns: [] as string[],
   hideAfterCopy: false,
   quickPaste: true,
@@ -182,7 +186,7 @@ function sanitizeSavedFilters(input: unknown): SavedFilter[] {
       timeFilter: value.timeFilter === 'today' || value.timeFilter === 'week' ? value.timeFilter : 'all',
       sortMode: value.sortMode === 'oldest' || value.sortMode === 'most-used' ? value.sortMode : 'newest',
     })
-    if (filters.length === 8) break
+    if (filters.length === 24) break
   }
   return filters
 }
@@ -206,7 +210,7 @@ function sanitizeRecentSearches(input: unknown): string[] {
 function sanitizeSettings(input: Partial<Settings> | undefined): Settings {
   const raw = { ...defaultSettings, ...(input || {}) }
   return {
-    maxHistory: Math.round(clamp(raw.maxHistory, 50, 500, defaultSettings.maxHistory)),
+    maxHistory: Math.round(clamp(raw.maxHistory, 50, 5000, defaultSettings.maxHistory)),
     hotkey: typeof raw.hotkey === 'string' && raw.hotkey.trim() ? raw.hotkey.trim() : defaultSettings.hotkey,
     searchHotkey: typeof raw.searchHotkey === 'string' && raw.searchHotkey.trim() ? raw.searchHotkey.trim() : defaultSettings.searchHotkey,
     clearHotkey: typeof raw.clearHotkey === 'string' && raw.clearHotkey.trim() ? raw.clearHotkey.trim() : defaultSettings.clearHotkey,
@@ -225,6 +229,8 @@ function sanitizeSettings(input: Partial<Settings> | undefined): Settings {
     recordImages: raw.recordImages !== false,
     soundEnabled: Boolean(raw.soundEnabled),
     ignoreSensitive: raw.ignoreSensitive !== false,
+    sensitiveRules: normalizeSensitiveContentRules(raw.sensitiveRules),
+    blockedApplications: normalizeBlockedApplications(raw.blockedApplications),
     ignoredPatterns: normalizeIgnoredPatterns(raw.ignoredPatterns),
     hideAfterCopy: Boolean(raw.hideAfterCopy),
     quickPaste: raw.quickPaste !== false,
@@ -431,7 +437,7 @@ function removeHistoryItems(shouldRemove: (item: ClipboardItem) => boolean, imag
 }
 
 // 保存剪贴板图片
-function saveClipboardImage(): { path: string; hash: string } | null {
+function saveClipboardImage(persist = true): { path: string; hash: string } | null {
   try {
     let image = clipboard.readImage()
     if (image.isEmpty()) return null
@@ -457,11 +463,12 @@ function saveClipboardImage(): { path: string; hash: string } | null {
 
     // 检查是否重复
     if (hash === lastClipboardImageHash) return null
+    lastClipboardImageHash = hash
+    if (!persist) return { path: '', hash }
 
     const imagePath = path.join(imagesDir, `${hash}.png`)
     if (!fs.existsSync(imagePath)) fs.writeFileSync(imagePath, buffer)
     ensureImageThumbnail(imagePath)
-    lastClipboardImageHash = hash
     return { path: imagePath, hash }
   } catch (err) {
     console.error('Failed to save clipboard image:', err)
@@ -514,7 +521,9 @@ function sanitizeHistoryItem(input: unknown, allowImagePath = true): ClipboardIt
   const html = typeof item.html === 'string' && isTextWithinLimit(item.html) ? item.html : undefined
   const rtf = typeof item.rtf === 'string' && isTextWithinLimit(item.rtf) ? item.rtf : undefined
   const imagePath = allowImagePath && typeof item.imagePath === 'string' ? resolveSafeImagePath(item.imagePath) : null
+  const files = type === 'file-list' ? normalizeClipboardFilePaths(Array.isArray(item.files) ? item.files : item.content.split(/\r?\n/)) : []
   if (type === 'image' && !imagePath) return null
+  if (type === 'file-list' && files.length === 0) return null
   return {
     id: typeof item.id === 'string' && item.id ? item.id : generateId(),
     content: item.content,
@@ -527,6 +536,7 @@ function sanitizeHistoryItem(input: unknown, allowImagePath = true): ClipboardIt
     copyCount: Math.max(1, Number.isFinite(Number(item.copyCount)) ? Number(item.copyCount) : 1),
     firstTimestamp: Number.isFinite(Number(item.firstTimestamp)) ? Number(item.firstTimestamp) : safeTimestamp,
     imagePath: imagePath || undefined,
+    files: files.length > 0 ? files : undefined,
     tags: normalizeTags(item.tags),
     copyTimestamps: normalizeCopyTimestamps(item.copyTimestamps, safeTimestamp),
     workspace: normalizeWorkspace(item.workspace),
@@ -536,7 +546,7 @@ function sanitizeHistoryItem(input: unknown, allowImagePath = true): ClipboardIt
 }
 
 function getHistoryDedupeKey(item: ClipboardItem) {
-  return `${item.type}:${item.content}:${item.html || ''}:${item.rtf || ''}`
+  return `${item.type}:${item.content}:${item.html || ''}:${item.rtf || ''}:${(item.files || []).join('\0')}`
 }
 
 function dedupeHistory(items: ClipboardItem[]) {
@@ -1067,7 +1077,7 @@ function rebuildTrayMenu() {
   tray.setContextMenu(contextMenu)
 }
 
-function pauseMonitoring(mode: number | Exclude<PauseMode, null>) {
+function pauseMonitoring(mode: number | Exclude<PauseMode, null | 'timed'>) {
   if (mode === 'until-resume') {
     pauseMode = mode
     pauseUntil = Number.MAX_SAFE_INTEGER
@@ -1170,6 +1180,7 @@ function startClipboardWatcher() {
       let currentContent = ''
       let currentHtml = ''
       let currentRtf = ''
+      let currentFiles: string[] = []
       try {
         currentContent = clipboard.readText()
       } catch (readErr) {
@@ -1179,8 +1190,20 @@ function startClipboardWatcher() {
 
       try { currentHtml = clipboard.readHTML() } catch {}
       try { currentRtf = clipboard.readRTF() } catch {}
+      try {
+        const fileNamePaths = clipboard.has('FileNameW') ? parseFileNameWBuffer(clipboard.readBuffer('FileNameW')) : []
+        const uriPaths = clipboard.has('text/uri-list') ? parseFileUriList(clipboard.read('text/uri-list')) : []
+        currentFiles = normalizeClipboardFilePaths([...fileNamePaths, ...uriPaths])
+      } catch (fileErr) {
+        console.error('Failed to read clipboard files:', fileErr)
+      }
       if (!isTextWithinLimit(currentHtml)) currentHtml = ''
       if (!isTextWithinLimit(currentRtf)) currentRtf = ''
+      if (currentFiles.length > 0) {
+        currentContent = currentFiles.join('\n')
+        currentHtml = ''
+        currentRtf = ''
+      }
       const clipboardFormatHash = getClipboardFormatHash(currentContent, currentHtml, currentRtf)
 
       if (currentContent && currentContent !== lastClipboardContent && !isTextWithinLimit(currentContent)) {
@@ -1191,6 +1214,21 @@ function startClipboardWatcher() {
         currentRtf = ''
       }
 
+      if (matchesBlockedApplication(settings.blockedApplications, getCachedApplication())) {
+        let protectedClipboardChanged = false
+        if ((currentContent || currentHtml || currentRtf) && clipboardFormatHash !== lastClipboardFormatHash) {
+          lastClipboardContent = currentContent
+          lastClipboardFormatHash = clipboardFormatHash
+          protectedClipboardChanged = true
+        }
+        if (settings.recordImages && currentFiles.length === 0 && saveClipboardImage(false)) {
+          lastImageCheckAt = Date.now()
+          protectedClipboardChanged = true
+        }
+        if (protectedClipboardChanged) recordProtectedItem()
+        return
+      }
+
       if (currentContent && clipboardFormatHash !== lastClipboardFormatHash && matchesIgnoredPattern(currentContent)) {
         lastClipboardContent = currentContent
         lastClipboardFormatHash = clipboardFormatHash
@@ -1198,7 +1236,7 @@ function startClipboardWatcher() {
         return
       }
 
-      if (settings.ignoreSensitive && currentContent && clipboardFormatHash !== lastClipboardFormatHash && isSensitiveClipboardContent(currentContent)) {
+      if (settings.ignoreSensitive && currentContent && clipboardFormatHash !== lastClipboardFormatHash && isSensitiveClipboardContent(currentContent, settings.sensitiveRules)) {
         lastClipboardContent = currentContent
         lastClipboardFormatHash = clipboardFormatHash
         recordProtectedItem()
@@ -1208,7 +1246,7 @@ function startClipboardWatcher() {
       // 检查图片内容
       let imageInfo: { path: string; hash: string } | null = null
       const shouldCheckImage = Date.now() - lastImageCheckAt >= 2500
-      if (settings.recordImages && shouldCheckImage) {
+      if (settings.recordImages && shouldCheckImage && currentFiles.length === 0) {
         lastImageCheckAt = Date.now()
         try {
           imageInfo = saveClipboardImage()
@@ -1222,12 +1260,14 @@ function startClipboardWatcher() {
         lastClipboardContent = currentContent
         lastClipboardFormatHash = clipboardFormatHash
 
-        const existingIndex = clipboardHistory.findIndex(item => item.content === currentContent && (item.html || '') === currentHtml && (item.rtf || '') === currentRtf)
+        const fileKey = currentFiles.join('\0')
+        const existingIndex = clipboardHistory.findIndex(item => item.content === currentContent && (item.html || '') === currentHtml && (item.rtf || '') === currentRtf && (item.files || []).join('\0') === fileKey)
         if (existingIndex !== -1) {
           const existing = clipboardHistory.splice(existingIndex, 1)[0]
           recordItemCopy(existing)
           if (!existing.workspaceManual) existing.workspace = getCachedWorkspace() || existing.workspace
           existing.sourceApplication = getCachedApplication() || existing.sourceApplication
+          existing.files = currentFiles.length > 0 ? currentFiles : undefined
           clipboardHistory.unshift(existing)
         } else {
           const now = Date.now()
@@ -1236,7 +1276,8 @@ function startClipboardWatcher() {
             content: currentContent,
             html: currentHtml || undefined,
             rtf: currentRtf || undefined,
-            type: getClipboardContentType(currentContent),
+            type: currentFiles.length > 0 ? 'file-list' : getClipboardContentType(currentContent),
+            files: currentFiles.length > 0 ? currentFiles : undefined,
             timestamp: now,
             pinned: false,
             favorited: false,
@@ -1799,7 +1840,7 @@ ipcMain.handle('restore-items', (event, items: unknown) => {
   assertTrustedRenderer(event)
   const restored = (Array.isArray(items) ? items : [])
     .slice(0, 500)
-    .map(sanitizeHistoryItem)
+    .map(item => sanitizeHistoryItem(item))
     .filter(Boolean) as ClipboardItem[]
   if (restored.length === 0) return clipboardHistory
   restored.forEach(item => cancelImageDelete(item.imagePath))

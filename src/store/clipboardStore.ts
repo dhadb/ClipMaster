@@ -1,8 +1,10 @@
 import { create } from 'zustand'
 import type { LanguageSetting } from '../i18n'
-import { matchesClipboardQuery, normalizeTags } from '../utils/clipboard'
+import { createClipboardSearchIndex, matchesClipboardQuery, normalizeTags, searchClipboardIndex, type ClipboardSearchIndex } from '../utils/clipboard'
 import { isThemeSetting, type ThemeSetting } from '../theme'
 import { isAccentSetting, type AccentSetting } from '../personalization'
+import { defaultSensitiveContentRules, normalizeSensitiveContentRules, type SensitiveContentRules } from '../utils/privacy'
+import { normalizeBlockedApplications } from '../utils/applicationPrivacy'
 import type { ClipboardItem, SavedFilter } from '../types/clipboard'
 
 export type { ClipboardItem, SavedFilter }
@@ -27,6 +29,8 @@ export interface Settings {
   recordImages: boolean
   soundEnabled: boolean
   ignoreSensitive: boolean
+  sensitiveRules: SensitiveContentRules
+  blockedApplications: string[]
   ignoredPatterns: string[]
   hideAfterCopy: boolean
   quickPaste: boolean
@@ -69,7 +73,7 @@ export interface UpdateDownloadProgress {
 
 export type UpdateStatus = 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'installing' | 'current' | 'error'
 
-export type ActiveTab = 'history' | 'favorites' | 'stats' | 'settings'
+export type ActiveTab = 'history' | 'favorites' | 'collections' | 'stats' | 'settings'
 export type SortMode = 'newest' | 'oldest' | 'most-used'
 export type TimeFilter = 'all' | 'today' | 'week'
 
@@ -81,7 +85,7 @@ export interface ToastNotice {
 }
 
 const defaultSettings: Settings = {
-  maxHistory: 200,
+  maxHistory: 1000,
   hotkey: 'CommandOrControl+Shift+V',
   searchHotkey: 'CommandOrControl+Shift+F',
   clearHotkey: 'CommandOrControl+Shift+Delete',
@@ -100,6 +104,8 @@ const defaultSettings: Settings = {
   recordImages: true,
   soundEnabled: false,
   ignoreSensitive: true,
+  sensitiveRules: { ...defaultSensitiveContentRules },
+  blockedApplications: [],
   ignoredPatterns: [],
   hideAfterCopy: false,
   quickPaste: true,
@@ -134,12 +140,14 @@ function normalizeSettings(settings: Partial<Settings>): Settings {
     theme: isThemeSetting(merged.theme) ? merged.theme : 'dark',
     accentColor: isAccentSetting(merged.accentColor) ? merged.accentColor : 'theme',
     language: merged.language === 'zh-CN' || merged.language === 'en-US' ? merged.language : 'system',
+    sensitiveRules: normalizeSensitiveContentRules(merged.sensitiveRules),
+    blockedApplications: normalizeBlockedApplications(merged.blockedApplications),
     ignoredPatterns: Array.isArray(merged.ignoredPatterns) ? merged.ignoredPatterns : [],
     quickPaste: merged.quickPaste !== false,
     recentSearches: normalizeRecentSearches(merged.recentSearches),
     savedFilters: Array.isArray(merged.savedFilters) ? merged.savedFilters
       .filter((filter): filter is SavedFilter => Boolean(filter) && typeof filter.id === 'string' && typeof filter.label === 'string' && typeof filter.query === 'string')
-      .slice(0, 8)
+      .slice(0, 24)
       .map(filter => ({
         id: filter.id.slice(0, 80),
         label: filter.label.trim().slice(0, 32) || filter.query.trim().slice(0, 32) || 'Filter',
@@ -152,12 +160,15 @@ function normalizeSettings(settings: Partial<Settings>): Settings {
   }
 }
 
-export function filterHistory(history: ClipboardItem[], activeTab: ActiveTab, searchQuery: string, filterType: string | null, sortMode: SortMode, timeFilter: TimeFilter): ClipboardItem[] {
+export function filterHistory(history: ClipboardItem[], activeTab: ActiveTab, searchQuery: string, filterType: string | null, sortMode: SortMode, timeFilter: TimeFilter, searchIndex?: ClipboardSearchIndex): ClipboardItem[] {
   let filtered = history
   if (activeTab === 'favorites') {
     filtered = filtered.filter(item => item.favorited)
   }
-  if (searchQuery) filtered = filtered.filter(item => matchesClipboardQuery(item, searchQuery))
+  if (searchQuery) {
+    const matchedIds = searchIndex ? searchClipboardIndex(searchIndex, searchQuery) : null
+    filtered = filtered.filter(item => matchedIds ? matchedIds.has(item.id) : matchesClipboardQuery(item, searchQuery))
+  }
   if (filterType) filtered = filtered.filter(item => item.type === filterType)
   if (timeFilter !== 'all') {
     const now = new Date()
@@ -173,6 +184,8 @@ export function filterHistory(history: ClipboardItem[], activeTab: ActiveTab, se
     return b.timestamp - a.timestamp
   })
 }
+
+let historySearchIndex = createClipboardSearchIndex([])
 
 interface ClipboardStore {
   history: ClipboardItem[]
@@ -277,12 +290,13 @@ export const useClipboardStore = create<ClipboardStore>((set, get) => ({
   setHistory: (history) => {
     const { searchQuery, activeTab, filterType, sortMode, timeFilter, selectedIds } = get()
     const validIds = new Set(history.map(item => item.id))
-    set({ history, filteredHistory: filterHistory(history, activeTab, searchQuery, filterType, sortMode, timeFilter), selectedIds: selectedIds.filter(id => validIds.has(id)) })
+    historySearchIndex = createClipboardSearchIndex(history)
+    set({ history, filteredHistory: filterHistory(history, activeTab, searchQuery, filterType, sortMode, timeFilter, historySearchIndex), selectedIds: selectedIds.filter(id => validIds.has(id)) })
   },
 
   setSearchQuery: (searchQuery) => {
     const { history, activeTab, filterType, sortMode, timeFilter } = get()
-    set({ searchQuery, filteredHistory: filterHistory(history, activeTab, searchQuery, filterType, sortMode, timeFilter) })
+    set({ searchQuery, filteredHistory: filterHistory(history, activeTab, searchQuery, filterType, sortMode, timeFilter, historySearchIndex) })
   },
 
   rememberSearch: (query) => {
@@ -362,28 +376,28 @@ export const useClipboardStore = create<ClipboardStore>((set, get) => ({
 
   setActiveTab: (activeTab) => {
     const { history, searchQuery, filterType, sortMode, timeFilter } = get()
-    set({ activeTab, showSettings: activeTab === 'settings', filteredHistory: filterHistory(history, activeTab, searchQuery, filterType, sortMode, timeFilter), selectionMode: false, selectedIds: [] })
+    set({ activeTab, showSettings: activeTab === 'settings', filteredHistory: filterHistory(history, activeTab, searchQuery, filterType, sortMode, timeFilter, historySearchIndex), selectionMode: false, selectedIds: [] })
   },
 
   setFilterType: (filterType) => {
     const { history, searchQuery, activeTab, sortMode, timeFilter } = get()
-    set({ filterType, filteredHistory: filterHistory(history, activeTab, searchQuery, filterType, sortMode, timeFilter) })
+    set({ filterType, filteredHistory: filterHistory(history, activeTab, searchQuery, filterType, sortMode, timeFilter, historySearchIndex) })
   },
 
   setSortMode: (sortMode) => {
     const { history, searchQuery, activeTab, filterType, timeFilter } = get()
-    set({ sortMode, filteredHistory: filterHistory(history, activeTab, searchQuery, filterType, sortMode, timeFilter) })
+    set({ sortMode, filteredHistory: filterHistory(history, activeTab, searchQuery, filterType, sortMode, timeFilter, historySearchIndex) })
   },
 
   setTimeFilter: (timeFilter) => {
     const { history, searchQuery, activeTab, filterType, sortMode } = get()
-    set({ timeFilter, filteredHistory: filterHistory(history, activeTab, searchQuery, filterType, sortMode, timeFilter) })
+    set({ timeFilter, filteredHistory: filterHistory(history, activeTab, searchQuery, filterType, sortMode, timeFilter, historySearchIndex) })
   },
 
   resetFilters: () => {
     const { history, activeTab } = get()
     const sortMode: SortMode = 'newest'
-    set({ searchQuery: '', filterType: null, timeFilter: 'all', sortMode, filteredHistory: filterHistory(history, activeTab, '', null, sortMode, 'all') })
+    set({ searchQuery: '', filterType: null, timeFilter: 'all', sortMode, filteredHistory: filterHistory(history, activeTab, '', null, sortMode, 'all', historySearchIndex) })
   },
 
   setSelectionMode: (selectionMode) => set({ selectionMode, selectedIds: selectionMode ? get().selectedIds : [] }),

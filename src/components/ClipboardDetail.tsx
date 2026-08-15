@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react'
-import { Copy, X, Pin, PinOff, Trash2, Heart, Check, ExternalLink, Mail, Hash, Code, FileText, Type, Pencil, Save, Minimize2, AlignLeft } from 'lucide-react'
+import { Copy, X, Pin, PinOff, Trash2, Heart, Check, ExternalLink, Mail, Hash, Code, FileText, FolderOpen, Type, Pencil, Save, Minimize2, AlignLeft } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { enUS, zhCN } from 'date-fns/locale'
@@ -19,6 +19,7 @@ const TYPE_CFG: Record<string, { Icon: LucideIcon; cssVar: string }> = {
   markdown: { Icon: FileText, cssVar: 'var(--type-long-text)' },
   'long-text': { Icon: FileText, cssVar: 'var(--type-long-text)' },
   'file-path': { Icon: FileText, cssVar: 'var(--type-text)' },
+  'file-list': { Icon: FolderOpen, cssVar: 'var(--type-text)' },
   phone: { Icon: Hash, cssVar: 'var(--type-number)' },
   image: { Icon: FileText, cssVar: 'var(--type-long-text)' },
 }
@@ -164,6 +165,9 @@ const ClipboardDetail: React.FC = () => {
   const onShowFile = useCallback(() => {
     if (item?.type === 'file-path') window.electronAPI?.showFileInFolder(item.content)
   }, [item])
+  const onShowFilePath = useCallback((filePath: string) => {
+    void window.electronAPI?.showFileInFolder(filePath)
+  }, [])
   const onSaveWorkspace = useCallback(async () => {
     if (!item) return
     try {
@@ -332,6 +336,22 @@ const ClipboardDetail: React.FC = () => {
             <span className="text-[12px] truncate">{t('detail.showFile')}</span>
             <FileText size={14} />
           </button>
+        )}
+
+        {item.type === 'file-list' && item.files && (
+          <div className="mb-3 rounded-lg p-3 slide-up" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-card)' }}>
+            <div className="mb-2 flex items-center gap-2 text-[11px] font-medium" style={{ color: 'var(--text-secondary)' }}>
+              <FolderOpen size={14} />{t('detail.fileList', { count: item.files.length })}
+            </div>
+            <div className="max-h-44 space-y-1 overflow-y-auto">
+              {item.files.map(filePath => (
+                <button key={filePath} onClick={() => onShowFilePath(filePath)} className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left interactive-chip" style={{ background: 'var(--bg-elevated)', color: 'var(--text-tertiary)' }}>
+                  <span className="min-w-0 flex-1 truncate text-[10px] font-mono">{filePath}</span>
+                  <FileText size={12} className="flex-shrink-0" />
+                </button>
+              ))}
+            </div>
+          </div>
         )}
 
         {item.type === 'image' && item.imagePath && (

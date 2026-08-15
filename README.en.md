@@ -78,13 +78,14 @@ Starting with `v1.4.1`, ClipMaster can download the official Windows installer i
 | Feature | Description |
 | --- | --- |
 | Live monitoring | Captures clipboard changes automatically |
-| Multi-format clipboard | Preserves text, HTML, and RTF when the source application provides them |
-| History | Stores up to 500 clipboard entries |
-| Smart categories | Detects text, links, emails, code, colors, JSON, Markdown, images, and more |
-| Command-style search | Fuzzy matches such as `git pu`, offline pinyin search, highlights, recent searches, saved filters, plus `#tags`, `type:`, `workspace:`, `app:`, `is:pinned`, and `has:rich` queries |
+| Multi-format clipboard | Preserves text, HTML, RTF, and Windows file lists; each saved file can be revealed in Explorer |
+| History | Stores up to 5000 clipboard entries with a reusable search index and bounded query cache |
+| Smart categories | Detects text, links, emails, code, colors, JSON, Markdown, images, file lists, and more |
+| Command-style search | Fuzzy matches such as `git pu`, offline pinyin search, highlights, recent searches, saved filters, plus `#tags`, `type:`, `workspace:`, `app:`, `is:pinned`, `has:files`, and `has:rich` queries |
 | Reusable snippets | Save frequently used text, commands, and replies manually |
 | Tags | Organize any entry with tags preserved across import and export |
 | Favorites | Use pinning for immediate access; keep longer-lived replies, commands, and addresses in Favorites, then organize them with tags |
+| Smart collections | Save a combined search, type, time, and sort view; result counts update as history changes |
 | Workspaces | Automatically label captures by the foreground Windows app; add a manual workspace such as Project A, thesis, or travel in details |
 | Batch actions | Pin, favorite, tag, or delete multiple selected records |
 | Content editing | Edit snippet content and tags in details with automatic type detection |
@@ -97,9 +98,9 @@ Starting with `v1.4.1`, ClipMaster can download the official Windows installer i
 | Data security | Encrypt local persistence with Electron `safeStorage` while migrating older plaintext data safely |
 | Global shortcuts | Configure separate shortcuts for showing history, focusing search, and clearing unprotected records |
 | Image performance | Store 256px JPEG thumbnails, bound renderer cache usage, and clean unreferenced image files |
-| Import and export | Export text-only JSON metadata without images or local paths, then merge or replace history during import |
-| Local privacy | No upload, sync, or clipboard analytics |
-| Privacy controls | Shows how many sensitive items were skipped without revealing them; pause for a duration, until resumed, or while staying in the current app |
+| Import and export | Export text-only JSON metadata without images or local file-list records, then merge or replace history during import |
+| Local privacy | No upload, sync, or clipboard analytics; block selected applications so their text, images, and file lists never enter history |
+| Privacy controls | Toggle credential, payment-card, and identity-number detection separately; shows only how many items were skipped and supports timed, manual, or current-app monitoring pauses |
 
 ## Shortcuts
 
@@ -114,6 +115,15 @@ Starting with `v1.4.1`, ClipMaster can download the official Windows installer i
 | `Enter` | Paste selected item back into the previous Windows app | In app |
 | `Delete` | Delete selected item | In app |
 | `Esc` | Clear search / close | In app |
+
+## Roadmap
+
+- [x] Ship the `v2.0.0` security and reliability foundation
+- [x] Add HTML, RTF, and file-list clipboard support in `v2.1.0`
+- [x] Add indexed search for 5000 history entries in `v2.1.0`
+- [x] Add application privacy policies, granular privacy toggles, and smart collections in `v2.1.0`
+- [x] Support custom shortcuts, portable downloads, and secure update downloads
+- [ ] Add Windows Authenticode code signing (certificate setup deferred)
 
 ## Development
 

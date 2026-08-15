@@ -2,6 +2,7 @@ import { match as matchPinyin } from 'pinyin-pro'
 
 export const MAX_TAGS = 8
 export const MAX_TAG_LENGTH = 24
+const MAX_SEARCH_CACHE_ENTRIES = 20
 
 export function normalizeTags(input: unknown): string[] {
   if (!Array.isArray(input)) return []
@@ -20,17 +21,33 @@ export function normalizeTags(input: unknown): string[] {
   return tags
 }
 
-interface SearchableClipboardItem {
+export interface SearchableClipboardItem {
+  id?: string
   content: string
   type: string
   pinned?: boolean
   favorited?: boolean
   imagePath?: string
+  files?: string[]
   html?: string
   rtf?: string
   sourceApplication?: string
   tags?: string[]
   workspace?: string
+}
+
+interface ClipboardSearchDocument {
+  item: SearchableClipboardItem
+  content: string
+  tags: string[]
+  workspace: string
+  sourceApplication: string
+  searchable: string
+}
+
+export interface ClipboardSearchIndex {
+  documents: Map<string, ClipboardSearchDocument>
+  queryCache: Map<string, Set<string>>
 }
 
 function getSearchTokens(rawQuery: string) {
@@ -53,45 +70,72 @@ function matchesFuzzyToken(text: string, token: string) {
   if (text.includes(token)) return true
   if (getSubsequenceIndexes(text, token)) return true
 
-  // pinyin-pro runs locally in the renderer; no clipboard content is sent away.
   if (/^[a-z]+$/i.test(token) && /[\u3400-\u9fff]/.test(text)) {
     return matchPinyin(text, token, { insensitive: true, precision: 'any' }) !== null
   }
   return false
 }
 
-export function matchesClipboardQuery(item: SearchableClipboardItem, rawQuery: string): boolean {
-  const tokens = getSearchTokens(rawQuery)
-  if (tokens.length === 0) return true
-
+function createSearchDocument(item: SearchableClipboardItem): ClipboardSearchDocument {
   const content = item.content.toLowerCase()
   const tags = normalizeTags(item.tags).map(tag => tag.toLowerCase())
   const workspace = item.workspace?.toLowerCase() || ''
   const sourceApplication = item.sourceApplication?.toLowerCase() || ''
   const searchable = `${content}\n${tags.join('\n')}\n${workspace}\n${sourceApplication}`
+  return { item, content, tags, workspace, sourceApplication, searchable }
+}
 
+function matchesSearchDocument(document: ClipboardSearchDocument, tokens: string[]): boolean {
+  const { item, content, tags, workspace, sourceApplication, searchable } = document
   return tokens.every(token => {
     if (token.startsWith('#') && token.length > 1) {
       const tagQuery = token.slice(1)
       return content.includes(token) || tags.some(tag => tag.includes(tagQuery))
     }
-    if (token.startsWith('type:') && token.length > 5) {
-      return item.type.toLowerCase() === token.slice(5)
-    }
-    if (token.startsWith('workspace:') && token.length > 10) {
-      return matchesFuzzyToken(workspace, token.slice(10))
-    }
-    if (token.startsWith('app:') && token.length > 4) {
-      return matchesFuzzyToken(sourceApplication, token.slice(4))
-    }
+    if (token.startsWith('type:') && token.length > 5) return item.type.toLowerCase() === token.slice(5)
+    if (token.startsWith('workspace:') && token.length > 10) return matchesFuzzyToken(workspace, token.slice(10))
+    if (token.startsWith('app:') && token.length > 4) return matchesFuzzyToken(sourceApplication, token.slice(4))
     if (token === 'is:pinned') return item.pinned === true
     if (token === 'is:favorite' || token === 'is:favorited') return item.favorited === true
     if (token === 'has:image') return Boolean(item.imagePath)
+    if (token === 'has:files') return Boolean(item.files?.length)
     if (token === 'has:html') return Boolean(item.html)
     if (token === 'has:rtf') return Boolean(item.rtf)
     if (token === 'has:rich') return Boolean(item.html || item.rtf)
     return matchesFuzzyToken(searchable, token)
   })
+}
+
+export function createClipboardSearchIndex(items: Array<SearchableClipboardItem & { id: string }>): ClipboardSearchIndex {
+  return {
+    documents: new Map(items.map(item => [item.id, createSearchDocument(item)])),
+    queryCache: new Map(),
+  }
+}
+
+export function searchClipboardIndex(index: ClipboardSearchIndex, rawQuery: string): Set<string> {
+  const normalizedQuery = rawQuery.trim().toLowerCase().replace(/\s+/g, ' ')
+  if (!normalizedQuery) return new Set(index.documents.keys())
+  const cached = index.queryCache.get(normalizedQuery)
+  if (cached) return cached
+
+  const tokens = getSearchTokens(normalizedQuery)
+  const matches = new Set<string>()
+  for (const [id, document] of index.documents) {
+    if (matchesSearchDocument(document, tokens)) matches.add(id)
+  }
+
+  if (index.queryCache.size >= MAX_SEARCH_CACHE_ENTRIES) {
+    const oldestKey = index.queryCache.keys().next().value
+    if (oldestKey) index.queryCache.delete(oldestKey)
+  }
+  index.queryCache.set(normalizedQuery, matches)
+  return matches
+}
+
+export function matchesClipboardQuery(item: SearchableClipboardItem, rawQuery: string): boolean {
+  const tokens = getSearchTokens(rawQuery)
+  return tokens.length === 0 || matchesSearchDocument(createSearchDocument(item), tokens)
 }
 
 export function getClipboardHighlightIndexes(content: string, rawQuery: string): number[] {
@@ -115,5 +159,5 @@ export function getClipboardHighlightIndexes(content: string, rawQuery: string):
     }
   }
 
-  return [...indexes].sort((a, b) => a - b)
+  return [...indexes].sort((first, second) => first - second)
 }

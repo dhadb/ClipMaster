@@ -72,7 +72,6 @@ export interface UpdateDownloadProgress {
 }
 
 export type UpdateStatus = 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'installing' | 'current' | 'error'
-
 export type ActiveTab = 'history' | 'favorites' | 'collections' | 'stats' | 'settings'
 export type SortMode = 'newest' | 'oldest' | 'most-used'
 export type TimeFilter = 'all' | 'today' | 'week'
@@ -210,6 +209,7 @@ interface ClipboardStore {
   timeFilter: TimeFilter
   selectionMode: boolean
   selectedIds: string[]
+  stackIds: string[]
   lastDeleted: ClipboardItem[]
   toast: ToastNotice | null
   _toastTimer: ReturnType<typeof setTimeout> | null
@@ -239,6 +239,10 @@ interface ClipboardStore {
   toggleSelection: (id: string) => void
   selectAllFiltered: () => void
   clearSelection: () => void
+  addToStack: (id: string) => void
+  removeFromStack: (id: string) => void
+  clearStack: () => void
+  copyNextStackItem: () => Promise<void>
   notify: (message: string, tone?: ToastNotice['tone'], action?: ToastNotice['action']) => void
   dismissToast: () => void
   addItem: (draft: ClipboardItemDraft) => Promise<{ itemId: string | null; created: boolean }>
@@ -254,7 +258,7 @@ interface ClipboardStore {
   clearHistory: () => Promise<void>
   clearAllHistory: () => Promise<void>
   importHistory: (payload: unknown, mode?: 'merge' | 'replace') => Promise<number>
-  copyItem: (id: string, options?: { pasteAfterCopy?: boolean }) => Promise<void>
+  copyItem: (id: string, options?: { pasteAfterCopy?: boolean }) => Promise<boolean>
   pauseMonitoring: (mode: number | 'until-resume' | 'current-application') => Promise<void>
   resumeMonitoring: () => Promise<void>
 }
@@ -282,6 +286,7 @@ export const useClipboardStore = create<ClipboardStore>((set, get) => ({
   timeFilter: 'all',
   selectionMode: false,
   selectedIds: [],
+  stackIds: [],
   lastDeleted: [],
   toast: null,
   _toastTimer: null,
@@ -291,7 +296,7 @@ export const useClipboardStore = create<ClipboardStore>((set, get) => ({
     const { searchQuery, activeTab, filterType, sortMode, timeFilter, selectedIds } = get()
     const validIds = new Set(history.map(item => item.id))
     historySearchIndex = createClipboardSearchIndex(history)
-    set({ history, filteredHistory: filterHistory(history, activeTab, searchQuery, filterType, sortMode, timeFilter, historySearchIndex), selectedIds: selectedIds.filter(id => validIds.has(id)) })
+    set({ history, filteredHistory: filterHistory(history, activeTab, searchQuery, filterType, sortMode, timeFilter, historySearchIndex), selectedIds: selectedIds.filter(id => validIds.has(id)), stackIds: get().stackIds.filter(id => validIds.has(id)) })
   },
 
   setSearchQuery: (searchQuery) => {
@@ -407,6 +412,18 @@ export const useClipboardStore = create<ClipboardStore>((set, get) => ({
   },
   selectAllFiltered: () => set({ selectedIds: get().filteredHistory.map(item => item.id) }),
   clearSelection: () => set({ selectedIds: [], selectionMode: false }),
+  addToStack: (id) => {
+    const { history, stackIds } = get()
+    if (!history.some(item => item.id === id) || stackIds.includes(id)) return
+    set({ stackIds: [...stackIds, id] })
+  },
+  removeFromStack: (id) => set({ stackIds: get().stackIds.filter(value => value !== id) }),
+  clearStack: () => set({ stackIds: [] }),
+  copyNextStackItem: async () => {
+    const id = get().stackIds[0]
+    if (!id) return
+    if (await get().copyItem(id)) set({ stackIds: get().stackIds.filter(value => value !== id) })
+  },
   notify: (message, tone = 'neutral', action) => {
     const currentTimer = get()._toastTimer
     if (currentTimer) clearTimeout(currentTimer)
@@ -572,7 +589,7 @@ export const useClipboardStore = create<ClipboardStore>((set, get) => ({
   copyItem: async (id, options) => {
     const { history, _copiedTimer, settings } = get()
     const item = history.find(h => h.id === id)
-    if (!item || !window.electronAPI) return
+    if (!item || !window.electronAPI) return false
     try {
       if (_copiedTimer) clearTimeout(_copiedTimer)
       const updatedHistory = await window.electronAPI.copyToClipboard(item, options)
@@ -586,7 +603,8 @@ export const useClipboardStore = create<ClipboardStore>((set, get) => ({
       }
       const timer = setTimeout(() => set({ copiedId: null, _copiedTimer: null }), 1000)
       set({ copiedId: id, _copiedTimer: timer })
-    } catch (err) { console.error('copyItem failed:', err) }
+      return true
+    } catch (err) { console.error('copyItem failed:', err); return false }
   },
 
   pauseMonitoring: async (mode) => {

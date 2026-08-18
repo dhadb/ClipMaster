@@ -13,6 +13,7 @@ import { accentPalettes } from './personalization'
 import BulkActionBar from './components/BulkActionBar'
 import ToastCenter from './components/ToastCenter'
 import PrivacyStatusBar from './components/PrivacyStatusBar'
+import ClipboardStackBar from './components/ClipboardStackBar'
 
 const ClipboardDetail = React.lazy(() => import('./components/ClipboardDetail'))
 const SettingsPanel = React.lazy(() => import('./components/SettingsPanel'))
@@ -241,6 +242,7 @@ function App() {
     >
       <TitleBar />
       <UpdateBanner />
+      <ClipboardStackBar />
       {showSearch && <SearchBar />}
       {!showSettings && activeTab !== 'settings' && <TabBar />}
       {showSearch && <BulkActionBar />}

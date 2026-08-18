@@ -103,6 +103,13 @@ const zh = {
   'bulk.delete': '删除所选',
   'bulk.close': '退出多选',
 
+  'stack.title': '粘贴栈 · {count} 条',
+  'stack.add': '加入粘贴栈',
+  'stack.queued': '已在粘贴栈中',
+  'stack.remove': '从粘贴栈移除',
+  'stack.copyNext': '复制下一条',
+  'stack.clear': '清空粘贴栈',
+
   'type.text': '文本',
   'type.link': '链接',
   'type.email': '邮箱',
@@ -456,6 +463,13 @@ const en: Record<keyof typeof zh, string> = {
   'bulk.deleteConfirm': 'Delete {count}?',
   'bulk.delete': 'Delete selection',
   'bulk.close': 'Exit selection',
+
+  'stack.title': 'Paste stack · {count}',
+  'stack.add': 'Add to paste stack',
+  'stack.queued': 'Already in paste stack',
+  'stack.remove': 'Remove from paste stack',
+  'stack.copyNext': 'Copy next item',
+  'stack.clear': 'Clear paste stack',
 
   'type.text': 'Text',
   'type.link': 'Link',

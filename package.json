@@ -1,6 +1,6 @@
 {
   "name": "clipmaster",
-  "version": "2.1.2",
+  "version": "3.0.0",
   "description": "Local-first Windows clipboard knowledge manager with secure search, quick paste, privacy controls, and image history.",
   "author": "ClipMaster Team",
   "license": "MIT",

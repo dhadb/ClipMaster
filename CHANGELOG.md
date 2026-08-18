@@ -1,5 +1,20 @@
 # Changelog
 
+## 3.0.0 - 2026-08-18
+
+### Features
+
+- Added the Clipboard Stack: queue multiple history entries from individual cards or multi-select, then copy the next entry in order as you work through a form, reply, or repeatable task.
+- Made the stack intentionally transient: it stays out of saved clipboard history and encrypted storage, and automatically removes entries that no longer exist.
+
+### Security
+
+- Applied the trusted-renderer check to IPC reads that return clipboard history, settings, data-encryption status, image data, and image-cache operations.
+
+### Quality
+
+- Added store tests for queue ordering, duplicate prevention, stale queue cleanup, and copying the next queued item.
+
 ## 2.1.2 - 2026-08-15
 
 ### Fixed

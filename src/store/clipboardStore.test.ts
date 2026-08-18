@@ -58,3 +58,30 @@ describe('filterHistory', () => {
     expect(state.filteredHistory.map(value => value.id)).toEqual(['recent', 'old'])
   })
 })
+
+describe('clipboard stack', () => {
+  it('keeps queue order, prevents duplicates, and removes stale items', () => {
+    const store = useClipboardStore.getState()
+    store.setHistory([item('first', 2), item('second', 1)])
+    store.clearStack()
+
+    store.addToStack('second')
+    store.addToStack('first')
+    store.addToStack('second')
+    expect(useClipboardStore.getState().stackIds).toEqual(['second', 'first'])
+
+    useClipboardStore.getState().setHistory([item('first', 2)])
+    expect(useClipboardStore.getState().stackIds).toEqual(['first'])
+  })
+
+  it('removes an item after copying the next queue entry', async () => {
+    const store = useClipboardStore.getState()
+    store.setHistory([item('first', 2), item('second', 1)])
+    store.clearStack()
+    store.addToStack('first')
+    store.addToStack('second')
+
+    await store.copyNextStackItem()
+    expect(useClipboardStore.getState().stackIds).toEqual(['second'])
+  })
+})

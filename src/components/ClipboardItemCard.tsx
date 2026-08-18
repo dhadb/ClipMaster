@@ -1,5 +1,5 @@
 import React, { useCallback, memo } from 'react'
-import { Copy, Pin, PinOff, Trash2, ExternalLink, Mail, Hash, Code, FileText, FolderOpen, Type, Check, Heart, Circle, CheckCircle2 } from 'lucide-react'
+import { Copy, Pin, PinOff, Trash2, ExternalLink, Mail, Hash, Code, FileText, FolderOpen, Type, Check, Heart, Circle, CheckCircle2, ListPlus } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useClipboardStore, ClipboardItem } from '../store/clipboardStore'
 import { getClipboardHighlightIndexes } from '../utils/clipboard'
@@ -72,6 +72,8 @@ const ClipboardItemCard: React.FC<Props> = memo(({ item, isSelected, onSelect, s
   const copyOnSelect = useClipboardStore(s => s.settings.copyOnSelect)
   const searchQuery = useClipboardStore(s => s.searchQuery)
   const notify = useClipboardStore(s => s.notify)
+  const addToStack = useClipboardStore(s => s.addToStack)
+  const stackIds = useClipboardStore(s => s.stackIds)
   const { t, typeLabel, language } = useI18n()
 
   const cfg = TYPE_CFG[item.type] || TYPE_CFG.text
@@ -102,6 +104,7 @@ const ClipboardItemCard: React.FC<Props> = memo(({ item, isSelected, onSelect, s
   }, [deleteItems, item.id, notify, t])
   const onPin = useCallback((e: React.MouseEvent) => { e.stopPropagation(); togglePin(item.id) }, [togglePin, item.id])
   const onFavorite = useCallback((e: React.MouseEvent) => { e.stopPropagation(); toggleFavorite(item.id) }, [toggleFavorite, item.id])
+  const onStack = useCallback((e: React.MouseEvent) => { e.stopPropagation(); addToStack(item.id) }, [addToStack, item.id])
 
   const typeColor = cfg.cssVar
   const typeBg = `color-mix(in srgb, ${cfg.cssVar} 8%, transparent)`
@@ -193,6 +196,7 @@ const ClipboardItemCard: React.FC<Props> = memo(({ item, isSelected, onSelect, s
             style={item.favorited ? { color: '#f472b6', background: 'rgba(244,114,182,0.12)' } : undefined}>
             <Heart size={13} fill={item.favorited ? '#f472b6' : 'none'} />
           </button>
+          <button onClick={onStack} disabled={stackIds.includes(item.id)} className="action-btn disabled:opacity-30" title={stackIds.includes(item.id) ? t('stack.queued') : t('stack.add')}><ListPlus size={13} /></button>
           <button onClick={onDelete} className="action-btn delete" title={t('item.delete')}>
             <Trash2 size={13} />
           </button>

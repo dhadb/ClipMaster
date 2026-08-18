@@ -1350,9 +1350,18 @@ function startClipboardWatcher() {
 }
 
 // IPC Handlers
-ipcMain.handle('get-image-data-url', (_, imagePath: string | undefined, size: 'thumb' | 'detail' = 'thumb') => getSafeImageDataUrl(imagePath, size === 'detail' ? 'detail' : 'thumb'))
-ipcMain.handle('get-image-info', (_, imagePath: string | undefined) => getImageInfo(imagePath))
-ipcMain.handle('cleanup-image-cache', () => cleanupImageCache())
+ipcMain.handle('get-image-data-url', (event, imagePath: string | undefined, size: 'thumb' | 'detail' = 'thumb') => {
+  assertTrustedRenderer(event)
+  return getSafeImageDataUrl(imagePath, size === 'detail' ? 'detail' : 'thumb')
+})
+ipcMain.handle('get-image-info', (event, imagePath: string | undefined) => {
+  assertTrustedRenderer(event)
+  return getImageInfo(imagePath)
+})
+ipcMain.handle('cleanup-image-cache', event => {
+  assertTrustedRenderer(event)
+  return cleanupImageCache()
+})
 ipcMain.handle('open-external-url', async (event, url: string) => {
   assertTrustedRenderer(event)
   if (!canOpenExternalUrl(url)) return false
@@ -1365,9 +1374,16 @@ ipcMain.handle('show-file-in-folder', async (event, filePath: string) => {
   shell.showItemInFolder(filePath.trim())
   return true
 })
-ipcMain.handle('get-history', () => clipboardHistory)
-ipcMain.handle('get-app-version', () => app.getVersion())
-ipcMain.handle('get-data-security-status', () => {
+ipcMain.handle('get-history', event => {
+  assertTrustedRenderer(event)
+  return clipboardHistory
+})
+ipcMain.handle('get-app-version', event => {
+  assertTrustedRenderer(event)
+  return app.getVersion()
+})
+ipcMain.handle('get-data-security-status', event => {
+  assertTrustedRenderer(event)
   const available = isDataEncryptionAvailable()
   return {
     available,
@@ -1939,7 +1955,10 @@ ipcMain.handle('import-history', (event, payload: unknown, mode: 'merge' | 'repl
   return { history: clipboardHistory, imported: imported.length }
 })
 
-ipcMain.handle('get-settings', () => settings)
+ipcMain.handle('get-settings', event => {
+  assertTrustedRenderer(event)
+  return settings
+})
 
 ipcMain.handle('update-settings', (event, newSettings: Partial<Settings>) => {
   assertTrustedRenderer(event)

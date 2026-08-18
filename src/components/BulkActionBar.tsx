@@ -1,5 +1,5 @@
 import React, { memo, useMemo, useState } from 'react'
-import { CheckSquare, Heart, Pin, Plus, Tag, Trash2, X } from 'lucide-react'
+import { CheckSquare, Heart, ListPlus, Pin, Plus, Tag, Trash2, X } from 'lucide-react'
 import { useClipboardStore } from '../store/clipboardStore'
 import { useI18n } from '../i18n'
 
@@ -13,6 +13,7 @@ const BulkActionBar: React.FC = memo(() => {
   const batchUpdateItems = useClipboardStore(s => s.batchUpdateItems)
   const deleteItems = useClipboardStore(s => s.deleteItems)
   const notify = useClipboardStore(s => s.notify)
+  const addToStack = useClipboardStore(s => s.addToStack)
   const { t } = useI18n()
   const [tagDraft, setTagDraft] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -39,6 +40,7 @@ const BulkActionBar: React.FC = memo(() => {
       </div>
       <button onClick={() => void batchUpdateItems(selectedIds, { pinned: !allPinned })} disabled={!selectedIds.length} className="action-btn pin disabled:opacity-30" title={allPinned ? t('item.unpin') : t('item.pin')}><Pin size={13} /></button>
       <button onClick={() => void batchUpdateItems(selectedIds, { favorited: !allFavorited })} disabled={!selectedIds.length} className="action-btn disabled:opacity-30" title={allFavorited ? t('item.unfavorite') : t('item.favorite')}><Heart size={13} fill={allFavorited ? '#f472b6' : 'none'} /></button>
+      <button onClick={() => selectedIds.forEach(addToStack)} disabled={!selectedIds.length} className="action-btn disabled:opacity-30" title={t('stack.add')}><ListPlus size={13} /></button>
       <div className="relative">
         <button onClick={() => setTagDraft(value => value ? '' : '#')} disabled={!selectedIds.length} className="action-btn disabled:opacity-30" title={t('bulk.addTag')}><Tag size={13} /></button>
         {tagDraft !== '' && (

@@ -23,7 +23,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-3.0.0-blue.svg" alt="Version">
+  <img src="https://img.shields.io/badge/version-3.0.3-blue.svg" alt="Version">
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-green.svg" alt="Platform">
   <img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="License">
   <img src="https://img.shields.io/badge/privacy-local--first-brightgreen.svg" alt="Local first">
@@ -45,7 +45,7 @@
 ## Quick Start
 
 1. Open [Releases](https://github.com/dhadb/ClipMaster/releases/latest).
-2. Download `ClipMaster-Setup-3.0.0.exe`, or choose `ClipMaster-Portable-3.0.0.exe`.
+2. Download `ClipMaster-Setup-3.0.3.exe`, or choose `ClipMaster-Portable-3.0.3.exe`.
 3. Run the installer, or launch the portable build directly.
 4. Copy anything, press `Ctrl + Shift + V`, select an entry with the arrow keys, and press `Enter` to paste it back into the previous app.
 
@@ -54,7 +54,7 @@
 Release assets include `checksums.sha256`. After downloading the installer, verify it in PowerShell:
 
 ```powershell
-Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-3.0.0.exe"
+Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-3.0.3.exe"
 ```
 
 Compare the SHA256 output with `checksums.sha256`. If it does not match, do not run the installer and report it in [Issues](https://github.com/dhadb/ClipMaster/issues).
@@ -124,7 +124,7 @@ Starting with `v1.4.1`, ClipMaster can download the official Windows installer i
 - [x] Add indexed search for 5000 history entries in `v2.1.0`
 - [x] Add application privacy policies, granular privacy toggles, and smart collections in `v2.1.0`
 - [x] Support custom shortcuts, portable downloads, and secure update downloads
-- [x] Add Clipboard Stack and trusted IPC reads in `v3.0.0`
+- [x] Add Clipboard Stack and trusted IPC reads in `v3.0.3`
 - [ ] Add Windows Authenticode code signing (certificate setup deferred)
 
 ## Development

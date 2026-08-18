@@ -589,7 +589,7 @@ export const useClipboardStore = create<ClipboardStore>((set, get) => ({
   copyItem: async (id, options) => {
     const { history, _copiedTimer, settings } = get()
     const item = history.find(h => h.id === id)
-    if (!item || !window.electronAPI) return false
+    if (!item || typeof window === 'undefined' || !window.electronAPI) return false
     try {
       if (_copiedTimer) clearTimeout(_copiedTimer)
       const updatedHistory = await window.electronAPI.copyToClipboard(item, options)

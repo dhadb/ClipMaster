@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { filterHistory, useClipboardStore, type ClipboardItem } from './clipboardStore'
 
 function item(id: string, timestamp: number, overrides: Partial<ClipboardItem> = {}): ClipboardItem {
@@ -75,6 +75,7 @@ describe('clipboard stack', () => {
   })
 
   it('removes an item after copying the next queue entry', async () => {
+    vi.stubGlobal('window', { electronAPI: { copyToClipboard: vi.fn().mockResolvedValue([]) } })
     const store = useClipboardStore.getState()
     store.setHistory([item('first', 2), item('second', 1)])
     store.clearStack()
@@ -83,5 +84,6 @@ describe('clipboard stack', () => {
 
     await store.copyNextStackItem()
     expect(useClipboardStore.getState().stackIds).toEqual(['second'])
+    vi.unstubAllGlobals()
   })
 })

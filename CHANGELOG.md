@@ -1,9 +1,10 @@
 # Changelog
 
-## 3.0.3 - 2026-08-18
+## 3.1.0 - 2026-08-18
 
 ### Features
 
+- Added a spring-based interaction pass: cards gently lift and settle, controls have tactile press feedback, list content lands with a soft bounce, and Clipboard Stack changes animate as a coherent surface.
 - Added the Clipboard Stack: queue multiple history entries from individual cards or multi-select, then copy the next entry in order as you work through a form, reply, or repeatable task.
 - Made the stack intentionally transient: it stays out of saved clipboard history and encrypted storage, and automatically removes entries that no longer exist.
 

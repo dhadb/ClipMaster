@@ -23,7 +23,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-3.0.3-blue.svg" alt="Version">
+  <img src="https://img.shields.io/badge/version-3.1.0-blue.svg" alt="Version">
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-green.svg" alt="Platform">
   <img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="License">
   <img src="https://img.shields.io/badge/privacy-local--first-brightgreen.svg" alt="Local first">
@@ -47,7 +47,7 @@
 ### 安装使用
 
 1. 打开 [Releases](https://github.com/dhadb/ClipMaster/releases/latest)。
-2. 下载 `ClipMaster-Setup-3.0.3.exe`，或选择 `ClipMaster-Portable-3.0.3.exe` 免安装版。
+2. 下载 `ClipMaster-Setup-3.1.0.exe`，或选择 `ClipMaster-Portable-3.1.0.exe` 免安装版。
 3. 运行安装包并按向导安装；便携版可直接运行。
 4. 复制任意内容并按 `Ctrl + Shift + V` 打开 ClipMaster。
 
@@ -56,7 +56,7 @@
 Release 页面会附带 `checksums.sha256`。下载后可以在 PowerShell 中校验：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-3.0.3.exe"
+Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-3.1.0.exe"
 ```
 
 将输出的 SHA256 与 `checksums.sha256` 中的值对比。如果不一致，请不要运行安装包，并在 [Issues](https://github.com/dhadb/ClipMaster/issues) 中反馈。
@@ -173,7 +173,7 @@ npm run build -- --publish never
 - [x] 支持自定义快捷键
 - [x] 增加便携版下载
 - [x] 增加安全的更新检查与下载提示
-- [x] 在 `v3.0.3` 增加剪贴板栈与受信 IPC 读取保护
+- [x] 在 `v3.1.0` 增加剪贴板栈与受信 IPC 读取保护
 - [ ] 为安装包增加 Windows Authenticode 代码签名（证书配置暂缓）
 
 ## 反馈

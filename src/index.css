@@ -61,6 +61,8 @@
   /* 动效曲线 */
   --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-spring: cubic-bezier(0.2, 0.9, 0.22, 1.15);
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-press: cubic-bezier(0.32, 0.72, 0, 1);
   --duration-fast: 150ms;
   --duration-normal: 240ms;
   --duration-slow: 420ms;
@@ -390,8 +392,11 @@
     position: relative;
     background: var(--bg-card);
     border: 1px solid var(--border-card);
+    transform: translateZ(0);
+    transform-origin: center;
+    will-change: transform, box-shadow;
     transition:
-      transform var(--duration-normal) var(--ease-out-soft),
+      transform var(--duration-normal) var(--ease-spring),
       background var(--duration-normal) var(--ease-out-soft),
       border-color var(--duration-normal) var(--ease-out-soft),
       box-shadow var(--duration-normal) var(--ease-out-soft),
@@ -402,10 +407,13 @@
     background: var(--bg-card-hover);
     border-color: var(--border-card-hover);
     box-shadow: var(--shadow-card-hover);
+    transform: translateY(-2px) scale(1.004);
   }
 
   .glass-card:active {
     background: var(--bg-card-selected);
+    transform: translateY(0) scale(0.987);
+    transition-duration: 90ms;
   }
 
   .glass-card.selected {
@@ -458,12 +466,13 @@
 
   /* 进入动画 */
   .item-enter {
-    animation: itemEnter 0.16s ease-out both;
+    animation: itemEnter 0.32s var(--ease-spring) both;
   }
 
   @keyframes itemEnter {
-    from { opacity: 0; transform: translateY(4px); }
-    to { opacity: 1; transform: translateY(0); }
+    from { opacity: 0; transform: translateY(9px) scale(0.985); }
+    65% { opacity: 1; transform: translateY(-1px) scale(1.002); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
   }
 
   .fade-in {
@@ -593,6 +602,8 @@
     background: transparent;
     border: none;
     cursor: pointer;
+    overflow: hidden;
+    isolation: isolate;
     transition:
       transform var(--duration-fast) var(--ease-spring),
       color var(--duration-fast) ease,
@@ -607,7 +618,31 @@
   }
 
   .action-btn:active {
-    transform: translateY(0) scale(0.92);
+    transform: translateY(1px) scale(0.9);
+    transition-duration: 80ms;
+  }
+
+  .action-btn::after {
+    content: '';
+    position: absolute;
+    inset: 50%;
+    z-index: -1;
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: currentColor;
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.2);
+    pointer-events: none;
+  }
+
+  .action-btn:active::after {
+    animation: buttonRipple 420ms var(--ease-out-soft) both;
+  }
+
+  @keyframes buttonRipple {
+    0% { opacity: 0.18; transform: translate(-50%, -50%) scale(0.2); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(7); }
   }
 
   .action-btn.copy:hover { color: var(--color-success); background: color-mix(in srgb, var(--color-success) 10%, transparent); }
@@ -793,7 +828,8 @@
   }
 
   .interactive-chip:active {
-    transform: translateY(0) scale(0.95);
+    transform: translateY(1px) scale(0.94);
+    transition-duration: 80ms;
   }
 
   .icon-badge {
@@ -836,12 +872,13 @@
   }
 
   .content-fade {
-    animation: contentFade 0.28s var(--ease-out-soft) both;
+    animation: contentFade 0.34s var(--ease-out-soft) both;
   }
 
   @keyframes contentFade {
-    from { opacity: 0; transform: translateY(6px); }
-    to { opacity: 1; transform: translateY(0); }
+    from { opacity: 0; transform: translateY(8px) scale(0.995); }
+    70% { opacity: 1; transform: translateY(-1px) scale(1.001); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
   }
 
   @keyframes pulse {
@@ -871,6 +908,26 @@ textarea:focus-visible {
 .glass-card.checked {
   background: color-mix(in srgb, var(--color-primary) 9%, var(--bg-card));
   border-color: color-mix(in srgb, var(--color-primary) 35%, var(--border-card));
+}
+
+.stack-bar {
+  animation: stackBarIn 360ms var(--ease-spring) both;
+  box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--color-success) 12%, transparent);
+}
+
+@keyframes stackBarIn {
+  from { opacity: 0; transform: translateY(-8px) scaleY(0.86); transform-origin: top; }
+  68% { opacity: 1; transform: translateY(1px) scaleY(1.01); }
+  to { opacity: 1; transform: translateY(0) scaleY(1); }
+}
+
+.stack-chip {
+  animation: stackChipIn 300ms var(--ease-bounce) both;
+}
+
+@keyframes stackChipIn {
+  from { opacity: 0; transform: translateX(-8px) scale(0.86); }
+  to { opacity: 1; transform: translateX(0) scale(1); }
 }
 
 .filter-chip {

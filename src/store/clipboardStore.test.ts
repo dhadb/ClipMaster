@@ -75,7 +75,7 @@ describe('clipboard stack', () => {
   })
 
   it('removes an item after copying the next queue entry', async () => {
-    vi.stubGlobal('window', { electronAPI: { copyToClipboard: vi.fn().mockResolvedValue([]) } })
+    vi.stubGlobal('window', { electronAPI: { copyToClipboard: vi.fn().mockImplementation(async () => useClipboardStore.getState().history) } })
     const store = useClipboardStore.getState()
     store.setHistory([item('first', 2), item('second', 1)])
     store.clearStack()

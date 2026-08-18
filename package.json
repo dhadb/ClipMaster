@@ -77,13 +77,13 @@
     "date-fns": "^2.30.0",
     "lucide-react": "^0.292.0",
     "pinyin-pro": "^3.28.2",
-    "react": "^18.2.0",
+    "react": "^19.2.8",
     "react-dom": "^18.2.0",
     "safe-regex2": "^5.1.1",
     "zustand": "^4.4.6"
   },
   "devDependencies": {
-    "@types/react": "^18.2.37",
+    "@types/react": "^19.2.18",
     "@types/react-dom": "^18.2.15",
     "@vitejs/plugin-react": "^5.2.0",
     "autoprefixer": "^10.4.16",

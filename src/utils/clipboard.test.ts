@@ -97,6 +97,36 @@ describe('#tag qualifier semantics (regression: M7b)', () => {
     expect(matchesClipboardQuery({ content: 'release checklist', type: 'text' }, '#work')).toBe(false)
   })
 
+  it('index-level: returns only the tagged item, exactly one hit', () => {
+    // M7b 缺口核心：把 clipboard.ts:93 改成 `return true` 时，旧用例集仍全绿。
+    // 本条在索引层锁定"命中 + 排除 + 只返 1 条"三件事：
+    //   tagged 含 #foo 标签 → 必须命中
+    //   untagged 无标签、other 只有别的标签 → 必须排除
+    //   结果集大小必须恰好为 1（等价于"标签过滤没有失效"）
+    const index = createClipboardSearchIndex([
+      { id: 'tagged', content: '部署检查清单', type: 'text', tags: ['foo'] },
+      { id: 'untagged', content: '部署检查清单', type: 'text' },
+      { id: 'other-tag', content: '部署检查清单', type: 'text', tags: ['bar'] },
+    ])
+    const hits = [...searchClipboardIndex(index, '#foo')]
+    expect(hits).toEqual(['tagged'])
+    expect(hits).toHaveLength(1)
+    expect(hits).not.toContain('untagged')
+    expect(hits).not.toContain('other-tag')
+  })
+
+  it('index-level: a tag query never rescues items without that tag', () => {
+    // 反向：让"标签过滤失效"的实现无法靠内容相似蒙混过关——两个条目的正文完全一致，
+    // 唯一区别是 tags，因此命中与否只可能由 #tag 分支决定。
+    const index = createClipboardSearchIndex([
+      { id: 'match', content: 'identical body text', type: 'text', tags: ['foo'] },
+      { id: 'miss', content: 'identical body text', type: 'text', tags: ['bar'] },
+    ])
+    expect([...searchClipboardIndex(index, '#foo')]).toEqual(['match'])
+    expect([...searchClipboardIndex(index, '#bar')]).toEqual(['miss'])
+    expect([...searchClipboardIndex(index, '#baz')]).toEqual([])
+  })
+
   it('still finds hash-prefixed content literally (intentional, keep it)', () => {
     // 用户复制 '#FFAA00' 这类带 # 的字面内容后，用 '#ffaa' 搜得到，体验上是必须的。
     // 与上一条合起来才完整锁死 #tag 语义：只实现"标签过滤"或只实现"正文匹配"都会变红。

@@ -31,6 +31,19 @@ npm-debug.log*
 .env.test.local
 .env.production.local
 
+# Code signing certificates & secrets
+# 证书、私钥与其 Base64 中间产物一律不入库。详见 docs/CODE_SIGNING.md。
+*.pfx
+*.p12
+*.pem
+*.key
+*.b64
+*.cer
+*.crt
+*.pvk
+certificates/
+secrets/
+
 # Electron
 out/
 
@@ -40,3 +53,6 @@ out/
 # Misc
 .cache/
 .temp/
+
+# Test coverage output
+coverage/

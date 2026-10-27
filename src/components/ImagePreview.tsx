@@ -18,6 +18,8 @@ const ImagePreview: React.FC<Props> = ({ imagePath, size = 'thumb' }) => {
   const isDetail = size === 'detail'
   const cacheKey = `${size}:${imagePath || ''}`
 
+  // imagePath/size 变化时清空上一次的预览结果，避免闪出别人的图。
+  /* eslint-disable react-hooks/set-state-in-effect -- 缓存键变化时重置预览状态 */
   useEffect(() => {
     let cancelled = false
     setSrc(null)
@@ -59,11 +61,14 @@ const ImagePreview: React.FC<Props> = ({ imagePath, size = 'thumb' }) => {
     imageDataUrlCache.delete(cacheKey)
     setFailed(true)
   }, [cacheKey])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   if (src && !failed) {
     const meta = info ? `${info.width} × ${info.height} · ${(info.bytes / 1024).toFixed(1)} KB` : ''
     return (
       <div className={isDetail ? 'space-y-2' : 'flex-shrink-0'}>
+        {/* img.onError 是资源加载失败回调，不是交互事件；该规则按「非交互元素挂了事件」误判 */}
+        {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- 见上 */}
         <img
           src={src}
           onError={onError}

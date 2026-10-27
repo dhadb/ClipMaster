@@ -86,8 +86,9 @@ const ClipboardItemCard: React.FC<Props> = memo(({ item, isSelected, onSelect, s
   const preview = getPreviewText(item, t('item.imagePreview'))
 
   const onCopy = useCallback((e: React.MouseEvent) => { e.stopPropagation(); copyItem(item.id) }, [copyItem, item.id])
-  const onOpenDetail = useCallback((event: React.MouseEvent) => {
-    if (selectionMode || event.ctrlKey || event.metaKey) {
+  // 主点击区：multi 表示按住 Ctrl/Cmd（或处于多选模式），用于切换勾选而非打开详情
+  const onOpenDetail = useCallback((multi: boolean) => {
+    if (selectionMode || multi) {
       if (!selectionMode) useClipboardStore.getState().setSelectionMode(true)
       onToggleSelection()
       return
@@ -136,98 +137,101 @@ const ClipboardItemCard: React.FC<Props> = memo(({ item, isSelected, onSelect, s
 
   return (
     <div
-      onClick={onOpenDetail}
-      onDoubleClick={onDoubleClickCopy}
-      onKeyDown={event => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault()
-          onOpenDetail(event as unknown as React.MouseEvent)
-        }
-      }}
-      role="button"
-      tabIndex={0}
-      className={`glass-card clipboard-card rounded-lg overflow-visible cursor-pointer flex flex-col ${isSelected ? 'selected' : ''} ${isChecked ? 'checked' : ''} ${isCode ? 'verification-card' : ''} ${isCopied ? 'just-copied' : ''}`}
+      className={`glass-card clipboard-card rounded-lg overflow-visible flex flex-col ${isSelected ? 'selected' : ''} ${isChecked ? 'checked' : ''} ${isCode ? 'verification-card' : ''} ${isCopied ? 'just-copied' : ''}`}
     >
-      <div className={`type-bar ${cfg.bar} w-full`} style={{ height: 2 }} />
-      <div className="flex-1 flex items-start gap-2.5 p-2.5 overflow-hidden">
-        {selectionMode ? (
-          <button onClick={event => { event.stopPropagation(); onToggleSelection() }} className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md" style={{ color: isChecked ? 'var(--color-primary-light)' : 'var(--text-ghost)', background: isChecked ? 'color-mix(in srgb, var(--color-primary) 12%, transparent)' : 'var(--bg-surface)' }} title={t('tabs.select')}>
-            {isChecked ? <CheckCircle2 size={16} strokeWidth={2.5} /> : <Circle size={16} />}
-          </button>
-        ) : <div
-          className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center relative"
-          style={{ background: typeBg }}
+      <div className={`type-bar ${cfg.bar} w-full`} style={{ height: 2 }} aria-hidden="true" />
+      <div className="flex-1 flex items-stretch overflow-hidden">
+        <button
+          type="button"
+          onClick={event => onOpenDetail(event.ctrlKey || event.metaKey)}
+          onDoubleClick={onDoubleClickCopy}
+          className="card-main flex-1 min-w-0 flex items-start gap-2.5 p-2.5 text-left cursor-pointer"
         >
-          <cfg.Icon size={14} color={typeColor} strokeWidth={2} />
-          {item.pinned && (
-            <div className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full flex items-center justify-center icon-badge"
-              style={{ background: 'var(--color-warning)', boxShadow: '0 1px 4px rgba(251,191,36,0.3)' }}>
-              <Pin size={7} color="white" strokeWidth={3} />
-            </div>
-          )}
-          {item.favorited && (
-            <div className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full flex items-center justify-center icon-badge"
-              style={{ background: '#f472b6', boxShadow: '0 1px 4px rgba(244,114,182,0.3)', right: item.pinned ? '-8px' : '-4px' }}>
-              <Heart size={7} color="white" strokeWidth={3} fill="white" />
-            </div>
-          )}
-        </div>}
-
-        {item.type === 'image' && <ImagePreview imagePath={item.imagePath} />}
-
-        <div className="flex-1 min-w-0 flex flex-col">
-          <div className="flex items-center gap-1.5 mb-1 min-w-0">
+          {selectionMode ? (
             <span
-              className="text-[10px] font-medium px-2 py-0.5 rounded-md flex-shrink-0"
-              style={{ color: typeColor, background: typeBg }}
+              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md"
+              style={{ color: isChecked ? 'var(--color-primary-light)' : 'var(--text-ghost)', background: isChecked ? 'color-mix(in srgb, var(--color-primary) 12%, transparent)' : 'var(--bg-surface)' }}
+              aria-hidden="true"
             >
-              {typeLabel(item.type)}
+              {isChecked ? <CheckCircle2 size={16} strokeWidth={2.5} /> : <Circle size={16} />}
             </span>
-            <span className="text-[10px] flex-shrink-0" style={{ color: 'var(--text-ghost)' }}>{timeAgo}</span>
-            {meta && <span className="text-[10px] truncate" style={{ color: 'var(--text-ghost)', opacity: 0.75 }}>{meta}</span>}
-            {item.tags?.[0] && (
-              <span className="text-[9px] truncate px-1.5 py-0.5 rounded flex-shrink" style={{ color: 'var(--color-primary-light)', background: 'color-mix(in srgb, var(--color-primary) 10%, transparent)' }}>
-                #{item.tags[0]}{item.tags.length > 1 ? ` +${item.tags.length - 1}` : ''}
-              </span>
-            )}
-            {item.workspace && (
-              <span className="text-[9px] truncate px-1.5 py-0.5 rounded flex-shrink" title={item.workspace} style={{ color: 'var(--color-success)', background: 'color-mix(in srgb, var(--color-success) 10%, transparent)' }}>
-                {item.workspace}
-              </span>
-            )}
-          </div>
-
-          <p
-            className={`text-[13px] leading-snug break-all ${showPreview ? 'line-clamp-2' : 'line-clamp-1'} ${isCode ? 'font-mono font-semibold' : ''}`}
-            style={{ color: isCode ? 'var(--color-warning)' : 'var(--text-secondary)', fontSize: isCode ? fontSize + 2 : fontSize - 2 }}
+          ) : <span
+            className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center relative"
+            style={{ background: typeBg }}
+            aria-hidden="true"
           >
-            {renderHighlightedPreview(preview, searchQuery)}
-          </p>
+            <cfg.Icon size={14} color={typeColor} strokeWidth={2} />
+            {item.pinned && (
+              <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full flex items-center justify-center icon-badge"
+                style={{ background: 'var(--color-warning)', boxShadow: '0 1px 4px var(--color-warning-glow)' }}>
+                <Pin size={7} color="white" strokeWidth={3} />
+              </span>
+            )}
+            {item.favorited && (
+              <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full flex items-center justify-center icon-badge"
+                style={{ background: 'var(--color-favorite)', boxShadow: '0 1px 4px var(--color-favorite-glow)', right: item.pinned ? '-8px' : '-4px' }}>
+                <Heart size={7} color="white" strokeWidth={3} fill="white" />
+              </span>
+            )}
+          </span>}
 
-          {item.type === 'color' && (
-            <div className="flex items-center gap-1.5 mt-1 min-w-0">
-              <div className="w-3.5 h-3.5 rounded flex-shrink-0"
-                style={{ background: item.content, border: '1px solid var(--border-card)' }} />
-              <span className="text-[10px] font-mono truncate" style={{ color: 'var(--text-ghost)' }}>{item.content}</span>
-            </div>
-          )}
-        </div>
+          {item.type === 'image' && <ImagePreview imagePath={item.imagePath} />}
 
-        {!selectionMode && <div ref={actionsRef} className="card-actions relative flex items-center gap-0.5 flex-shrink-0">
-          <button onClick={onCopy} className="action-btn copy" title={t('item.copy')}>
+          <span className="flex-1 min-w-0 flex flex-col">
+            <span className="flex items-center gap-1.5 mb-1 min-w-0">
+              <span
+                className="text-[10px] font-medium px-2 py-0.5 rounded-md flex-shrink-0"
+                style={{ color: typeColor, background: typeBg }}
+              >
+                {typeLabel(item.type)}
+              </span>
+              <span className="text-[10px] flex-shrink-0" style={{ color: 'var(--text-ghost)' }}>{timeAgo}</span>
+              {meta && <span className="text-[10px] truncate" style={{ color: 'var(--text-ghost)', opacity: 0.75 }}>{meta}</span>}
+              {item.tags?.[0] && (
+                <span className="text-[9px] truncate px-1.5 py-0.5 rounded flex-shrink" style={{ color: 'var(--color-primary-light)', background: 'color-mix(in srgb, var(--color-primary) 10%, transparent)' }}>
+                  #{item.tags[0]}{item.tags.length > 1 ? ` +${item.tags.length - 1}` : ''}
+                </span>
+              )}
+              {item.workspace && (
+                <span className="text-[9px] truncate px-1.5 py-0.5 rounded flex-shrink" title={item.workspace} style={{ color: 'var(--color-success)', background: 'color-mix(in srgb, var(--color-success) 10%, transparent)' }}>
+                  {item.workspace}
+                </span>
+              )}
+            </span>
+
+            <span
+              className={`text-[13px] leading-snug break-all ${showPreview ? 'line-clamp-2' : 'line-clamp-1'} ${isCode ? 'font-mono font-semibold' : ''}`}
+              style={{ color: isCode ? 'var(--color-warning)' : 'var(--text-secondary)', fontSize: isCode ? fontSize + 2 : fontSize - 2 }}
+            >
+              {renderHighlightedPreview(preview, searchQuery)}
+            </span>
+
+            {item.type === 'color' && (
+              <span className="flex items-center gap-1.5 mt-1 min-w-0">
+                <span className="w-3.5 h-3.5 rounded flex-shrink-0"
+                  style={{ background: item.content, border: '1px solid var(--border-card)' }} />
+                <span className="text-[10px] font-mono truncate" style={{ color: 'var(--text-ghost)' }}>{item.content}</span>
+              </span>
+            )}
+          </span>
+        </button>
+
+        {!selectionMode && <div ref={actionsRef} className="card-actions relative flex items-center gap-0.5 flex-shrink-0 self-start mt-2.5 mr-2.5">
+          <button onClick={onCopy} className="action-btn copy" title={t('item.copy')} aria-label={t('item.copy')}>
             {isCopied ? <Check size={13} color="var(--color-success)" strokeWidth={3} /> : <Copy size={13} />}
           </button>
           <button
             onClick={event => { event.stopPropagation(); setMenuOpen(value => !value) }}
             className={`action-btn ${menuOpen ? 'active' : ''}`}
             title={t('tabs.more')}
+            aria-label={t('tabs.more')}
             aria-expanded={menuOpen}
             aria-haspopup="menu"
           >
             <MoreHorizontal size={14} />
           </button>
           {menuOpen && (
-            <div onClick={event => event.stopPropagation()} className="card-menu absolute right-0 top-8 z-30 w-44 rounded-md p-1 shadow-xl fade-in" role="menu">
+            <div onClick={event => event.stopPropagation()} className="card-menu absolute right-0 top-8 z-30 w-44 rounded-md p-1 shadow-xl fade-in" role="menu" tabIndex={-1}>
               <button onClick={onPin} className="menu-item" role="menuitem">
                 {item.pinned ? <PinOff size={13} /> : <Pin size={13} />}
                 {item.pinned ? t('item.unpin') : t('item.pin')}
@@ -236,9 +240,9 @@ const ClipboardItemCard: React.FC<Props> = memo(({ item, isSelected, onSelect, s
                 onClick={onFavorite}
                 className="menu-item"
                 role="menuitem"
-                style={item.favorited ? { color: '#f472b6' } : undefined}
+                style={item.favorited ? { color: 'var(--color-favorite)' } : undefined}
               >
-                <Heart size={13} fill={item.favorited ? '#f472b6' : 'none'} />
+                <Heart size={13} fill={item.favorited ? 'var(--color-favorite)' : 'none'} />
                 {item.favorited ? t('item.unfavorite') : t('item.favorite')}
               </button>
               <button onClick={onStack} disabled={stackIds.includes(item.id)} className="menu-item disabled:opacity-40" role="menuitem">
@@ -257,7 +261,8 @@ const ClipboardItemCard: React.FC<Props> = memo(({ item, isSelected, onSelect, s
 
       {isSelected && (
         <div className="absolute left-0 top-0 bottom-0 w-[2px] rounded-r"
-          style={{ background: 'linear-gradient(to bottom, var(--color-primary-light), var(--color-primary))' }} />
+          style={{ background: 'linear-gradient(to bottom, var(--color-primary-light), var(--color-primary))' }}
+          aria-hidden="true" />
       )}
       {isCopied && <div className="copy-feedback-rail" aria-hidden="true" />}
     </div>

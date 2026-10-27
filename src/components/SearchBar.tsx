@@ -49,6 +49,9 @@ const SearchBar: React.FC = () => {
   const inputRef = useRef<HTMLInputElement>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // 外部 query 变化（如清除筛选、快捷键重置）要回填到输入框；local 只承担防抖期间的即时输入，
+  // 不能直接用 searchQuery 当 value —— 那样每敲一个字都会被 store 的节流回写覆盖光标。
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- 见上
   useEffect(() => { setLocal(searchQuery) }, [searchQuery])
   useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current) }, [])
   useEffect(() => {

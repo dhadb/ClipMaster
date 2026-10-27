@@ -5,6 +5,7 @@ import TabBar from './components/TabBar'
 import ClipboardList from './components/ClipboardList'
 import EmptyState from './components/EmptyState'
 import UpdateBanner from './components/UpdateBanner'
+import StorageHealthBanner from './components/StorageHealthBanner'
 import { Clipboard } from 'lucide-react'
 import { useClipboardStore } from './store/clipboardStore'
 import { useI18n } from './i18n'
@@ -255,6 +256,7 @@ function App() {
       <div className="flex min-h-0 flex-1">
         {viewMode === 'library' && <WorkspaceRail />}
         <main className="flex min-w-0 flex-1 flex-col">
+          <StorageHealthBanner />
           <UpdateBanner />
           <ClipboardStackBar />
           {showSearch && <SearchBar />}

@@ -74,9 +74,9 @@ const StatsPanel: React.FC = memo(() => {
       <div className="grid grid-cols-2 gap-2.5 fade-in" style={{ animationDelay: '50ms' }}>
         {[
           { label: t('stats.total'), value: stats.total, color: 'var(--color-primary-light)' },
-          { label: t('stats.favorited'), value: stats.favorited, color: '#fbbf24' },
+          { label: t('stats.favorited'), value: stats.favorited, color: 'var(--color-warning)' },
           { label: t('stats.today'), value: stats.today, color: 'var(--color-success)' },
-          { label: t('stats.week'), value: stats.week, color: '#818cf8' },
+          { label: t('stats.week'), value: stats.week, color: 'var(--color-primary-light)' },
         ].map((s, i) => (
           <div key={i} className="glass-card rounded-lg p-3.5 slide-up" style={{ animationDelay: `${80 + i * 35}ms` }}>
             <p className="text-[10px] mb-1.5" style={{ color: 'var(--text-ghost)' }}>{s.label}</p>

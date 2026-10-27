@@ -1,4 +1,4 @@
-import React, { memo, useMemo, useState } from 'react'
+import React, { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { CheckSquare, Heart, ListPlus, Pin, Plus, Tag, Trash2, X } from 'lucide-react'
 import { useClipboardStore } from '../store/clipboardStore'
 import { useI18n } from '../i18n'
@@ -17,6 +17,12 @@ const BulkActionBar: React.FC = memo(() => {
   const { t } = useI18n()
   const [tagDraft, setTagDraft] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const tagInputRef = useRef<HTMLInputElement | null>(null)
+
+  // 点「添加标签」展开输入框后立即聚焦（等价于原 autoFocus）
+  useEffect(() => {
+    if (tagDraft !== '') tagInputRef.current?.focus()
+  }, [tagDraft])
 
   const selected = useMemo(() => history.filter(item => selectedIds.includes(item.id)), [history, selectedIds])
   const allSelected = filteredHistory.length > 0 && filteredHistory.every(item => selectedIds.includes(item.id))
@@ -39,13 +45,13 @@ const BulkActionBar: React.FC = memo(() => {
         <button onClick={allSelected ? clearSelection : selectAllFiltered} className="rounded px-1.5 py-1 text-[10px] interactive-chip" style={{ color: 'var(--color-primary-light)' }}>{allSelected ? t('bulk.clear') : t('bulk.all')}</button>
       </div>
       <button onClick={() => void batchUpdateItems(selectedIds, { pinned: !allPinned })} disabled={!selectedIds.length} className="action-btn pin disabled:opacity-30" title={allPinned ? t('item.unpin') : t('item.pin')}><Pin size={13} /></button>
-      <button onClick={() => void batchUpdateItems(selectedIds, { favorited: !allFavorited })} disabled={!selectedIds.length} className="action-btn disabled:opacity-30" title={allFavorited ? t('item.unfavorite') : t('item.favorite')}><Heart size={13} fill={allFavorited ? '#f472b6' : 'none'} /></button>
+      <button onClick={() => void batchUpdateItems(selectedIds, { favorited: !allFavorited })} disabled={!selectedIds.length} className="action-btn disabled:opacity-30" title={allFavorited ? t('item.unfavorite') : t('item.favorite')}><Heart size={13} fill={allFavorited ? 'var(--color-favorite)' : 'none'} /></button>
       <button onClick={() => selectedIds.forEach(addToStack)} disabled={!selectedIds.length} className="action-btn disabled:opacity-30" title={t('stack.add')}><ListPlus size={13} /></button>
       <div className="relative">
         <button onClick={() => setTagDraft(value => value ? '' : '#')} disabled={!selectedIds.length} className="action-btn disabled:opacity-30" title={t('bulk.addTag')}><Tag size={13} /></button>
         {tagDraft !== '' && (
           <div className="absolute right-0 top-8 z-30 flex items-center gap-1 rounded-md p-1.5 shadow-xl" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-card-hover)' }}>
-            <input autoFocus value={tagDraft === '#' ? '' : tagDraft} onChange={event => setTagDraft(event.target.value)} onKeyDown={async event => { if (event.key === 'Enter') { await batchUpdateItems(selectedIds, { addTags: [tagDraft] }); setTagDraft('') } }} placeholder={t('tags.placeholder')} className="h-7 w-24 rounded px-2 text-[10px] outline-none" style={{ background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-input)' }} />
+            <input ref={tagInputRef} value={tagDraft === '#' ? '' : tagDraft} onChange={event => setTagDraft(event.target.value)} onKeyDown={async event => { if (event.key === 'Enter') { await batchUpdateItems(selectedIds, { addTags: [tagDraft] }); setTagDraft('') } }} placeholder={t('tags.placeholder')} className="h-7 w-24 rounded px-2 text-[10px] outline-none" style={{ background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-input)' }} />
             <button onClick={async () => { await batchUpdateItems(selectedIds, { addTags: [tagDraft] }); setTagDraft('') }} className="action-btn" style={{ width: 24, height: 24 }} title={t('bulk.addTag')}><Plus size={12} /></button>
           </div>
         )}

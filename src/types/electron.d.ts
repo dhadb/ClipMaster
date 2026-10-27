@@ -1,6 +1,7 @@
 import type { ClipboardItem } from './clipboard'
 import type { Settings, PrivacyState } from '../store/clipboardStore'
 import type { ViewMode } from '../store/clipboardStore'
+import type { StorageHealth } from './storageHealth'
 
 export interface ClipboardItemDraft {
   content: string
@@ -38,6 +39,8 @@ export interface ElectronAPI {
   getHistory: () => Promise<ClipboardItem[]>
   getAppVersion: () => Promise<string>
   getDataSecurityStatus: () => Promise<DataSecurityStatus>
+  /** P0-1 落盘健康快照，对应 electron/main.ts:2163 的 get-storage-health */
+  getStorageHealth: () => Promise<StorageHealth>
   checkForUpdates: (force?: boolean) => Promise<UpdateInfo>
   downloadUpdate: () => Promise<{ version: string }>
   installUpdate: () => Promise<{ version: string }>

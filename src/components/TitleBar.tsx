@@ -50,7 +50,7 @@ const TitleBar: React.FC = memo(() => {
             alt=""
             className="w-7 h-7 rounded-md"
             draggable={false}
-            style={{ boxShadow: '0 2px 8px rgba(15,118,110,0.25)' }}
+            style={{ boxShadow: '0 2px 8px color-mix(in srgb, var(--color-primary) 25%, transparent)' }}
           />
           <div className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full icon-badge"
             style={{

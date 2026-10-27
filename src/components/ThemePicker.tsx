@@ -8,15 +8,15 @@ interface Props {
   onChange: (theme: ThemeSetting) => void
 }
 
-const options: Array<{ id: ThemeSetting; labelKey: Parameters<ReturnType<typeof useI18n>['t']>[0]; colors: string[]; light?: boolean }> = [
-  { id: 'dark', labelKey: 'settings.dark', colors: ['#18181b', '#6366f1', '#34d399'] },
-  { id: 'light', labelKey: 'settings.light', colors: ['#fafafa', '#4f46e5', '#f59e0b'], light: true },
-  { id: 'graphite', labelKey: 'settings.graphite', colors: ['#1c1d20', '#22d3ee', '#fbbf24'] },
-  { id: 'forest', labelKey: 'settings.forest', colors: ['#102019', '#34d399', '#eab308'] },
-  { id: 'rose', labelKey: 'settings.rose', colors: ['#25161d', '#fb7185', '#67e8f9'] },
-  { id: 'ocean', labelKey: 'settings.ocean', colors: ['#102329', '#2dd4bf', '#fb7185'] },
-  { id: 'high-contrast', labelKey: 'settings.highContrast', colors: ['#000000', '#facc15', '#ffffff'] },
-  { id: 'auto', labelKey: 'settings.autoTheme', colors: ['#18181b', '#fafafa', '#6366f1'] },
+const options: Array<{ id: ThemeSetting; labelKey: Parameters<ReturnType<typeof useI18n>['t']>[0]; light?: boolean }> = [
+  { id: 'dark', labelKey: 'settings.dark' },
+  { id: 'light', labelKey: 'settings.light', light: true },
+  { id: 'graphite', labelKey: 'settings.graphite' },
+  { id: 'forest', labelKey: 'settings.forest' },
+  { id: 'rose', labelKey: 'settings.rose' },
+  { id: 'ocean', labelKey: 'settings.ocean' },
+  { id: 'high-contrast', labelKey: 'settings.highContrast' },
+  { id: 'auto', labelKey: 'settings.autoTheme' },
 ]
 
 const ThemePicker: React.FC<Props> = ({ value, onChange }) => {
@@ -38,8 +38,10 @@ const ThemePicker: React.FC<Props> = ({ value, onChange }) => {
               border: `1px solid ${active ? 'color-mix(in srgb, var(--color-primary) 38%, var(--border-card))' : 'var(--border-card)'}`,
             }}
           >
-            <div className="flex h-9 w-12 flex-shrink-0 overflow-hidden rounded-md" style={{ border: '1px solid rgba(127,127,127,0.2)' }}>
-              {option.colors.map(color => <span key={color} className="h-full flex-1" style={{ background: color }} />)}
+            <div className="flex h-9 w-12 flex-shrink-0 overflow-hidden rounded-md" style={{ border: '1px solid var(--border-card)' }}>
+              <span className={`theme-swatch theme-swatch--${option.id}`} aria-hidden="true">
+                <span /><span /><span />
+              </span>
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">

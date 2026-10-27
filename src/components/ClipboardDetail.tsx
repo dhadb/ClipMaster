@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react'
+import React, { useCallback, useMemo, useRef, useState } from 'react'
 import { Copy, X, Pin, PinOff, Trash2, Heart, Check, ExternalLink, Mail, Hash, Code, FileText, FolderOpen, Type, Pencil, Save, Minimize2, AlignLeft } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
@@ -63,20 +63,21 @@ function getLinkDetails(content: string) {
 
 function getColorVariants(content: string) {
   const value = content.trim()
-  let r = 0, g = 0, b = 0
-  if (/^#[0-9a-f]{3}$/i.test(value)) {
-    r = parseInt(value[1] + value[1], 16)
-    g = parseInt(value[2] + value[2], 16)
-    b = parseInt(value[3] + value[3], 16)
-  } else if (/^#[0-9a-f]{6}$/i.test(value)) {
-    r = parseInt(value.slice(1, 3), 16)
-    g = parseInt(value.slice(3, 5), 16)
-    b = parseInt(value.slice(5, 7), 16)
+  let channels: [number, number, number]
+  const shortHex = /^#([0-9a-f]{3})$/i.exec(value)
+  const longHex = shortHex ? null : /^#([0-9a-f]{6})$/i.exec(value)
+  if (shortHex) {
+    const [h1, h2, h3] = shortHex[1].split('')
+    channels = [parseInt(h1 + h1, 16), parseInt(h2 + h2, 16), parseInt(h3 + h3, 16)]
+  } else if (longHex) {
+    const hex = longHex[1]
+    channels = [parseInt(hex.slice(0, 2), 16), parseInt(hex.slice(2, 4), 16), parseInt(hex.slice(4, 6), 16)]
   } else {
     const match = value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i)
     if (!match) return null
-    r = Number(match[1]); g = Number(match[2]); b = Number(match[3])
+    channels = [Number(match[1]), Number(match[2]), Number(match[3])]
   }
+  const [r, g, b] = channels
   const hex = `#${[r, g, b].map(n => n.toString(16).padStart(2, '0')).join('')}`.toUpperCase()
   return { hex, rgb: `rgb(${r}, ${g}, ${b})`, cssVar: `--color: ${hex};` }
 }
@@ -118,9 +119,19 @@ const ClipboardDetail: React.FC = () => {
   const [draftWorkspace, setDraftWorkspace] = useState('')
   const [saving, setSaving] = useState(false)
   const [editError, setEditError] = useState('')
+  const contentTextareaRef = useRef<HTMLTextAreaElement | null>(null)
+
+  // 进入编辑态时聚焦正文（等价于原 autoFocus，但不依赖 jsx-a11y/no-autofocus 豁免）
+  React.useEffect(() => {
+    if (editing) contentTextareaRef.current?.focus()
+  }, [editing])
 
   const item = useMemo<ClipboardItem | undefined>(() => history.find(h => h.id === detailItemId), [history, detailItemId])
 
+  // 切换详情条目时必须把本地草稿重置为新条目的内容。
+  // 这是"外部数据变化 -> 同步本地编辑态"的合法场景：本组件由 store 驱动、
+  // 无法通过父级 key 重挂载来重置，因此保留 effect，而非用派生状态改写（那会破坏"编辑中不被后台更新冲掉"的语义）。
+  /* eslint-disable react-hooks/set-state-in-effect -- 见上：外部数据变化同步本地编辑态 */
   React.useEffect(() => {
     if (!item) return
     setDraftContent(item.content)
@@ -129,6 +140,7 @@ const ClipboardDetail: React.FC = () => {
     setEditing(false)
     setEditError('')
   }, [item?.id])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const onClose = useCallback(() => setDetailItemId(null), [setDetailItemId])
   const onCopy = useCallback(() => { if (item) copyItem(item.id) }, [copyItem, item])
@@ -367,7 +379,7 @@ const ClipboardDetail: React.FC = () => {
             <span>{t('item.chars', { count: editing ? draftContent.length : item.content.length })}</span>
           </div>
           {editing ? (
-            <textarea autoFocus value={draftContent} onChange={event => setDraftContent(event.target.value)} className="min-h-[220px] w-full resize-none bg-transparent p-3 text-[12px] leading-relaxed outline-none" style={{ color: 'var(--text-primary)', fontFamily: item.type === 'code' || item.type === 'json' || item.type === 'markdown' ? 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace' : 'inherit' }} />
+            <textarea ref={contentTextareaRef} value={draftContent} onChange={event => setDraftContent(event.target.value)} className="min-h-[220px] w-full resize-none bg-transparent p-3 text-[12px] leading-relaxed outline-none" style={{ color: 'var(--text-primary)', fontFamily: item.type === 'code' || item.type === 'json' || item.type === 'markdown' ? 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace' : 'inherit' }} />
           ) : (
             <pre className="p-3 text-[12px] leading-relaxed whitespace-pre-wrap break-words max-h-[45vh] overflow-auto" style={{ color: 'var(--text-secondary)', fontFamily: item.type === 'code' || item.type === 'json' || item.type === 'markdown' ? 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace' : 'inherit' }}>{displayContent}</pre>
           )}
@@ -391,8 +403,8 @@ const ClipboardDetail: React.FC = () => {
         <button onClick={onPin} className={`action-btn pin ${item.pinned ? 'active' : ''}`} title={item.pinned ? t('item.unpin') : t('item.pin')} style={{ width: 40, height: 40 }}>
           {item.pinned ? <PinOff size={15} /> : <Pin size={15} />}
         </button>
-        <button onClick={onFavorite} className={`action-btn ${item.favorited ? 'active' : ''}`} title={item.favorited ? t('item.unfavorite') : t('item.favorite')} style={{ width: 40, height: 40, ...(item.favorited ? { color: '#f472b6', background: 'rgba(244,114,182,0.12)' } : {}) }}>
-          <Heart size={15} fill={item.favorited ? '#f472b6' : 'none'} />
+        <button onClick={onFavorite} className={`action-btn ${item.favorited ? 'active' : ''}`} title={item.favorited ? t('item.unfavorite') : t('item.favorite')} style={{ width: 40, height: 40, ...(item.favorited ? { color: 'var(--color-favorite)', background: 'var(--color-favorite-bg)' } : {}) }}>
+          <Heart size={15} fill={item.favorited ? 'var(--color-favorite)' : 'none'} />
         </button>
         <button onClick={onDelete} className="action-btn delete" title={t('item.delete')} style={{ width: 40, height: 40 }}>
           <Trash2 size={15} />

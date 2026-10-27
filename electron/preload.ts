@@ -4,6 +4,7 @@ import type { AccentSetting } from '../src/personalization'
 import type { ClipboardItem } from '../src/types/clipboard'
 import type { ViewMode } from '../src/store/clipboardStore'
 import type { SensitiveContentRules } from '../src/utils/privacy'
+import type { StorageHealth } from '../src/types/storageHealth'
 
 export interface Settings {
   maxHistory: number
@@ -87,6 +88,9 @@ const electronAPI = {
   getHistory: (): Promise<ClipboardItem[]> => ipcRenderer.invoke('get-history'),
   getAppVersion: (): Promise<string> => ipcRenderer.invoke('get-app-version'),
   getDataSecurityStatus: (): Promise<DataSecurityStatus> => ipcRenderer.invoke('get-data-security-status'),
+  // P0-1：落盘健康度（备份恢复 / 主文件隔离 / 保存裁剪 / 加密降级）。
+  // 主进程 handler 见 electron/main.ts:2163，快照来源 getStorageHealthSnapshot()。
+  getStorageHealth: (): Promise<StorageHealth> => ipcRenderer.invoke('get-storage-health'),
   checkForUpdates: (force = false): Promise<UpdateInfo> => ipcRenderer.invoke('check-for-updates', force),
   downloadUpdate: (): Promise<{ version: string }> => ipcRenderer.invoke('download-update'),
   installUpdate: (): Promise<{ version: string }> => ipcRenderer.invoke('install-update'),

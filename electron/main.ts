@@ -1614,11 +1614,38 @@ const latestReleaseApiUrl = 'https://api.github.com/repos/dhadb/ClipMaster/relea
 const maxUpdateDownloadBytes = 300 * 1024 * 1024
 let downloadedInstallerPath: string | null = null
 let downloadedInstallerVersion: string | null = null
+// 下载时据此校验过 SHA256；安装前再算一遍比对，封住"下载完到点安装之间
+// temp 目录里的安装包被替换"的路径（D-003：更新链 fail-closed）。
+let downloadedInstallerHash: string | null = null
 let updateDownloadPromise: Promise<{ version: string }> | null = null
 
 function getUpdateDownloadUrl(version: string) {
   const encodedVersion = encodeURIComponent(version)
   return `https://github.com/dhadb/ClipMaster/releases/download/v${encodedVersion}/ClipMaster-Setup-${encodedVersion}.exe`
+}
+
+/**
+ * 清理 %TEMP% 里残留的历史安装包（D-003 的技术债收口）。
+ *
+ * 每升级一个版本会留下一个 `ClipMaster-Setup-<version>.exe`（~114 MB）。
+ * 安装成功后当前进程已经退出，没有"安装后钩子"可用，所以在下次启动时清掉旧包：
+ * 此刻正在运行的进程已经从该 exe 启动完毕，删掉不会影响升级结果。
+ * 清理属于卫生问题而非功能，任何失败一律静默——绝不能让清理把启动拖垮。
+ */
+function cleanupStaleInstallers() {
+  const tempDir = app.getPath('temp')
+  try {
+    for (const entry of fs.readdirSync(tempDir)) {
+      if (!/^ClipMaster-Setup-[\d.]+\.exe$/i.test(entry)) continue
+      try {
+        fs.rmSync(path.join(tempDir, entry), { force: true })
+      } catch {
+        // 正在被占用（例如用户此刻正打开着安装包）或无权限：跳过，下次再清。
+      }
+    }
+  } catch {
+    // %TEMP% 不可读：不值得打扰用户。
+  }
 }
 
 function getUpdateChecksumsUrl(version: string) {
@@ -1668,8 +1695,10 @@ async function downloadInstaller(info: UpdateInfo): Promise<{ version: string }>
       await fs.promises.rm(downloadedInstallerPath, { force: true })
       downloadedInstallerPath = null
       downloadedInstallerVersion = null
+      downloadedInstallerHash = null
     } else {
       const cachedSize = fs.statSync(downloadedInstallerPath).size
+      downloadedInstallerHash = expectedHash
       emitUpdateDownloadProgress({ receivedBytes: cachedSize, totalBytes: cachedSize, percent: 100 })
       return { version: info.latestVersion }
     }
@@ -1730,6 +1759,7 @@ async function downloadInstaller(info: UpdateInfo): Promise<{ version: string }>
   }
   downloadedInstallerPath = installerPath
   downloadedInstallerVersion = info.latestVersion
+  downloadedInstallerHash = expectedHash
   emitUpdateDownloadProgress({ receivedBytes, totalBytes: totalBytes || receivedBytes, percent: 100 })
   return { version: info.latestVersion }
 }
@@ -1810,8 +1840,17 @@ ipcMain.handle('download-update', async event => {
 
 ipcMain.handle('install-update', async event => {
   assertTrustedRenderer(event)
-  if (!downloadedInstallerPath || !downloadedInstallerVersion || !fs.existsSync(downloadedInstallerPath)) {
+  if (!downloadedInstallerPath || !downloadedInstallerVersion || !downloadedInstallerHash || !fs.existsSync(downloadedInstallerPath)) {
     throw new Error('Update package has not been downloaded')
+  }
+  // D-003：安装前复校 SHA256。下载时的校验只覆盖"下载那一刻"，这里覆盖"点安装那一刻"。
+  const actualHash = await calculateFileSha256(downloadedInstallerPath)
+  if (actualHash !== downloadedInstallerHash) {
+    await fs.promises.rm(downloadedInstallerPath, { force: true })
+    downloadedInstallerPath = null
+    downloadedInstallerVersion = null
+    downloadedInstallerHash = null
+    throw new Error('Update package failed checksum verification before install')
   }
   const openError = await shell.openPath(downloadedInstallerPath)
   if (openError) throw new Error(openError)
@@ -2256,6 +2295,7 @@ if (hasSingleInstanceLock) {
   app.whenReady().then(() => {
     loadData()
     cleanupImageCache()
+    cleanupStaleInstallers()
     applyAutoStart()
     createWindow()
     createTray()

@@ -1,4 +1,10 @@
 @echo off
+rem ---------------------------------------------------------------------------
+rem The Windows installer is produced by electron-builder, not by a hand-written
+rem NSIS script: package.json -> build.win.target = ["nsis", "portable"].
+rem This .bat is only a convenience wrapper for "npm run build" + checksums.
+rem The former installer/installer.nsi was removed, see docs/DECISIONS.md (D-001).
+rem ---------------------------------------------------------------------------
 echo ========================================
 echo   ClipMaster Installer Builder
 echo ========================================

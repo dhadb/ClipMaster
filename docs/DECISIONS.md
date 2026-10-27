@@ -1,0 +1,112 @@
+# 构建与发布决策记录（DECISIONS）
+
+本文件记录 ClipMaster 在 Windows 构建/发布链路上的**已执行决策**和**待定决策**。
+每条决策给出：结论、决策理由、证据、影响范围、复现方式。执行记录见 [REMEDIATION.md](./REMEDIATION.md)。
+
+- 基准 commit：`831c884`（branch `main`）
+- 记录日期：2026-10-26
+- 维护者：DSH 运维评审角色（整改仅涉及 `.gitignore`、`installer/**`、`docs/**`、`scripts/**`、`build*.bat`）
+
+---
+
+## D-001 移除从未进入构建链的自研 NSIS 脚本（已执行）
+
+**状态**：已执行（删除）｜**优先级**：P1｜**类型**：技术债清理
+
+### 结论
+
+删除 `installer/installer.nsi`、`installer/header.bmp`、`installer/welcome.bmp`、`scripts/generate-installer-assets.js`。
+Windows 安装包**唯一来源**是 `electron-builder`（`package.json` → `build.win.target = ["nsis", "portable"]`）。
+
+### 为什么选删除而不是"纳入 CI"（方案 A vs B）
+
+| 判断项 | 事实 | 结论 |
+| --- | --- | --- |
+| 是否参与构建 | `build.bat:7`、`build-installer.bat:10` 都只 `call npm run build`；全仓 `git grep -E "makensis\|installer.nsi"` 无任何命中 | 从未被编译，属死代码 |
+| 产物是否已存在 | `npm run build` 实测产出 `ClipMaster-Setup-5.0.0.exe` 与 `ClipMaster-Portable-5.0.0.exe` | 已有可用安装包，nsi 属重复定义 |
+| 语义是否一致 | nsi `:11` `InstallDir "$PROGRAMFILES\ClipMaster"` + `:13` `RequestExecutionLevel admin`；electron-builder 实测 `perMachine=false`（per-user） | 两者权限模型互斥，无法"并存" |
+| 修好它需要多少工作 | 至少要改权限模型、修 `:46` 失效链接、重排 `:201-205` 页面、实现真实进度（当前 `:113-154` 进度条是假的）、处理 `:242-244` 无条件自启，再接入 CI 并与 electron-builder 产物互斥 | 成本远高于收益，且会造成"两套安装器"长期维护负担 |
+
+因此采用**方案 A：删除**。方案 B（nsi 成为唯一安装包来源、electron-builder 只出 portable）被否决，原因不是"做不到"，而是它要在没有额外用户价值的前提下重新实现一遍 electron-builder 已经稳定工作的能力。
+
+### 被删文件的语义缺陷（作为删除依据存档）
+
+| 位置 | 问题 |
+| --- | --- |
+| `installer/installer.nsi:46` | 官网页链接写成 `https://github.com/clipmaster`，与实际仓库 `dhadb/ClipMaster` 不符 |
+| `installer/installer.nsi:201-205` | `MUI_PAGE_WELCOME` 与自绘 `ShowWelcomePage` 并存，欢迎页重复出现两次 |
+| `installer/installer.nsi:113-154` | 自绘进度条无定时器、无实际进度：文件在离开该页后才由 `:219` 复制，用户看到的是假进度 |
+| `installer/installer.nsi:242-244` | 注释写 "optional"，实际无条件写 `HKCU\...\CurrentVersion\Run` 自启，无勾选项 |
+| `installer/installer.nsi:89-103,148,168` | 用 `✦`/`●○`/`✓` 字符当功能图标（团队 P0 规则：禁止 emoji/字符作功能图标） |
+| `installer/installer.nsi:31-32,142-145` | 硬编码颜色 `0x1A1B1E`、`0xC1C2C5`、`0x4C6EF5`（团队 P0 规则：禁止硬编码颜色） |
+
+### 恢复方式
+
+该文件仍可从历史取回：
+
+```powershell
+git show 831c884:installer/installer.nsi > installer.nsi
+```
+
+如未来确实需要自定义安装器 UI，建议基于 electron-builder 的 `nsis.include` / `nsis.script` 扩展点，而不是自建第二套安装器。
+
+---
+
+## D-002 `latest.yml` 与 `*.blockmap`：接差分更新，还是删掉（待定）
+
+**状态**：决策记录（本次不改代码/工作流）｜**优先级**：P2
+
+### 现状证据
+
+- `npm run build` 实测会生成 `release/latest.yml`（含 `version: 5.0.0`、`sha512`、`releaseDate`）和 `ClipMaster-Setup-5.0.0.exe.blockmap`（121,155 B）。
+- `package.json` 依赖里**没有** `electron-updater`（依赖仅 `date-fns`/`lucide-react`/`pinyin-pro`/`react`/`react-dom`/`safe-regex2`/`zustand`），更新逻辑是自研的：`electron/main.ts:1590-1652` 走 GitHub API + HTML 回退，`:1472-1480` 拼接 `checksums.sha256` 校验。
+- `.github/workflows/release.yml:142-145` 上传的是 `release/*.exe`、`release/*.blockmap`、`release/checksums.sha256`，**没有上传 `latest.yml`**。
+
+结论：`blockmap` 被上传但没有任何消费者（自研更新器整包下载 114 MB，不做差分）；`latest.yml` 被生成但连上传都没有。两者当前都是纯冗余产物。
+
+### 二选一（需维护者拍板）
+
+**选项 1：接入 `electron-updater` 做差分更新**
+- 收益：增量下载可把单次升级从 ~114 MB 降到 ~1-10 MB（blockmap 即为此服务）。
+- 代价：需改造自研更新链路（`electron/main.ts:1464-1677` 整段）、引入新依赖与签名校验路径变更、`latest.yml` 必须上传，且更新源需 `publish` 配置。
+- 完成判据：`package.json` 出现 `electron-updater` 与 `build.publish`；`release.yml` 上传 `latest.yml`；实测从 5.0.0 → 5.1.0 的下载量 < 20 MB。
+
+**选项 2：删掉这两个产物（推荐先做）**
+- 动作：`package.json`（Lead 作用域）加 `build.nsis.differentialPackage = false`，并调整 `release.yml` 不再上传 `*.blockmap`；`latest.yml` 不生成或不上传。
+- 收益：Release 页面少两个无意义文件，用户不再困惑"这个 .blockmap 要不要下"。
+- 完成判据：`npm run build` 后 `release/` 内不再出现 `.blockmap`；Release 资产仅 `.exe` + `checksums.sha256`。
+
+**建议**：先执行选项 2（成本 5 分钟），把差分更新放进 P2 路线图再评估——114 MB 的下载量在桌面工具场景尚可接受，而改造更新链路的回归风险更高。
+
+---
+
+## D-003 `%TEMP%` 中的安装包永不清理（未修，超出本角色作用域）
+
+**状态**：未修（仅记录）｜**优先级**：P2
+
+- 证据：`electron/main.ts:1514` 下载目标固定为 `path.join(app.getPath('temp'), \`ClipMaster-Setup-${info.latestVersion}.exe\`)`；`:1577` 与 `:1581` 只在**校验失败**时删除，成功安装后不清理。
+- 影响：每升级一个版本，用户 `%TEMP%` 留下一个 ~114 MB 的安装包，长期累积数百 MB 且无提示。
+- 修复建议（由后端/架构角色在 `electron/main.ts` 执行）：安装成功或启动时清理 `%TEMP%/ClipMaster-Setup-*.exe`，保留最近一个版本；或改用 `app.getPath('userData')/updates` 并在 `cleanupImageCache` 同类逻辑中做保留策略。
+- 完成判据：连续升级两次后 `%TEMP%` 内 `ClipMaster-Setup-*.exe` 数量 ≤ 1。
+
+---
+
+## D-004 `docs/release-checksums/` 归档格式规范化（已执行）
+
+**状态**：已执行（新增说明，历史文件不可回改）｜**优先级**：P2
+
+- 问题：`docs/release-checksums/v1.0.0.sha256` 内容为
+  `0F0625E4...1067F  ClipMaster Setup 1.0.0.exe`，文件名**含空格**；
+  而当前 `package.json` 的 `nsis.artifactName` 是 `${productName}-Setup-${version}.${ext}`（连字符），实测产物名为 `ClipMaster-Setup-5.0.0.exe`。
+- 处理：历史文件保持原样（它记录的是当时真实的 1.0.0 产物名，改写等于伪造历史），改为在同目录新增 `README.md` 说明当前格式规范与历史差异。
+- 完成判据：`docs/release-checksums/README.md` 存在且说明格式；后续版本归档文件名与 `artifactName` 一致。
+
+---
+
+## D-005 签名证书与私钥的忽略规则（已执行）
+
+**状态**：已执行｜**优先级**：P0
+
+- 问题：`.gitignore` 原第 27-32 行只忽略 `.env*`，而 `docs/CODE_SIGNING.md` 曾指导把 PFX 放在工作目录做本地签名，`git add .` 会直接提交证书。
+- 处理：`.gitignore` 新增 `*.pfx *.p12 *.pem *.key *.b64 *.cer *.crt *.pvk certificates/ secrets/`；`docs/CODE_SIGNING.md` 改为统一使用仓库外目录 `%USERPROFILE%\.clipmaster-signing\`。
+- 说明：`.gitignore` 只对未跟踪文件生效；仓库历史中从未出现证书（`git log --all` 全历史扫描无命中），因此无需清理历史。

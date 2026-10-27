@@ -32,8 +32,13 @@ jobs:
       - name: Verify project metadata
         shell: powershell
         run: |
+          # 校验语义版本格式 + 与 CHANGELOG 对齐，不写死具体版本号：
+          # 写死 '5.0.0' 会让下一次版本号变更直接把 CI 打成红色。
           $packageVersion = node -p "require('./package.json').version"
-          if ($packageVersion -ne '5.0.0') { throw "Expected v5.0.0, found $packageVersion" }
+          if ($packageVersion -notmatch '^\d+\.\d+\.\d+([-+][0-9A-Za-z.-]+)?$') { throw "package.json version '$packageVersion' is not valid semver" }
+          $changelog = Get-Content CHANGELOG.md -Raw
+          if ($changelog -notmatch [regex]::Escape("## $packageVersion")) { throw "CHANGELOG.md has no '## $packageVersion' section" }
+          Write-Host "package version: $packageVersion (matches CHANGELOG)"
 
       - name: Audit runtime dependencies
         run: npm audit --omit=dev --audit-level=high --registry=https://registry.npmjs.org

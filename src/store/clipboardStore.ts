@@ -604,8 +604,12 @@ export const useClipboardStore = create<ClipboardStore>((set, get) => ({
         try {
           const audio = new Audio('data:audio/wav;base64,UklGRjQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YRAAAAAAAP//AAD//wAA//8AAP//AAA=')
           audio.volume = 0.12
-          audio.play().catch(() => {})
-        } catch {}
+          void audio.play().catch(() => {})
+        } catch (error) {
+          // 音效是纯装饰：无音频设备 / 受限环境下构造 Audio 会抛，
+          // 静默降级即可 —— 绝不能让"没响"把整个复制流程判成失败。
+          void error
+        }
       }
       const timer = setTimeout(() => set({ copiedId: null, _copiedTimer: null }), 1000)
       set({ copiedId: id, _copiedTimer: timer })

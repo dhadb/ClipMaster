@@ -1,7 +1,7 @@
 const secretPatterns = [
   /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
   /\beyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\b/,
-  /\b(?:sk|pk|rk|ghp|github_pat|xox[baprs])-?[a-zA-Z0-9_\-]{20,}\b/i,
+  /\b(?:sk|pk|rk|ghp|github_pat|xox[baprs])-?[a-zA-Z0-9_-]{20,}\b/i,
   /\bAKIA[0-9A-Z]{16}\b/,
   /\b(?:password|passwd|pwd|token|secret|api[_-]?key)\s*[:=]\s*\S+/i,
 ]

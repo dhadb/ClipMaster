@@ -12,11 +12,13 @@ import { defaultSensitiveContentRules, getClipboardPrivacyScanText, isSensitiveC
 import { matchesBlockedApplication, normalizeBlockedApplications } from '../src/utils/applicationPrivacy'
 import { isResolvedPathInside } from '../src/utils/pathSafety'
 import { retainHistoryItems } from '../src/utils/retention'
+import { fitHistoryToBudget } from '../src/utils/persistBudget'
 import { parseJsonDocument, recoverWithBackup } from '../src/utils/recovery'
 import { getConstrainedImageSize } from '../src/utils/imageLimits'
 import { normalizeClipboardFilePaths, parseFileNameWBuffer, parseFileUriList } from '../src/utils/fileClipboard'
 import {
   getBoundedImportSource,
+  getUtf8ByteLength,
   isTextWithinLimit,
   MAX_HISTORY_TEXT_BYTES,
   MAX_IMAGE_BYTES,
@@ -55,7 +57,26 @@ type HotkeyAction = 'toggle' | 'search' | 'clear'
 const currentHotkeys = new Map<HotkeyAction, string>()
 const pendingImageDeletes = new Map<string, ReturnType<typeof setTimeout>>()
 let storageEncryptionState: 'encrypted' | 'plain' | 'unknown' = 'unknown'
-let dataRecoveredFromBackup = false
+
+/**
+ * 落盘健康状态。此前这些信息（尤其是"备份恢复过""主文件读不出来"）
+ * 全部只写 console，打包后的 GUI 进程没有 stdio，用户永远看不到。
+ */
+interface StorageHealth {
+  recoveredFromBackup: boolean
+  loadFailed: boolean
+  corruptFilePath: string | null
+  trimmedOnSave: number
+  lastError: string | null
+}
+
+const storageHealth: StorageHealth = {
+  recoveredFromBackup: false,
+  loadFailed: false,
+  corruptFilePath: null,
+  trimmedOnSave: 0,
+  lastError: null,
+}
 let foregroundTracker: ReturnType<typeof setInterval> | null = null
 let foregroundTrackerRequestInFlight = false
 let foregroundSampleSequence = 0
@@ -659,14 +680,60 @@ function applyLoadedData(data: Partial<AppData>) {
   applyRetentionRules()
 }
 
+// 明文 JSON 的预算：落盘前按未加密长度估算，预留 base64(≈1.34×) + 信封 + DPAPI 头部的膨胀空间。
+// 留 1.4 倍余量，宁可提前裁剪也不能写出一个下次读不回来的文件。
+const PLAINTEXT_PERSIST_BUDGET = Math.floor(MAX_PERSISTED_DATA_BYTES / 1.4)
+
+/**
+ * P0-1：历史上 saveData 完全不看体积，只在**读取**侧用 MAX_PERSISTED_DATA_BYTES 拒绝。
+ * 一旦写出超限文件，下次启动 readPersistedData 抛错 → 回退 .bak → 本轮改动全丢 →
+ * 之后每次保存都超限，永久写不进去。裁剪规则见 src/utils/persistBudget.ts（有单测）。
+ */
+function fitPersistedData(data: AppData): { data: AppData; dropped: number } {
+  const result = fitHistoryToBudget(
+    data.history,
+    PLAINTEXT_PERSIST_BUDGET,
+    items => getUtf8ByteLength(JSON.stringify({ ...data, history: items })),
+  )
+  if (result.dropped === 0) return { data, dropped: 0 }
+  return { data: { ...data, history: result.items }, dropped: result.dropped }
+}
+
+function getStorageHealthSnapshot(): StorageHealth & { encryption: string } {
+  return { ...storageHealth, encryption: storageEncryptionState }
+}
+
 function loadData() {
+  const primaryExisted = fs.existsSync(dataPath)
   const recovered = recoverWithBackup(
     () => fs.existsSync(dataPath) ? readPersistedData(dataPath) : null,
     () => fs.existsSync(backupPath) ? readPersistedData(backupPath) : null,
   )
   if (recovered.primaryError) console.error('Failed to load data:', recovered.primaryError)
   if (recovered.backupError) console.error('Failed to load backup data:', recovered.backupError)
-  dataRecoveredFromBackup = recovered.source === 'backup'
+
+  // P0-1 关键：只要主文件"存在却读不出来"，立刻改名隔离。
+  // 否则 saveData() 的 copyFileSync 会把这个坏文件当成"新备份"，
+  // 覆盖掉真正能救命的那份 .bak —— 主备同时报废，而用户零感知。
+  if (primaryExisted && recovered.source !== 'primary') {
+    try {
+      const corruptPath = `${dataPath}.corrupt-${Date.now()}`
+      fs.renameSync(dataPath, corruptPath)
+      storageHealth.corruptFilePath = corruptPath
+      console.error('Quarantined unreadable data file:', corruptPath)
+    } catch (err) {
+      console.error('Failed to quarantine unreadable data file:', err)
+    }
+  }
+
+  storageHealth.recoveredFromBackup = recovered.source === 'backup'
+  storageHealth.loadFailed = recovered.source === 'none' && primaryExisted
+  if (storageHealth.recoveredFromBackup || storageHealth.loadFailed) {
+    storageHealth.lastError = recovered.primaryError
+      ? String(recovered.primaryError)
+      : 'Clipboard history could not be loaded'
+  }
+
   if (recovered.value) {
     applyLoadedData(recovered.value)
     if (storageEncryptionState === 'plain' && isDataEncryptionAvailable()) scheduleSave()
@@ -681,14 +748,30 @@ function loadData() {
 function saveData() {
   try {
     refreshProtectedCounter()
-    const data: AppData = { schemaVersion: 2, history: clipboardHistory, settings, protectedToday, protectedDate, pauseUntil, pauseMode, pausedWorkspace, pausedApplicationKey }
+    const base: AppData = { schemaVersion: 2, history: clipboardHistory, settings, protectedToday, protectedDate, pauseUntil, pauseMode, pausedWorkspace, pausedApplicationKey }
+    const { data, dropped } = fitPersistedData(base)
+    if (dropped > 0) {
+      clipboardHistory = data.history
+      storageHealth.trimmedOnSave += dropped
+      console.warn(`Persistence budget exceeded: dropped ${dropped} older history items`)
+    }
     const serialized = serializePersistedData(data)
+    // 硬校验：裁剪后仍超限（例如受保护条目太多）就报错跳过，不写一个读不回来的文件
+    const bytes = getUtf8ByteLength(serialized)
+    if (bytes > MAX_PERSISTED_DATA_BYTES) {
+      throw new Error(`Refusing to persist ${bytes} bytes (limit ${MAX_PERSISTED_DATA_BYTES})`)
+    }
     const tmpPath = `${dataPath}.${process.pid}.tmp`
     fs.writeFileSync(tmpPath, serialized, 'utf-8')
-    if (fs.existsSync(dataPath) && !dataRecoveredFromBackup) fs.copyFileSync(dataPath, backupPath)
+    // 从 .bak 恢复那一轮，主文件已被隔离（不存在），天然不会污染备份；
+    // 保留 recoveredFromBackup 判断作为双保险。
+    if (fs.existsSync(dataPath) && !storageHealth.recoveredFromBackup) fs.copyFileSync(dataPath, backupPath)
     fs.renameSync(tmpPath, dataPath)
-    dataRecoveredFromBackup = false
+    storageHealth.recoveredFromBackup = false
+    storageHealth.loadFailed = false
+    storageHealth.lastError = null
   } catch (err) {
+    storageHealth.lastError = String(err)
     console.error('Failed to save data:', err)
   }
 }
@@ -860,6 +943,14 @@ function sampleForegroundTarget(): Promise<ForegroundTarget | null> {
   })
 }
 
+// P0-3：原实现固定 1200ms 轮询，等于每小时 spawn 3000 次 powershell.exe ——
+// 对一个托盘常驻工具来说是纯浪费（空闲时没人看前台是什么）。
+// 现在：应用级暂停开启时才用 1200ms（该功能必须秒级感知"用户切回来了"），
+// 平时降到 2500ms，并把缓存 TTL 提到 3000ms 保证轮询间隔永远在有效期内，精度不降。
+const FOREGROUND_TRACK_ACTIVE_MS = 1200
+const FOREGROUND_TRACK_IDLE_MS = 2500
+const FOREGROUND_CACHE_TTL_MS = 3000
+
 function runForegroundTrackerSample() {
   if (foregroundTrackerRequestInFlight || isQuitting) return
   foregroundTrackerRequestInFlight = true
@@ -868,28 +959,45 @@ function runForegroundTrackerSample() {
   })
 }
 
+function scheduleForegroundTrackerTick() {
+  if (!foregroundTracker || isQuitting) return
+  const delay = pauseMode === 'application' ? FOREGROUND_TRACK_ACTIVE_MS : FOREGROUND_TRACK_IDLE_MS
+  foregroundTracker = setTimeout(() => {
+    if (isQuitting || !foregroundTracker) return
+    runForegroundTrackerSample()
+    scheduleForegroundTrackerTick()
+  }, delay)
+}
+
 function startForegroundTracker() {
   if (foregroundTracker || process.platform !== 'win32' || isQuitting) return
   runForegroundTrackerSample()
-  foregroundTracker = setInterval(runForegroundTrackerSample, 1200)
+  scheduleForegroundTrackerTick()
 }
 
 function stopForegroundTracker() {
   if (foregroundTracker) {
-    clearInterval(foregroundTracker)
+    clearTimeout(foregroundTracker)
     foregroundTracker = null
   }
 }
 
+/** pauseMode 变化后立刻切到对应采样频率，不用等下一轮 tick。 */
+function refreshForegroundTrackerCadence() {
+  if (!foregroundTracker) return
+  stopForegroundTracker()
+  startForegroundTracker()
+}
+
 function getCachedWorkspace() {
   const target = currentForegroundTarget
-  if (!target || isClipMasterTarget(target) || Date.now() - target.capturedAt > 2500) return ''
+  if (!target || isClipMasterTarget(target) || Date.now() - target.capturedAt > FOREGROUND_CACHE_TTL_MS) return ''
   return target.workspace
 }
 
 function getCachedApplication() {
   const target = currentForegroundTarget
-  if (!target || isClipMasterTarget(target) || Date.now() - target.capturedAt > 2500) return undefined
+  if (!target || isClipMasterTarget(target) || Date.now() - target.capturedAt > FOREGROUND_CACHE_TTL_MS) return undefined
   return normalizeSourceApplication(target.processName)
 }
 
@@ -1104,6 +1212,7 @@ function pauseMonitoring(mode: number | Exclude<PauseMode, null | 'timed'>) {
   }
   rebuildTrayMenu()
   emitPrivacyState()
+  refreshForegroundTrackerCadence()
   scheduleSave()
 }
 
@@ -1114,6 +1223,7 @@ function resumeMonitoring() {
   pausedApplicationKey = ''
   rebuildTrayMenu()
   emitPrivacyState()
+  refreshForegroundTrackerCadence()
   scheduleSave()
 }
 
@@ -2043,7 +2153,17 @@ ipcMain.handle('update-settings', (event, newSettings: Partial<Settings>) => {
   return settings
 })
 
-ipcMain.handle('get-privacy-state', () => getPrivacyState())
+ipcMain.handle('get-privacy-state', event => {
+  assertTrustedRenderer(event)
+  return getPrivacyState()
+})
+
+// 落盘健康状态给渲染层：备份恢复、主文件隔离、保存裁剪都必须在界面上可见，
+// 否则"历史悄悄丢了"这件事用户永远发现不了。
+ipcMain.handle('get-storage-health', event => {
+  assertTrustedRenderer(event)
+  return getStorageHealthSnapshot()
+})
 ipcMain.handle('pause-monitoring', (event, requestedMode: number | 'until-resume' | 'current-application') => {
   assertTrustedRenderer(event)
   if (requestedMode === 'until-resume') pauseMonitoring('until-resume')

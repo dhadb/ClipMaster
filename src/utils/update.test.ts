@@ -12,6 +12,33 @@ describe('parseReleaseChecksum', () => {
   })
 })
 
+// 回归（P1）：校验和解析的格式矩阵。宁可拒绝一个合法升级包，也不能接受一个错包 —— 这里只收紧、不放宽。
+describe('parseReleaseChecksum input formats', () => {
+  const asset = 'ClipMaster-Setup-5.0.0.exe'
+  const hash = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
+
+  it('accepts the two-space sha256sum format', () => {
+    expect(parseReleaseChecksum(`${hash}  ${asset}`, asset)).toBe(hash)
+  })
+
+  it('accepts the binary-mode asterisk format', () => {
+    expect(parseReleaseChecksum(`${hash} *${asset}`, asset)).toBe(hash)
+  })
+
+  it('normalizes a mixed-case sha256 to lowercase', () => {
+    expect(parseReleaseChecksum(`${hash.toUpperCase()}  ${asset}`, asset)).toBe(hash)
+  })
+
+  it('rejects empty, truncated, non-hex and nameless input', () => {
+    expect(parseReleaseChecksum('', asset)).toBeNull()
+    expect(parseReleaseChecksum('   \n\t\n', asset)).toBeNull()
+    expect(parseReleaseChecksum(`${hash.slice(0, 63)}  ${asset}`, asset)).toBeNull()
+    expect(parseReleaseChecksum(`${hash}g  ${asset}`, asset)).toBeNull()
+    expect(parseReleaseChecksum(`${hash}  `, asset)).toBeNull()
+    expect(parseReleaseChecksum(`${hash}  ${asset}`, '')).toBeNull()
+  })
+})
+
 describe('parseClipMasterReleaseUrl', () => {
   it('extracts stable and prerelease versions from ClipMaster release URLs', () => {
     expect(parseClipMasterReleaseUrl('https://github.com/dhadb/ClipMaster/releases/tag/v1.3.1')).toEqual({

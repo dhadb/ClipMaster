@@ -49,6 +49,8 @@ export function parseFileUriList(value: unknown): string[] {
         paths.push(decodedPath.replace(/^\/([A-Za-z]:)/, '$1').replace(/\//g, '\\'))
       }
     } catch {
+      // 这行不是合法的 file:// URL（例如 PowerShell 输出里的提示文本），跳过即可，不是错误
+      continue
     }
   }
   return normalizeClipboardFilePaths(paths)

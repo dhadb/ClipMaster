@@ -110,3 +110,81 @@ git show 831c884:installer/installer.nsi > installer.nsi
 - 问题：`.gitignore` 原第 27-32 行只忽略 `.env*`，而 `docs/CODE_SIGNING.md` 曾指导把 PFX 放在工作目录做本地签名，`git add .` 会直接提交证书。
 - 处理：`.gitignore` 新增 `*.pfx *.p12 *.pem *.key *.b64 *.cer *.crt *.pvk certificates/ secrets/`；`docs/CODE_SIGNING.md` 改为统一使用仓库外目录 `%USERPROFILE%\.clipmaster-signing\`。
 - 说明：`.gitignore` 只对未跟踪文件生效；仓库历史中从未出现证书（`git log --all` 全历史扫描无命中），因此无需清理历史。
+
+---
+
+## D-006 更新链 fail-closed：下载校验 + 安装前复校（已执行）
+
+**状态**：已执行｜**优先级**：P0｜**类型**：安全加固
+
+### 结论
+
+1. 更新包必须有 SHA256 校验值：取不到 `checksums.sha256`、或文件里没有对应文件名，**直接失败**，不存在"跳过校验继续装"的降级路径。
+2. 校验做两次：下载落盘后一次，**点安装时再一次**（对 `%TEMP%` 里的文件重新计算并与下载时记录的值比对），不一致就删包并拒绝安装。
+3. 暂不启用 Authenticode 签名：没有 OV/EV 证书，签名开关 `ENABLE_WINDOWS_CODE_SIGNING` 保留，拿到证书后无需改代码即可开启。
+
+### 理由
+
+- 未签名时 SHA256 是唯一的完整性来源，fail-closed 才能把"拿到什么就装什么"的窗口关掉。
+- 下载校验只覆盖"下载那一刻"；用户可能隔很久才点安装，期间 `%TEMP%` 里的文件可被替换。复校成本是 114 MB 一次哈希（约 0.3 s），换的是"点安装时包的完整性"，值得。
+- 不给无证书的包做"假签名"或"跳过校验"，因为那会把安全性降到和没有更新机制一样，却让用户以为有。
+
+### 证据与完成判据
+
+- `electron/main.ts`：`getExpectedUpdateHash`（缺校验值抛错）、`downloadInstaller`（落盘后比对、失败删包）、`install-update`（安装前复校，先于 `shell.openPath`）。
+- `src/utils/releaseSafetyContract.test.ts`：4 条源码契约守卫，禁止上述任一路径被改回 fail-open。
+- 门禁：`typecheck` 0 错误、`vitest` 全绿、`lint` 0 error。
+
+### 影响范围
+
+`install-update` 多一次磁盘哈希；失败提示改为"checksum verification before install"。无 UI 变更。
+
+---
+
+## D-007 卸载保留用户数据（已执行，产品决定）
+
+**状态**：已执行｜**优先级**：P1｜**类型**：产品取舍
+
+### 结论
+
+`build.nsis.deleteAppDataOnUninstall = false`：**卸载不删除** `%AppData%/ClipMaster/`（历史、设置、图片缓存都保留）。重装后数据还在。
+
+### 理由
+
+- 剪贴板历史是用户不可再生的数据（复制过的东西不会回来），静默删除属于不可逆伤害；误点卸载的代价远大于"留几百 KB 残留"。
+- NSIS 卸载是用户最不设防的破坏性操作之一，默认值应当保守。
+
+### 代价与补偿
+
+- 代价：卸载后残留数据，用户若想要"干净移除"需要手动删目录。
+- 补偿：`PRIVACY.md` 的 *Clearing Data* 已写明卸载不删数据、如何手动删除；不再让用户以为卸载=清除。
+
+### 完成判据
+
+`package.json` 中该字段为 `false`；`PRIVACY.md` 含卸载说明；安装/卸载实测后 `%AppData%/ClipMaster/` 仍存在。
+
+---
+
+## D-008 v5 不引入账号、云同步与付费额度墙（产品决定，不改代码）
+
+**状态**：决策已定，不执行代码｜**优先级**：P2｜**类型**：产品取舍
+
+### 结论
+
+v5.0.0 保持 local-first：不做账号体系、不做跨设备同步、不做免费版功能额度墙。
+
+### 理由
+
+- 现有 `PRIVACY.md` 明确承诺"不上传、不同步、不分析剪贴板内容"。云同步会把这条承诺整体推翻，需要服务端、账号、合规、密钥管理一整套设施，成本远大于 v5 剩余时间窗。
+- 剪贴板工具的核心价值是"本地零延迟 + 隐私"，同步是另一个产品问题，不该顺手塞进 v5。
+- 没有云端就没有额度墙的意义：本地功能不存在边际成本，人为设限只会削弱口碑。
+
+### 如果未来要做
+
+需要独立的产品决策与设计文档：账号与密钥、端到端加密方案、冲突合并策略、服务端成本模型，并重写 `PRIVACY.md`。届时按新版本处理，不回头改 v5 的承诺。
+
+---
+
+## D-003 补记：`%TEMP%` 历史安装包清理已收口
+
+原 D-003（每升级一次在 `%TEMP%` 留一个 ~114 MB 安装包）已按建议实现：启动时 `cleanupStaleInstallers()` 删除 `%TEMP%/ClipMaster-Setup-<version>.exe`，失败静默。连续升级两次后残留 ≤ 1 的判据可在本机验证。

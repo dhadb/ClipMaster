@@ -46,6 +46,8 @@ You can clear clipboard history from inside the app. You can also remove stored 
 %AppData%/ClipMaster/
 ```
 
+Uninstalling ClipMaster does **not** delete this folder: history, settings, and the image cache stay where they are, so reinstalling keeps your data. For a clean removal, delete `%AppData%/ClipMaster/` yourself after uninstalling.
+
 ## Questions
 
 If you notice unexpected data storage or privacy behavior, please open an issue:

@@ -32,6 +32,7 @@ import { isThemeSetting, type ThemeSetting } from '../src/theme'
 import { isAccentSetting, type AccentSetting } from '../src/personalization'
 import type { ViewMode } from '../src/store/clipboardStore'
 import { clipboardTypes as CLIPBOARD_TYPES, type ClipboardItem, type ClipboardType, type SavedFilter } from '../src/types/clipboard'
+import type { StorageHealth as SharedStorageHealth } from '../src/types/storageHealth'
 
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
@@ -61,14 +62,12 @@ let storageEncryptionState: 'encrypted' | 'plain' | 'unknown' = 'unknown'
 /**
  * 落盘健康状态。此前这些信息（尤其是"备份恢复过""主文件读不出来"）
  * 全部只写 console，打包后的 GUI 进程没有 stdio，用户永远看不到。
+ *
+ * 字段定义以 src/types/storageHealth.ts 的 StorageHealth 为唯一来源（IPC 契约
+ * 与渲染层共用），这里只 Omit 掉 encryption：加密状态由 storageEncryptionState
+ * 单独维护、由 getStorageHealthSnapshot 合并进快照，避免两份字段各自漂移。
  */
-interface StorageHealth {
-  recoveredFromBackup: boolean
-  loadFailed: boolean
-  corruptFilePath: string | null
-  trimmedOnSave: number
-  lastError: string | null
-}
+type StorageHealth = Omit<SharedStorageHealth, 'encryption'>
 
 const storageHealth: StorageHealth = {
   recoveredFromBackup: false,
@@ -699,13 +698,15 @@ function fitPersistedData(data: AppData): { data: AppData; dropped: number } {
   return { data: { ...data, history: result.items }, dropped: result.dropped }
 }
 
-function getStorageHealthSnapshot(): StorageHealth & { encryption: string } {
+function getStorageHealthSnapshot(): SharedStorageHealth {
   return { ...storageHealth, encryption: storageEncryptionState }
 }
 
 /**
  * 推送去重键：只看用户可见的那几个字段（裁剪条数 / 备份恢复 / 读取失败 / 最近错误）。
  * corruptFilePath 与 encryption 在保存周期内不变，不参与比较。
+ * encryption 初值由首帧 get-storage-health 拉取拿到；它的运行期变化点是
+ * 安全存储探测/降级，不发生在保存路径里，放进去重键只会制造无意义的推送。
  */
 function storageHealthSignature(health: StorageHealth): string {
   return [

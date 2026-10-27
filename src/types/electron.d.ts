@@ -39,8 +39,8 @@ export interface ElectronAPI {
   getHistory: () => Promise<ClipboardItem[]>
   getAppVersion: () => Promise<string>
   getDataSecurityStatus: () => Promise<DataSecurityStatus>
-  /** P0-1 落盘健康快照，对应 electron/main.ts:2163 的 get-storage-health */
-  getStorageHealth: () => Promise<StorageHealth>
+  /** 落盘健康快照（IPC: get-storage-health）。旧版 preload 没有该方法，故为可选。 */
+  getStorageHealth?: () => Promise<StorageHealth>
   checkForUpdates: (force?: boolean) => Promise<UpdateInfo>
   downloadUpdate: () => Promise<{ version: string }>
   installUpdate: () => Promise<{ version: string }>
@@ -71,6 +71,8 @@ export interface ElectronAPI {
   onHistoryUpdated: (callback: (history: ClipboardItem[]) => void) => () => void
   onSettingsUpdated: (callback: (settings: Settings) => void) => () => void
   onPrivacyUpdated: (callback: (state: PrivacyState) => void) => () => void
+  /** 落盘健康快照变化推送（取消订阅即返回的函数）。旧版 preload 没有该方法，故为可选。 */
+  onStorageHealthChanged?: (callback: (health: StorageHealth) => void) => () => void
   onUpdateDownloadProgress: (callback: (progress: UpdateDownloadProgress) => void) => () => void
   onFocusSearch: (callback: () => void) => () => void
   onShowSettings: (callback: () => void) => () => void

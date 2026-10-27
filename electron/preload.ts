@@ -89,7 +89,7 @@ const electronAPI = {
   getAppVersion: (): Promise<string> => ipcRenderer.invoke('get-app-version'),
   getDataSecurityStatus: (): Promise<DataSecurityStatus> => ipcRenderer.invoke('get-data-security-status'),
   // P0-1：落盘健康度（备份恢复 / 主文件隔离 / 保存裁剪 / 加密降级）。
-  // 主进程 handler 见 electron/main.ts:2163，快照来源 getStorageHealthSnapshot()。
+  // 主进程 handler 见 electron/main.ts 的 get-storage-health，快照来源 getStorageHealthSnapshot()。
   getStorageHealth: (): Promise<StorageHealth> => ipcRenderer.invoke('get-storage-health'),
   checkForUpdates: (force = false): Promise<UpdateInfo> => ipcRenderer.invoke('check-for-updates', force),
   downloadUpdate: (): Promise<{ version: string }> => ipcRenderer.invoke('download-update'),
@@ -130,6 +130,13 @@ const electronAPI = {
     const handler = (_event: IpcRendererEvent, state: PrivacyState) => callback(state)
     ipcRenderer.on('privacy-updated', handler)
     return () => { ipcRenderer.removeListener('privacy-updated', handler) }
+  },
+  // 落盘健康变化推送：主进程在 saveData 结束后发现裁剪/恢复/报错变化才发一条，
+  // 渲染层无需重开窗口即可看到新的提示（见 electron/main.ts 的 emitStorageHealthIfChanged）。
+  onStorageHealthChanged: (callback: (health: StorageHealth) => void) => {
+    const handler = (_event: IpcRendererEvent, health: StorageHealth) => callback(health)
+    ipcRenderer.on('storage-health-changed', handler)
+    return () => { ipcRenderer.removeListener('storage-health-changed', handler) }
   },
   onUpdateDownloadProgress: (callback: (progress: UpdateDownloadProgress) => void) => {
     const handler = (_event: IpcRendererEvent, progress: UpdateDownloadProgress) => callback(progress)

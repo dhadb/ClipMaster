@@ -703,6 +703,36 @@ function getStorageHealthSnapshot(): StorageHealth & { encryption: string } {
   return { ...storageHealth, encryption: storageEncryptionState }
 }
 
+/**
+ * 推送去重键：只看用户可见的那几个字段（裁剪条数 / 备份恢复 / 读取失败 / 最近错误）。
+ * corruptFilePath 与 encryption 在保存周期内不变，不参与比较。
+ */
+function storageHealthSignature(health: StorageHealth): string {
+  return [
+    health.trimmedOnSave,
+    health.recoveredFromBackup ? 1 : 0,
+    health.loadFailed ? 1 : 0,
+    health.lastError ?? '',
+  ].join('|')
+}
+
+/**
+ * 保存结束后推送落盘健康变化（同一轮保存只发一次，由 saveData 的 finally 保证）。
+ * saveData 在两种"窗口不可用"的时刻也会跑：启动期（loadData → scheduleSave，mainWindow 还是 null）
+ * 和退出期（before-quit → flushPendingSave，webContents 可能已在销毁）。这两种情况下推送
+ * 必须静默跳过——通知失败绝不能反过来把保存/退出流程搞挂。
+ */
+function emitStorageHealthIfChanged(before: string) {
+  if (storageHealthSignature(storageHealth) === before) return
+  const win = mainWindow
+  if (!win || win.isDestroyed() || win.webContents.isDestroyed()) return
+  try {
+    win.webContents.send('storage-health-changed', getStorageHealthSnapshot())
+  } catch (err) {
+    console.error('Failed to push storage health:', err)
+  }
+}
+
 function loadData() {
   const primaryExisted = fs.existsSync(dataPath)
   const recovered = recoverWithBackup(
@@ -746,13 +776,14 @@ function loadData() {
 }
 
 function saveData() {
+  // 推送基线：保存前先记指纹，结束后只在这几项真的变了时推一次给渲染层。
+  const healthBeforeSave = storageHealthSignature(storageHealth)
   try {
     refreshProtectedCounter()
     const base: AppData = { schemaVersion: 2, history: clipboardHistory, settings, protectedToday, protectedDate, pauseUntil, pauseMode, pausedWorkspace, pausedApplicationKey }
     const { data, dropped } = fitPersistedData(base)
     if (dropped > 0) {
       clipboardHistory = data.history
-      storageHealth.trimmedOnSave += dropped
       console.warn(`Persistence budget exceeded: dropped ${dropped} older history items`)
     }
     const serialized = serializePersistedData(data)
@@ -770,9 +801,14 @@ function saveData() {
     storageHealth.recoveredFromBackup = false
     storageHealth.loadFailed = false
     storageHealth.lastError = null
+    // 语义是"最近一次落盘裁剪了多少条"（文案：保存时裁剪了 N 条），不是自启动以来的累计值。
+    // 与上面三个一次性字段同组重置：本次没裁剪就归零，"最后一次保存没有裁剪"才能重新出现。
+    storageHealth.trimmedOnSave = dropped
   } catch (err) {
     storageHealth.lastError = String(err)
     console.error('Failed to save data:', err)
+  } finally {
+    emitStorageHealthIfChanged(healthBeforeSave)
   }
 }
 

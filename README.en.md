@@ -163,10 +163,6 @@ npm run build
 
 Build output goes to `release/`, containing the NSIS installer and the portable build.
 
-## Roadmap
-
-- [ ] Add Windows Authenticode code signing (certificate setup deferred)
-
 ## License
 
 [MIT](LICENSE)

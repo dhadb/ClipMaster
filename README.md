@@ -165,19 +165,6 @@ npm run build
 
 构建产物输出到 `release/`，包含 NSIS 安装包与便携版。
 
-## 技术栈
-
-- Electron
-- React
-- TypeScript
-- Vite
-- Tailwind CSS
-- Zustand
-
-## 路线图
-
-- [ ] 为安装包增加 Windows Authenticode 代码签名（证书配置暂缓）
-
 ## 反馈
 
 欢迎在 [Issues](https://github.com/dhadb/ClipMaster/issues) 中提交 bug、功能建议或安装体验反馈。

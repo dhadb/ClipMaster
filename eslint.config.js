@@ -1,4 +1,4 @@
-// eslint.config.js —— ESLint 9/10 flat config 基线（QA 建立并维护）
+// eslint.config.js —— ESLint 9 flat config 基线（QA 建立并维护）
 //
 // 目的：把"人眼评审"里能机械判定的问题变成可回归的门禁信号，尤其是
 //   1) jsx-a11y/no-nested-interactive —— 任务卡片/列表项里嵌套 button 导致的交互 bug（P0 来源）

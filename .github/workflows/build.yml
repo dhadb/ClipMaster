@@ -69,5 +69,4 @@ jobs:
           if-no-files-found: error
           path: |
             release/*.exe
-            release/*.blockmap
             release/checksums.sha256

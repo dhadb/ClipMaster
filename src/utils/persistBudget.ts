@@ -11,7 +11,7 @@ export interface BudgetableHistoryItem {
   timestamp: number
 }
 
-export interface PersistBudgetResult<T> {
+interface PersistBudgetResult<T> {
   items: T[]
   /** 被移除的条目数 */
   dropped: number

@@ -1,4 +1,4 @@
-export interface TextMetadataBackup<T, S> {
+interface TextMetadataBackup<T, S> {
   format: 'clipmaster-text-metadata'
   version: '1.3'
   exportedAt: string

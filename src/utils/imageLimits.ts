@@ -1,6 +1,6 @@
 import { MAX_IMAGE_EDGE, MAX_IMAGE_PIXELS } from './limits'
 
-export interface ImageSize {
+interface ImageSize {
   width: number
   height: number
 }

@@ -1,4 +1,4 @@
-export interface RecoveryResult<T> {
+interface RecoveryResult<T> {
   value: T | null
   source: 'primary' | 'backup' | 'none'
   primaryError?: unknown

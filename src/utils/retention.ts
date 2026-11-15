@@ -11,7 +11,7 @@ export interface RetentionItem {
   files?: string[]
 }
 
-export interface RetentionOptions {
+interface RetentionOptions {
   maxHistory: number
   autoDeleteDays: number
   verificationCodeTtlMinutes: number

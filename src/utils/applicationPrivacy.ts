@@ -1,5 +1,5 @@
-export const MAX_BLOCKED_APPLICATIONS = 40
-export const MAX_APPLICATION_RULE_LENGTH = 120
+const MAX_BLOCKED_APPLICATIONS = 40
+const MAX_APPLICATION_RULE_LENGTH = 120
 
 function normalizeApplicationName(value: string): string {
   return value.trim().split(/[\\/]/).pop()?.toLowerCase().replace(/\.exe$/i, '').replace(/\s+/g, ' ').slice(0, MAX_APPLICATION_RULE_LENGTH) || ''

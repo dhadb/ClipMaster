@@ -1,9 +1,9 @@
-export interface ClipMasterRelease {
+interface ClipMasterRelease {
   latestVersion: string
   releaseUrl: string
 }
 
-export interface ClipMasterReleaseDetails extends ClipMasterRelease {
+interface ClipMasterReleaseDetails extends ClipMasterRelease {
   releaseNotes: string
   publishedAt: string | null
 }

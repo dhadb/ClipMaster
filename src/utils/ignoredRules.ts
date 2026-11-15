@@ -1,7 +1,7 @@
 import safeRegex from 'safe-regex2'
 
-export const MAX_IGNORED_RULES = 30
-export const MAX_IGNORED_RULE_LENGTH = 160
+const MAX_IGNORED_RULES = 30
+const MAX_IGNORED_RULE_LENGTH = 160
 const regexPrefix = /^regex:/i
 
 export type CompiledIgnoredRule =

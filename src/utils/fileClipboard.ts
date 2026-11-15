@@ -1,5 +1,5 @@
 export const MAX_CLIPBOARD_FILES = 100
-export const MAX_CLIPBOARD_FILE_PATH_LENGTH = 4_096
+const MAX_CLIPBOARD_FILE_PATH_LENGTH = 4_096
 
 function normalizeWindowsPath(value: string): string | null {
   const normalized = value.replace(/\0/g, '').trim()

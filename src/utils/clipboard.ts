@@ -1,7 +1,7 @@
 import { match as matchPinyin } from 'pinyin-pro'
 
 export const MAX_TAGS = 8
-export const MAX_TAG_LENGTH = 24
+const MAX_TAG_LENGTH = 24
 const MAX_SEARCH_CACHE_ENTRIES = 20
 
 export function normalizeTags(input: unknown): string[] {
@@ -21,7 +21,7 @@ export function normalizeTags(input: unknown): string[] {
   return tags
 }
 
-export interface SearchableClipboardItem {
+interface SearchableClipboardItem {
   id?: string
   content: string
   type: string

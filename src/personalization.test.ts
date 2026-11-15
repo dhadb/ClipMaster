@@ -12,7 +12,6 @@ describe('personalization', () => {
     expect(accentPalettes.blue).toEqual({
       primary: '#2f80ed',
       light: '#70adff',
-      dark: '#1f63bd',
     })
   })
 })

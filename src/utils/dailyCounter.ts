@@ -1,4 +1,4 @@
-export interface DailyCounter {
+interface DailyCounter {
   date: string
   count: number
 }

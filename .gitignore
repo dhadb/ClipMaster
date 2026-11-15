@@ -7,7 +7,6 @@ node_modules/
 dist/
 dist-electron/
 release/
-temp-copy/
 
 # IDE
 .idea/
@@ -43,9 +42,6 @@ npm-debug.log*
 *.pvk
 certificates/
 secrets/
-
-# Electron
-out/
 
 # TypeScript
 *.tsbuildinfo

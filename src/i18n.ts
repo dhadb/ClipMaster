@@ -33,7 +33,6 @@ const zh = {
   'app.monitoring': '监控中',
   'app.paused': '已暂停记录',
   'app.records': '{count} 条记录',
-  'app.protectedToday': '今日保护 {count} 条',
   'app.resume': '恢复记录',
   'app.pause5': '暂停 5 分钟',
   'app.pauseMinutes': '暂停 {count} 分钟',
@@ -62,7 +61,6 @@ const zh = {
   'tabs.clearKept': '清空未收藏',
   'tabs.clearKeptTitle': '清空未收藏/未置顶',
   'tabs.clearAllTitle': '清空全部历史',
-  'tabs.importReplaceConfirm': '是否替换当前历史？\n\n确定：替换当前历史\n取消：合并到当前历史',
   'tabs.imported': '已导入 {count} 条记录',
   'tabs.importEmpty': '没有找到可导入的记录',
   'tabs.importFailed': '导入失败：请选择 ClipMaster 导出的 JSON 文件',
@@ -84,13 +82,6 @@ const zh = {
 
   'search.placeholder': '搜索内容或 #标签...',
   'search.addSnippet': '新建常用片段',
-  'search.current': '当前显示',
-  'search.total': '共',
-  'search.items': '条',
-  'search.totalCount': '/ 总计 {count}',
-  'search.backHistory': '返回历史',
-  'search.viewFavorites': '查看收藏',
-  'search.today': '今日 {count}',
   'search.all': '全部',
   'search.clear': '清空搜索',
   'search.filters': '筛选与排序',
@@ -133,7 +124,6 @@ const zh = {
   'type.file-list': '文件列表',
   'type.phone': '电话',
   'type.image': '图片',
-  'type.long-short': '长文',
 
   'item.imagePreview': '图片内容 · 点击查看详情或直接复制',
   'item.verification': '验证码 · 临时保护',
@@ -199,19 +189,6 @@ const zh = {
   'empty.emptyClipboard': '剪贴板是空的',
   'empty.tryOther': '试试其他关键词',
   'empty.favoriteHint': '点击图标添加收藏',
-  'empty.copyHint': '复制任意内容，它们会自动出现',
-  'empty.start': '复制任意内容开始使用',
-  'empty.quickOpen': '快速唤起',
-  'empty.searchContent': '搜索内容',
-  'empty.doubleClick': '双击',
-  'empty.quickCopy': '快速复制',
-  'empty.favoriteContent': '收藏内容',
-  'empty.createSnippet': '新建常用片段',
-
-  'shortcut.select': '选择',
-  'shortcut.copy': '复制',
-  'shortcut.quickCopy': '快复制',
-  'shortcut.delete': '删除',
 
   'stats.title': '使用统计',
   'stats.total': '总记录',
@@ -425,7 +402,6 @@ const en: Record<keyof typeof zh, string> = {
   'app.monitoring': 'Monitoring',
   'app.paused': 'Recording paused',
   'app.records': '{count} records',
-  'app.protectedToday': 'Protected today: {count}',
   'app.resume': 'Resume',
   'app.pause5': 'Pause 5 min',
   'app.pauseMinutes': 'Pause {count} min',
@@ -454,7 +430,6 @@ const en: Record<keyof typeof zh, string> = {
   'tabs.clearKept': 'Clear unstarred',
   'tabs.clearKeptTitle': 'Clear unstarred/unpinned',
   'tabs.clearAllTitle': 'Clear all history',
-  'tabs.importReplaceConfirm': 'Replace current history?\n\nOK: replace current history\nCancel: merge into current history',
   'tabs.imported': 'Imported {count} records',
   'tabs.importEmpty': 'No importable records found',
   'tabs.importFailed': 'Import failed: choose a JSON file exported by ClipMaster',
@@ -476,13 +451,6 @@ const en: Record<keyof typeof zh, string> = {
 
   'search.placeholder': 'Search content or #tags...',
   'search.addSnippet': 'Create a reusable snippet',
-  'search.current': 'Showing',
-  'search.total': 'Total',
-  'search.items': 'items',
-  'search.totalCount': '/ total {count}',
-  'search.backHistory': 'Back to history',
-  'search.viewFavorites': 'View favorites',
-  'search.today': 'Today {count}',
   'search.all': 'All',
   'search.clear': 'Clear search',
   'search.filters': 'Filters and sorting',
@@ -525,7 +493,6 @@ const en: Record<keyof typeof zh, string> = {
   'type.file-list': 'File list',
   'type.phone': 'Phone',
   'type.image': 'Image',
-  'type.long-short': 'Long',
 
   'item.imagePreview': 'Image content · open details or copy directly',
   'item.verification': 'Code · temporary protection',
@@ -591,19 +558,6 @@ const en: Record<keyof typeof zh, string> = {
   'empty.emptyClipboard': 'Clipboard is empty',
   'empty.tryOther': 'Try another keyword',
   'empty.favoriteHint': 'Click the icon to add favorites',
-  'empty.copyHint': 'Copy anything and it will appear here',
-  'empty.start': 'Copy anything to get started',
-  'empty.quickOpen': 'Quick open',
-  'empty.searchContent': 'Search content',
-  'empty.doubleClick': 'Double-click',
-  'empty.quickCopy': 'Quick copy',
-  'empty.favoriteContent': 'Favorite items',
-  'empty.createSnippet': 'Create a snippet',
-
-  'shortcut.select': 'Select',
-  'shortcut.copy': 'Copy',
-  'shortcut.quickCopy': 'Quick copy',
-  'shortcut.delete': 'Delete',
 
   'stats.title': 'Usage Stats',
   'stats.total': 'Total',
@@ -797,13 +751,13 @@ const translations: Record<ResolvedLanguage, Record<TranslationKey, string>> = {
   'en-US': en,
 }
 
-export function resolveLanguage(setting: LanguageSetting = 'system', locale?: string): ResolvedLanguage {
+function resolveLanguage(setting: LanguageSetting = 'system', locale?: string): ResolvedLanguage {
   if (setting === 'zh-CN' || setting === 'en-US') return setting
   const detected = (locale || (typeof navigator !== 'undefined' ? navigator.language : '')).toLowerCase()
   return detected.startsWith('zh') ? 'zh-CN' : 'en-US'
 }
 
-export function formatMessage(template: string, params: Params = {}) {
+function formatMessage(template: string, params: Params = {}) {
   return template.replace(/\{(\w+)\}/g, (_, key) => String(params[key] ?? ''))
 }
 

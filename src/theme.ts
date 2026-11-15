@@ -1,4 +1,4 @@
-export const themeIds = ['dark', 'light', 'graphite', 'forest', 'rose', 'ocean', 'high-contrast', 'auto'] as const
+const themeIds = ['dark', 'light', 'graphite', 'forest', 'rose', 'ocean', 'high-contrast', 'auto'] as const
 
 export type ThemeSetting = typeof themeIds[number]
 export type ResolvedTheme = Exclude<ThemeSetting, 'auto'>

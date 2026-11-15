@@ -72,13 +72,11 @@ function App() {
     if (settings.accentColor === 'theme') {
       root.style.removeProperty('--color-primary')
       root.style.removeProperty('--color-primary-light')
-      root.style.removeProperty('--color-primary-dark')
       return
     }
     const palette = accentPalettes[settings.accentColor]
     root.style.setProperty('--color-primary', palette.primary)
     root.style.setProperty('--color-primary-light', palette.light)
-    root.style.setProperty('--color-primary-dark', palette.dark)
   }, [settings.accentColor, resolvedTheme])
 
   // 监听系统主题变化 (auto 模式)

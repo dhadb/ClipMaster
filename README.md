@@ -34,48 +34,44 @@
   <img src="docs/screenshot.png" width="760" alt="ClipMaster 应用截图">
 </p>
 
-## 为什么用 ClipMaster
+## 简介
 
-- **本地优先**：剪贴板历史、设置和图片缓存只写入本机 `%AppData%/ClipMaster/`。
-- **快速找回**：复制过的文本、链接、代码、颜色、JSON、Markdown 和图片都可以搜索和筛选。
-- **隐私保护**：默认跳过疑似密码、Token、私钥、银行卡号等高风险内容。
+ClipMaster 是一款面向 Windows 的本地优先剪贴板管理工具。它在后台持续捕获剪贴板变化，将文本、链接、代码、颜色、JSON、Markdown 与图片整理为可搜索、可收藏、可批量管理的历史记录；所有数据仅保存在本机，并通过 Electron `safeStorage` 加密落盘。
+
+## 核心特性
+
+- **本地优先**：剪贴板历史、设置和图片缓存只写入本机 `%AppData%/ClipMaster/`，不上传、不同步、不分析。
+- **快速找回**：复制过的文本、链接、代码、颜色、JSON、Markdown 和图片均可通过模糊匹配、离线拼音、标签与类型筛选快速检索。
+- **隐私保护**：默认跳过疑似密码、Token、私钥、银行卡号等高风险内容；支持按应用黑名单与分时段暂停监控。
 - **双工作区**：使用 `Ctrl + Shift + V` 进入紧凑的快速粘贴；需要整理时切换到资料库，查看完整内容和元数据。
-- **顺手高效**：时间范围、类型和排序可以组合筛选，批量收藏、置顶、加标签与删除不再逐条操作。
+- **高效管理**：时间范围、类型和排序可组合筛选，支持批量收藏、置顶、加标签与删除。
 
 ## 快速开始
 
 ### 安装使用
 
 1. 打开 [Releases](https://github.com/dhadb/ClipMaster/releases/latest)。
-2. 下载 `ClipMaster-Setup-5.0.0.exe`，或选择 `ClipMaster-Portable-5.0.0.exe` 免安装版。
+2. 下载 `ClipMaster-Setup-<版本号>.exe` 安装包，或选择 `ClipMaster-Portable-<版本号>.exe` 免安装版。
 3. 运行安装包并按向导安装；便携版可直接运行。
 4. 复制任意内容并按 `Ctrl + Shift + V` 打开 ClipMaster。
 
 ### 校验安装包
 
-Release 页面会附带 `checksums.sha256`。下载后可以在 PowerShell 中校验：
+Release 页面附带 `checksums.sha256`。下载后可在 PowerShell 中校验：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-5.0.0.exe"
+Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-<版本号>.exe"
 ```
 
-将输出的 SHA256 与 `checksums.sha256` 中的值对比。如果不一致，请不要运行安装包，并在 [Issues](https://github.com/dhadb/ClipMaster/issues) 中反馈。
+将输出的 SHA256 与 `checksums.sha256` 中的值对比。若不一致，请勿运行安装包，并在 [Issues](https://github.com/dhadb/ClipMaster/issues) 中反馈。
 
 > Windows 可能会对未签名的开源安装包显示 SmartScreen 提醒。请只从本仓库的 GitHub Releases 下载。
 
 ### 应用内更新
 
-从 `v1.4.1` 开始，ClipMaster 检查到新版本后可以直接在应用内下载官方 Windows 安装包，显示下载进度，并在完成后安装并重启。从 `v2.1.0` 开始，设置页还会显示该版本的 GitHub Release 更新说明；下载失败时仍可打开 Release 页面手动处理。
+ClipMaster 支持应用内更新：检测到新版本后，可在应用内直接下载官方 Windows 安装包并显示进度，安装前会强制校验发布校验和。下载失败时仍可打开 Release 页面手动处理。
 
-`v1.5.0` 进一步使用 Electron `safeStorage` 加密本地历史和设置，支持显示、搜索、清理三组全局快捷键，并将图片缩略图压缩为低占用 JPEG。
-
-`v1.6.0` 加入 Windows 快速粘贴：按 `Ctrl + Shift + V` 唤起后可用方向键选择，按 `Enter` 会回到原应用并自动粘贴；同时提供离线模糊与拼音搜索、关键词高亮、最近搜索、加密保存的筛选、复制时间线、前台应用工作区与手动工作区。链接可净化追踪参数，JSON 可格式化或压缩复制，代码可规范化复制；所有处理均在本地完成。
-
-`v1.7.0` 让快速粘贴更可靠：唤起时记录前台窗口句柄（HWND），按 `Enter` 后只会恢复并向该窗口发送粘贴；无法确认目标时仅保留“已复制”，不会盲目粘贴到其他窗口。前台应用与工作区改为异步缓存，避免高频复制阻塞主进程；“当前应用期间暂停”会正确引用打开 ClipMaster 前的应用。最近 5 条搜索会通过加密设置持久化保存，英文界面的收藏术语也已统一为 Favorites。
-
-`v2.0.0` 建立新的安全与可靠性基础：渲染层启用沙箱和内容安全策略，敏感 IPC 仅接受受信渲染器请求；历史数据带版本号并以最后已知正常快照作为备份；剪贴板记录保留 HTML、RTF 和来源应用；应用内更新在安装前强制校验发布校验和。
-
-## 功能特性
+## 功能一览
 
 | 功能 | 说明 |
 | --- | --- |
@@ -87,7 +83,7 @@ Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-5.0.0.exe"
 | 组合筛选 | 搜索内容和 `#标签`，组合类型、时间范围、最新/最早/常用排序与 `type:` 查询 |
 | 常用片段 | 手动保存常用文本、命令或回复，可直接收藏和置顶 |
 | 标签整理 | 为任意文本记录添加标签，标签随文本备份完整保留 |
-| 收藏与标签 | 置顶用于即时高频内容；收藏结合标签用于“常用回复”“开发命令”“收货信息”等长期归档 |
+| 收藏与置顶 | 置顶用于即时高频内容；收藏结合标签用于“常用回复”“开发命令”“收货信息”等长期归档 |
 | 智能集合 | 将搜索、类型、时间和排序组合保存为集合，随历史变化自动更新结果数量 |
 | 工作区 | 自动记录前台 Windows 应用，并可在详情中手动命名“项目 A”“论文”“旅行”等工作区 |
 | 双模式界面 | 快速粘贴保持紧凑聚焦；资料库提供导航栏、内容检查器和完整管理操作 |
@@ -136,6 +132,7 @@ ClipMaster 不包含云端服务，不会上传、同步或分析你的剪贴板
 ### 环境要求
 
 - Node.js 22.12+
+- npm 10.9+
 - Git
 - Windows 10/11
 
@@ -148,13 +145,25 @@ npm install
 npm run dev
 ```
 
+### 常用命令
+
+| 命令 | 说明 |
+| --- | --- |
+| `npm run dev` | 启动开发服务器（渲染层 + Electron 主进程热更新） |
+| `npm run typecheck` | 对渲染层与主进程分别执行 TypeScript 类型检查 |
+| `npm test` | 运行 Vitest 单元与组件测试 |
+| `npm run test:coverage` | 运行测试并输出覆盖率报告 |
+| `npm run lint` | 对 `src/` 执行 ESLint 检查 |
+| `npm run check` | 类型检查 + 测试 + 渲染层构建的组合门禁 |
+| `npm run build` | 类型检查 + 构建 + 打包 Windows 安装包，产物输出到 `release/` |
+
 ### 构建安装包
 
 ```bash
-npm run build -- --publish never
+npm run build
 ```
 
-构建产物会输出到 `release/`。
+构建产物输出到 `release/`，包含 NSIS 安装包与便携版。
 
 ## 技术栈
 
@@ -167,16 +176,6 @@ npm run build -- --publish never
 
 ## 路线图
 
-- [x] 发布 `v2.0.0` 安全与可靠性基础
-- [x] 在 `v2.1.0` 支持 HTML、RTF、文件列表等多格式剪贴板
-- [x] 在 `v2.1.0` 使用索引搜索支持 5000 条历史
-- [x] 在 `v2.1.0` 增加应用级隐私策略、细分隐私开关与智能集合管理
-- [x] 支持自定义快捷键
-- [x] 增加便携版下载
-- [x] 增加安全的更新检查与下载提示
-- [x] 在 `v3.1.0` 增加剪贴板栈与受信 IPC 读取保护
-- [x] 在 `v4.0.0` 完成外观、动效与剪贴流程的桌面化升级
-- [x] 在 `v5.0.0` 增加快速粘贴与资料库双工作区
 - [ ] 为安装包增加 Windows Authenticode 代码签名（证书配置暂缓）
 
 ## 反馈

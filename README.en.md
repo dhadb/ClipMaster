@@ -34,18 +34,22 @@
   <img src="docs/screenshot.png" width="760" alt="ClipMaster screenshot">
 </p>
 
-## Why ClipMaster
+## Overview
 
-- **Local-first**: Clipboard history, settings, and image cache are stored only under `%AppData%/ClipMaster/`.
+ClipMaster is a local-first clipboard manager for Windows. It continuously captures clipboard changes in the background and organizes text, links, code, colors, JSON, Markdown, and images into searchable, favoritable, batch-manageable history. All data stays on your machine and is encrypted at rest with Electron `safeStorage`.
+
+## Highlights
+
+- **Local-first**: Clipboard history, settings, and image cache are stored only under `%AppData%/ClipMaster/` — no upload, sync, or analytics.
 - **Fast recovery**: Fuzzy, pinyin, tag, type, and workspace search finds copied text, links, code snippets, colors, JSON, Markdown, and images.
-- **Privacy guardrails**: High-risk content such as passwords, tokens, private keys, and card numbers is skipped by default.
+- **Privacy guardrails**: High-risk content such as passwords, tokens, private keys, and card numbers is skipped by default; per-app blocklists and timed monitoring pauses are supported.
 - **Two focused workspaces**: Press `Ctrl + Shift + V` for compact Quick Paste, then switch to Library when you need full content, metadata, and management tools.
 - **Efficient workflows**: Combine time, type, and sort filters, then batch favorite, pin, tag, or delete records.
 
 ## Quick Start
 
 1. Open [Releases](https://github.com/dhadb/ClipMaster/releases/latest).
-2. Download `ClipMaster-Setup-5.0.0.exe`, or choose `ClipMaster-Portable-5.0.0.exe`.
+2. Download the `ClipMaster-Setup-<version>.exe` installer, or choose the portable `ClipMaster-Portable-<version>.exe`.
 3. Run the installer, or launch the portable build directly.
 4. Copy anything, press `Ctrl + Shift + V`, select an entry with the arrow keys, and press `Enter` to paste it back into the previous app.
 
@@ -54,24 +58,16 @@
 Release assets include `checksums.sha256`. After downloading the installer, verify it in PowerShell:
 
 ```powershell
-Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-5.0.0.exe"
+Get-FileHash -Algorithm SHA256 ".\ClipMaster-Setup-<version>.exe"
 ```
 
 Compare the SHA256 output with `checksums.sha256`. If it does not match, do not run the installer and report it in [Issues](https://github.com/dhadb/ClipMaster/issues).
 
 Windows may show a SmartScreen warning for unsigned open-source installers. Download ClipMaster only from this repository's GitHub Releases.
 
-### In-app updates
+## In-app Updates
 
-Starting with `v1.4.1`, ClipMaster can download the official Windows installer inside the app after finding a new release, show live progress, and install it with a restart. Starting with `v2.1.0`, the settings page also displays the GitHub Release notes for the detected version. If the download fails, the Release page remains available as a fallback.
-
-`v1.5.0` adds Electron `safeStorage` encryption for local history and settings, separate global shortcuts for showing history, focusing search, and clearing unprotected records, plus compact JPEG thumbnails with bounded renderer cache usage.
-
-`v1.6.0` adds Windows quick paste, offline fuzzy and pinyin search with highlights, recent searches and encrypted saved filters, copy timelines, automatic foreground-app workspaces with manual workspace labels, richer content actions, and clearer privacy pause states. Quick paste, pinyin lookup, and workspace detection run locally; clipboard content is never uploaded.
-
-`v1.7.0` makes quick paste deterministic: it records the foreground window handle (HWND) when opened, then restores and pastes only into that target when you press `Enter`. If the target cannot be confirmed, the item remains copied without a blind paste. Foreground app and workspace detection now use an asynchronous cache to keep high-frequency captures responsive, and "Pause for this app" correctly uses the app active before ClipMaster opened. The last five searches now persist through encrypted settings, and English terminology now correctly labels saved items as Favorites.
-
-`v2.0.0` establishes the security and reliability foundation: the renderer runs with sandboxing and a content security policy, sensitive IPC calls accept only trusted renderer requests, persisted data is versioned with a last-known-good backup, HTML/RTF and source applications are retained, and in-app installers must pass release checksum verification before installation.
+ClipMaster supports in-app updates: when a new release is detected, the official Windows installer can be downloaded inside the app with live progress, and the release checksum is verified before installation. If the download fails, the Release page remains available as a fallback.
 
 ## Features
 
@@ -82,9 +78,10 @@ Starting with `v1.4.1`, ClipMaster can download the official Windows installer i
 | History | Stores up to 5000 clipboard entries with a reusable search index and bounded query cache |
 | Smart categories | Detects text, links, emails, code, colors, JSON, Markdown, images, file lists, and more |
 | Command-style search | Fuzzy matches such as `git pu`, offline pinyin search, highlights, recent searches, saved filters, plus `#tags`, `type:`, `workspace:`, `app:`, `is:pinned`, `has:files`, and `has:rich` queries |
+| Combined filters | Combine search and `#tags` with type, time range, newest/oldest/most-used sorting, and `type:` queries |
 | Reusable snippets | Save frequently used text, commands, and replies manually |
 | Tags | Organize any entry with tags preserved across import and export |
-| Favorites | Use pinning for immediate access; keep longer-lived replies, commands, and addresses in Favorites, then organize them with tags |
+| Favorites and pins | Use pinning for immediate access; keep longer-lived replies, commands, and addresses in Favorites, then organize them with tags |
 | Smart collections | Save a combined search, type, time, and sort view; result counts update as history changes |
 | Workspaces | Automatically label captures by the foreground Windows app; add a manual workspace such as Project A, thesis, or travel in details |
 | Two-mode workspace | Use compact Quick Paste for shortcut-driven paste flows and Library for navigation, inspection, and management |
@@ -118,21 +115,26 @@ Starting with `v1.4.1`, ClipMaster can download the official Windows installer i
 | `Delete` | Delete selected item | In app |
 | `Esc` | Clear search / close | In app |
 
-## Roadmap
+## Privacy and Data Storage
 
-- [x] Ship the `v2.0.0` security and reliability foundation
-- [x] Add HTML, RTF, and file-list clipboard support in `v2.1.0`
-- [x] Add indexed search for 5000 history entries in `v2.1.0`
-- [x] Add application privacy policies, granular privacy toggles, and smart collections in `v2.1.0`
-- [x] Support custom shortcuts, portable downloads, and secure update downloads
-- [x] Add Clipboard Stack and trusted IPC reads in `v3.1.0`
-- [x] Ship the `v4.0.0` visual, motion, and paste-flow refresh
-- [x] Ship the `v5.0.0` Quick Paste and Library workspace update
-- [ ] Add Windows Authenticode code signing (certificate setup deferred)
+ClipMaster contains no cloud services and never uploads, syncs, or analyzes your clipboard content. Default data directory:
+
+```text
+%AppData%/ClipMaster/
+```
+
+See [PRIVACY.md](PRIVACY.md) for details.
 
 ## Development
 
-Requires Node.js 22.12 or newer.
+### Requirements
+
+- Node.js 22.12+
+- npm 10.9+
+- Git
+- Windows 10/11
+
+### Run locally
 
 ```bash
 git clone https://github.com/dhadb/ClipMaster.git
@@ -141,11 +143,29 @@ npm install
 npm run dev
 ```
 
-Build the Windows installer:
+### Common commands
+
+| Command | Description |
+| --- | --- |
+| `npm run dev` | Start the dev server (renderer + Electron main process hot reload) |
+| `npm run typecheck` | TypeScript type checking for renderer and main process |
+| `npm test` | Run Vitest unit and component tests |
+| `npm run test:coverage` | Run tests with a coverage report |
+| `npm run lint` | Run ESLint over `src/` |
+| `npm run check` | Combined gate: typecheck + tests + renderer build |
+| `npm run build` | Typecheck + build + package the Windows installers into `release/` |
+
+### Build the installer
 
 ```bash
-npm run build -- --publish never
+npm run build
 ```
+
+Build output goes to `release/`, containing the NSIS installer and the portable build.
+
+## Roadmap
+
+- [ ] Add Windows Authenticode code signing (certificate setup deferred)
 
 ## License
 

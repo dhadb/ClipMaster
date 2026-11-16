@@ -8,7 +8,10 @@ interface Props {
   size?: 'thumb' | 'detail'
 }
 
-const imageDataUrlCache = new WeightedLruCache<string>(20, 12 * 1024 * 1024)
+// thumb 与 detail 拆成两个独立 LRU：detail 大图（≤8MB）若与 thumb 共用缓存，
+// 几张大图就会把全部缩略图挤出缓存，导致列表缩略图反复重载。
+const thumbCache = new WeightedLruCache<string>(20, 12 * 1024 * 1024)
+const detailCache = new WeightedLruCache<string>(6, 24 * 1024 * 1024)
 
 const ImagePreview: React.FC<Props> = ({ imagePath, size = 'thumb' }) => {
   const { t } = useI18n()
@@ -31,7 +34,8 @@ const ImagePreview: React.FC<Props> = ({ imagePath, size = 'thumb' }) => {
       return
     }
 
-    const cached = imageDataUrlCache.get(cacheKey)
+    const cache = isDetail ? detailCache : thumbCache
+    const cached = cache.get(cacheKey)
     if (cached) {
       setSrc(cached)
     } else {
@@ -39,7 +43,7 @@ const ImagePreview: React.FC<Props> = ({ imagePath, size = 'thumb' }) => {
         .then(dataUrl => {
           if (cancelled) return
           if (dataUrl) {
-            imageDataUrlCache.set(cacheKey, dataUrl, dataUrl.length)
+            cache.set(cacheKey, dataUrl, dataUrl.length)
             setSrc(dataUrl)
           } else setFailed(true)
         })
@@ -58,9 +62,10 @@ const ImagePreview: React.FC<Props> = ({ imagePath, size = 'thumb' }) => {
   }, [cacheKey, imagePath, isDetail, size])
 
   const onError = useCallback(() => {
-    imageDataUrlCache.delete(cacheKey)
+    if (isDetail) detailCache.delete(cacheKey)
+    else thumbCache.delete(cacheKey)
     setFailed(true)
-  }, [cacheKey])
+  }, [cacheKey, isDetail])
   /* eslint-enable react-hooks/set-state-in-effect */
 
   if (src && !failed) {
@@ -72,6 +77,8 @@ const ImagePreview: React.FC<Props> = ({ imagePath, size = 'thumb' }) => {
         <img
           src={src}
           onError={onError}
+          loading="lazy"
+          decoding="async"
           className={isDetail ? 'max-h-[36vh] w-full object-contain rounded-lg' : 'w-12 h-12 object-cover rounded-lg flex-shrink-0'}
           style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-card)' }}
           alt={t('image.alt')}

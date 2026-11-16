@@ -154,7 +154,15 @@ const ClipboardList: React.FC<Props> = ({ variant = 'quick' }) => {
   }, [filteredHistory, copyItem, variant])
 
   return (
-    <div ref={containerRef} className="h-full overflow-y-auto px-2 py-1" style={{ contain: 'layout paint' }}>
+    <div
+      ref={containerRef}
+      tabIndex={0}
+      className="h-full overflow-y-auto px-2 py-1"
+      style={{ contain: 'layout paint' }}
+      role="listbox"
+      aria-label={t('tabs.history')}
+      aria-activedescendant={selectedId ? `clip-${selectedId}` : undefined}
+    >
       <div style={{ height: totalH, position: 'relative' }}>
         {visible.map((item, i) => {
           const actualIndex = range.start + i
@@ -163,6 +171,8 @@ const ClipboardList: React.FC<Props> = ({ variant = 'quick' }) => {
             <div
               key={item.id}
               id={`clip-${item.id}`}
+              role="option"
+              aria-selected={selectedId === item.id}
               className={actualIndex < 8 ? 'item-enter' : ''}
               data-density={listDensity}
               style={{ position: 'absolute', top, left: 0, right: 0, height: itemH, animationDelay: actualIndex < 8 ? `${Math.min(actualIndex * 10, 60)}ms` : '0ms' }}

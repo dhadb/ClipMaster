@@ -129,6 +129,8 @@ const ClipboardItemCard: React.FC<Props> = memo(({ item, isSelected, onSelect, s
 
   const typeColor = cfg.cssVar
   const typeBg = `color-mix(in srgb, ${cfg.cssVar} 8%, transparent)`
+  // 主按钮的可读名称：优先用条目预览文本，图片等无文本时退回类型标签
+  const cardAriaLabel = preview.trim() ? `${typeLabel(item.type)} · ${preview}` : typeLabel(item.type)
   const meta = [
     isCode ? t('item.verification') : null,
     item.content.length > 0 ? t('item.chars', { count: item.content.length }) : null,
@@ -146,6 +148,8 @@ const ClipboardItemCard: React.FC<Props> = memo(({ item, isSelected, onSelect, s
           onClick={event => onOpenDetail(event.ctrlKey || event.metaKey)}
           onDoubleClick={onDoubleClickCopy}
           className="card-main flex-1 min-w-0 flex items-start gap-2.5 p-2.5 text-left cursor-pointer"
+          aria-label={cardAriaLabel}
+          aria-current={isSelected ? 'true' : undefined}
         >
           {selectionMode ? (
             <span
@@ -231,7 +235,13 @@ const ClipboardItemCard: React.FC<Props> = memo(({ item, isSelected, onSelect, s
             <MoreHorizontal size={14} />
           </button>
           {menuOpen && (
-            <div onClick={event => event.stopPropagation()} className="card-menu absolute right-0 top-8 z-30 w-44 rounded-md p-1 shadow-xl fade-in" role="menu" tabIndex={-1}>
+            <div
+              onClick={event => event.stopPropagation()}
+              onKeyDown={event => event.stopPropagation()}
+              className="card-menu absolute right-0 top-8 z-30 w-44 rounded-md p-1 shadow-xl fade-in"
+              role="menu"
+              tabIndex={-1}
+            >
               <button onClick={onPin} className="menu-item" role="menuitem">
                 {item.pinned ? <PinOff size={13} /> : <Pin size={13} />}
                 {item.pinned ? t('item.unpin') : t('item.pin')}

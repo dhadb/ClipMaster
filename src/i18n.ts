@@ -33,6 +33,7 @@ const zh = {
   'app.monitoring': '监控中',
   'app.paused': '已暂停记录',
   'app.records': '{count} 条记录',
+  'app.records_one': '{count} 条记录',
   'app.resume': '恢复记录',
   'app.pause5': '暂停 5 分钟',
   'app.pauseMinutes': '暂停 {count} 分钟',
@@ -62,6 +63,7 @@ const zh = {
   'tabs.clearKeptTitle': '清空未收藏/未置顶',
   'tabs.clearAllTitle': '清空全部历史',
   'tabs.imported': '已导入 {count} 条记录',
+  'tabs.imported_one': '已导入 {count} 条记录',
   'tabs.importEmpty': '没有找到可导入的记录',
   'tabs.importFailed': '导入失败：请选择 ClipMaster 导出的 JSON 文件',
   'tabs.importTooLarge': '导入失败：备份文件不能超过 32 MB',
@@ -73,8 +75,10 @@ const zh = {
   'tabs.confirmClear': '确认清理',
   'tabs.organizeEmpty': '暂无可整理的内容',
   'tabs.organized': '已整理并复制 {count} 条内容',
+  'tabs.organized_one': '已整理并复制 {count} 条内容',
   'tabs.importTitle': '导入历史记录',
   'tabs.importPreview': '发现 {count} 条可导入记录，请选择处理方式。',
+  'tabs.importPreview_one': '发现 {count} 条可导入记录，请选择处理方式。',
   'tabs.importMerge': '合并导入',
   'tabs.importMergeDesc': '保留当前记录，并自动去除重复内容。',
   'tabs.importReplace': '替换现有记录',
@@ -87,6 +91,7 @@ const zh = {
   'search.filters': '筛选与排序',
   'search.resultSummary': '显示 {count} / {total} 条',
   'search.totalSummary': '共 {count} 条记录',
+  'search.totalSummary_one': '共 {count} 条记录',
   'search.reset': '重置',
   'search.sortNewest': '最新',
   'search.sortOldest': '最早',
@@ -128,7 +133,9 @@ const zh = {
   'item.imagePreview': '图片内容 · 点击查看详情或直接复制',
   'item.verification': '验证码 · 临时保护',
   'item.chars': '{count} 字符',
+  'item.chars_one': '{count} 字符',
   'item.copyCount': '复制 {count} 次',
+  'item.copyCount_one': '复制 {count} 次',
   'item.copy': '复制',
   'item.pin': '置顶',
   'item.unpin': '取消置顶',
@@ -146,6 +153,7 @@ const zh = {
   'detail.words': '词数',
   'detail.copies': '复制',
   'detail.copyTimes': '{count} 次',
+  'detail.copyTimes_one': '{count} 次',
   'detail.firstRecorded': '首次记录',
   'detail.status': '状态',
   'detail.pinned': '已置顶',
@@ -159,6 +167,7 @@ const zh = {
   'detail.mailTo': '写邮件给 {email}',
   'detail.showFile': '打开所在位置',
   'detail.fileList': '{count} 个文件',
+  'detail.fileList_one': '{count} 个文件',
   'detail.fullContent': '完整内容',
   'detail.copyJson': '复制格式化 JSON',
   'detail.copyContent': '复制内容',
@@ -246,9 +255,11 @@ const zh = {
   'settings.history': '历史记录',
   'settings.maxHistory': '最大保存数量',
   'settings.countUnit': '{count} 条',
+  'settings.countUnit_one': '{count} 条',
   'settings.retentionDays': '普通记录保留天数',
   'settings.zeroNever': '0 表示不过期',
   'settings.daysUnit': '{count} 天',
+  'settings.daysUnit_one': '{count} 天',
   'settings.verificationTtl': '验证码保留时间',
   'settings.minutesUnit': '{count} 分钟',
   'settings.themeStyle': '主题风格',
@@ -303,6 +314,7 @@ const zh = {
   'settings.cleanupDesc': '删除历史后可清理不再被引用的图片文件。',
   'settings.cleanup': '清理缓存',
   'settings.cleanupDone': '已清理 {count} 个文件，释放 {size} MB',
+  'settings.cleanupDone_one': '已清理 {count} 个文件，释放 {size} MB',
   'settings.cleanupFailed': '清理失败，请稍后再试',
   'settings.notification': '通知设置',
   'settings.copySound': '复制提示音',
@@ -346,6 +358,7 @@ const zh = {
   'image.unavailable': '图片预览不可用',
 
   'toast.deleted': '已删除 {count} 条记录',
+  'toast.deleted_one': '已删除 {count} 条记录',
   'toast.updated': '修改已保存',
   'toast.exported': '文本备份已导出，图片记录未包含',
   'toast.clearedAll': '历史记录已清空',
@@ -359,6 +372,7 @@ const zh = {
   'storageHealth.recoveredFromBackup': '已从备份恢复',
   'storageHealth.recoveredFromBackupDesc': '主数据文件读不出来，已改用最近一次备份启动，最后一次改动可能缺失。',
   'storageHealth.trimmed': '保存时裁剪了 {count} 条记录',
+  'storageHealth.trimmed_one': '保存时裁剪了 {count} 条记录',
   'storageHealth.trimmedDesc': '数据文件达到体积上限，较旧的记录在落盘时被移除。',
   'storageHealth.encryptionPlain': '本地加密不可用',
   'storageHealth.encryptionPlainDesc': '当前系统无法使用 safeStorage，历史记录以明文保存在磁盘上。',
@@ -373,6 +387,10 @@ const zh = {
   'storageHealth.sectionTitle': '数据写入健康',
   'storageHealth.ok': '本地数据写入正常',
   'storageHealth.okDesc': '加密已启用，最近一次保存没有裁剪记录。',
+
+  'errorBoundary.title': 'ClipMaster 遇到错误',
+  'errorBoundary.description': '应用状态未丢失，可以重新加载界面。',
+  'errorBoundary.reload': '重新加载',
 } as const
 
 const en: Record<keyof typeof zh, string> = {
@@ -402,6 +420,7 @@ const en: Record<keyof typeof zh, string> = {
   'app.monitoring': 'Monitoring',
   'app.paused': 'Recording paused',
   'app.records': '{count} records',
+  'app.records_one': '{count} record',
   'app.resume': 'Resume',
   'app.pause5': 'Pause 5 min',
   'app.pauseMinutes': 'Pause {count} min',
@@ -431,6 +450,7 @@ const en: Record<keyof typeof zh, string> = {
   'tabs.clearKeptTitle': 'Clear unstarred/unpinned',
   'tabs.clearAllTitle': 'Clear all history',
   'tabs.imported': 'Imported {count} records',
+  'tabs.imported_one': 'Imported {count} record',
   'tabs.importEmpty': 'No importable records found',
   'tabs.importFailed': 'Import failed: choose a JSON file exported by ClipMaster',
   'tabs.importTooLarge': 'Import failed: backup files cannot exceed 32 MB',
@@ -442,8 +462,10 @@ const en: Record<keyof typeof zh, string> = {
   'tabs.confirmClear': 'Clear now',
   'tabs.organizeEmpty': 'There is nothing to organize yet',
   'tabs.organized': 'Organized and copied {count} items',
+  'tabs.organized_one': 'Organized and copied {count} item',
   'tabs.importTitle': 'Import history',
   'tabs.importPreview': 'Found {count} importable records. Choose how to continue.',
+  'tabs.importPreview_one': 'Found {count} importable record. Choose how to continue.',
   'tabs.importMerge': 'Merge records',
   'tabs.importMergeDesc': 'Keep current history and remove duplicate content.',
   'tabs.importReplace': 'Replace history',
@@ -456,6 +478,7 @@ const en: Record<keyof typeof zh, string> = {
   'search.filters': 'Filters and sorting',
   'search.resultSummary': 'Showing {count} of {total}',
   'search.totalSummary': '{count} records',
+  'search.totalSummary_one': '{count} record',
   'search.reset': 'Reset',
   'search.sortNewest': 'Newest',
   'search.sortOldest': 'Oldest',
@@ -497,7 +520,9 @@ const en: Record<keyof typeof zh, string> = {
   'item.imagePreview': 'Image content · open details or copy directly',
   'item.verification': 'Code · temporary protection',
   'item.chars': '{count} chars',
+  'item.chars_one': '{count} char',
   'item.copyCount': 'Copied {count} times',
+  'item.copyCount_one': 'Copied {count} time',
   'item.copy': 'Copy',
   'item.pin': 'Pin',
   'item.unpin': 'Unpin',
@@ -515,6 +540,7 @@ const en: Record<keyof typeof zh, string> = {
   'detail.words': 'Words',
   'detail.copies': 'Copies',
   'detail.copyTimes': '{count} times',
+  'detail.copyTimes_one': '{count} time',
   'detail.firstRecorded': 'First recorded',
   'detail.status': 'Status',
   'detail.pinned': 'Pinned',
@@ -528,6 +554,7 @@ const en: Record<keyof typeof zh, string> = {
   'detail.mailTo': 'Email {email}',
   'detail.showFile': 'Show in folder',
   'detail.fileList': '{count} files',
+  'detail.fileList_one': '{count} file',
   'detail.fullContent': 'Full content',
   'detail.copyJson': 'Copy formatted JSON',
   'detail.copyContent': 'Copy content',
@@ -615,9 +642,11 @@ const en: Record<keyof typeof zh, string> = {
   'settings.history': 'History',
   'settings.maxHistory': 'Max records',
   'settings.countUnit': '{count} items',
+  'settings.countUnit_one': '{count} item',
   'settings.retentionDays': 'Normal retention days',
   'settings.zeroNever': '0 means never expire',
   'settings.daysUnit': '{count} days',
+  'settings.daysUnit_one': '{count} day',
   'settings.verificationTtl': 'Verification code retention',
   'settings.minutesUnit': '{count} min',
   'settings.themeStyle': 'Theme',
@@ -672,6 +701,7 @@ const en: Record<keyof typeof zh, string> = {
   'settings.cleanupDesc': 'After deleting history, clean image files that are no longer referenced.',
   'settings.cleanup': 'Clean cache',
   'settings.cleanupDone': 'Cleaned {count} files and freed {size} MB',
+  'settings.cleanupDone_one': 'Cleaned {count} file and freed {size} MB',
   'settings.cleanupFailed': 'Cleanup failed. Please try again later.',
   'settings.notification': 'Notifications',
   'settings.copySound': 'Copy sound',
@@ -715,6 +745,7 @@ const en: Record<keyof typeof zh, string> = {
   'image.unavailable': 'Image preview unavailable',
 
   'toast.deleted': 'Deleted {count} records',
+  'toast.deleted_one': 'Deleted {count} record',
   'toast.updated': 'Changes saved',
   'toast.exported': 'Text backup exported without image records',
   'toast.clearedAll': 'History cleared',
@@ -728,6 +759,7 @@ const en: Record<keyof typeof zh, string> = {
   'storageHealth.recoveredFromBackup': 'Restored from backup',
   'storageHealth.recoveredFromBackupDesc': 'The main data file could not be read, so the most recent backup was used; changes since then may be missing.',
   'storageHealth.trimmed': 'Trimmed {count} records on save',
+  'storageHealth.trimmed_one': 'Trimmed {count} record on save',
   'storageHealth.trimmedDesc': 'The data file reached its size limit, so older records were dropped while saving.',
   'storageHealth.encryptionPlain': 'Local encryption unavailable',
   'storageHealth.encryptionPlainDesc': 'safeStorage is not available on this system, so history is stored on disk as plain text.',
@@ -742,6 +774,10 @@ const en: Record<keyof typeof zh, string> = {
   'storageHealth.sectionTitle': 'Storage health',
   'storageHealth.ok': 'Local storage is healthy',
   'storageHealth.okDesc': 'Encryption is on and the last save did not trim any records.',
+
+  'errorBoundary.title': 'ClipMaster hit an error',
+  'errorBoundary.description': 'App state is safe. You can reload the interface.',
+  'errorBoundary.reload': 'Reload',
 }
 
 export type TranslationKey = keyof typeof zh
@@ -761,8 +797,32 @@ function formatMessage(template: string, params: Params = {}) {
   return template.replace(/\{(\w+)\}/g, (_, key) => String(params[key] ?? ''))
 }
 
+const pluralRulesCache = new Map<ResolvedLanguage, Intl.PluralRules>()
+
+// 英文按 Intl.PluralRules 区分单复数，取 `${key}_one` 变体；中文无复数变化，恒用基础键。
+function isSingularCount(language: ResolvedLanguage, count: number) {
+  let rules = pluralRulesCache.get(language)
+  if (!rules) {
+    rules = new Intl.PluralRules(language)
+    pluralRulesCache.set(language, rules)
+  }
+  return rules.select(count) === 'one'
+}
+
 export function translate(language: ResolvedLanguage, key: TranslationKey, params?: Params) {
-  return formatMessage(translations[language][key] ?? translations['zh-CN'][key] ?? key, params)
+  const dict = translations[language] ?? translations['zh-CN']
+  let template: string = dict[key] ?? translations['zh-CN'][key] ?? key
+  if (typeof params?.count === 'number' && isSingularCount(language, params.count)) {
+    const oneKey = `${key}_one` as TranslationKey
+    const oneTemplate = dict[oneKey] ?? translations['zh-CN'][oneKey]
+    if (oneTemplate) template = oneTemplate
+  }
+  return formatMessage(template, params)
+}
+
+export function translateCurrent(key: TranslationKey, params?: Params) {
+  const language = resolveLanguage(useClipboardStore.getState().settings.language)
+  return translate(language, key, params)
 }
 
 export function useI18n() {
@@ -771,6 +831,13 @@ export function useI18n() {
   return useMemo(() => ({
     language,
     t: (key: TranslationKey, params?: Params) => translate(language, key, params),
-    typeLabel: (type: string) => translate(language, `type.${type}` as TranslationKey),
+    typeLabel: (type: string) => {
+      const key = `type.${type}` as TranslationKey
+      // 未知类型兜底为通用文本类型文案，而不是把内部键名直接展示给用户
+      if (translations[language][key] == null && translations['zh-CN'][key] == null) {
+        return translate(language, 'type.text')
+      }
+      return translate(language, key)
+    },
   }), [language])
 }

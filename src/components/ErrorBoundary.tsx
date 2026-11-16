@@ -1,4 +1,5 @@
 import React from 'react'
+import { translateCurrent } from '../i18n'
 
 interface ErrorBoundaryState {
   hasError: boolean
@@ -20,15 +21,15 @@ export default class ErrorBoundary extends React.Component<React.PropsWithChildr
     return (
       <div className="h-screen w-screen flex items-center justify-center" style={{ background: 'var(--bg-root)', color: 'var(--text-primary)' }}>
         <div className="flex flex-col items-center gap-3 text-center px-6">
-          <strong className="text-[14px]">ClipMaster 遇到错误</strong>
-          <span className="text-[12px]" style={{ color: 'var(--text-tertiary)' }}>应用状态未丢失，可以重新加载界面。</span>
+          <strong className="text-[14px]">{translateCurrent('errorBoundary.title')}</strong>
+          <span className="text-[12px]" style={{ color: 'var(--text-tertiary)' }}>{translateCurrent('errorBoundary.description')}</span>
           <button
             type="button"
             onClick={() => window.location.reload()}
             className="rounded-lg px-4 py-2 text-[12px]"
             style={{ background: 'var(--color-primary)', color: 'white' }}
           >
-            重新加载
+            {translateCurrent('errorBoundary.reload')}
           </button>
         </div>
       </div>

@@ -120,6 +120,8 @@ const ClipboardDetail: React.FC = () => {
   const [saving, setSaving] = useState(false)
   const [editError, setEditError] = useState('')
   const contentTextareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const panelRef = useRef<HTMLDivElement | null>(null)
+  const restoreFocusRef = useRef<HTMLElement | null>(null)
 
   // 进入编辑态时聚焦正文（等价于原 autoFocus，但不依赖 jsx-a11y/no-autofocus 豁免）
   React.useEffect(() => {
@@ -127,6 +129,42 @@ const ClipboardDetail: React.FC = () => {
   }, [editing])
 
   const item = useMemo<ClipboardItem | undefined>(() => history.find(h => h.id === detailItemId), [history, detailItemId])
+
+  // 详情层打开时补齐对话框语义的焦点管理：
+  // 进入聚焦首个可聚焦元素、Tab 在面板内循环、关闭时归还焦点到触发元素。
+  // 不迁移到 ui/Modal：该层是全屏覆盖（非居中卡片），且 Esc/Ctrl+C 语义依赖
+  // 编辑状态（Esc 在编辑态是取消编辑而非关闭），Modal 基座会与其键盘处理冲突。
+  React.useEffect(() => {
+    if (!detailItemId) return
+    restoreFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const panel = panelRef.current
+    const focusables = (): HTMLElement[] => {
+      if (!panel) return []
+      return Array.from(panel.querySelectorAll<HTMLElement>(
+        ['a[href]', 'button:not([disabled])', 'textarea:not([disabled])', 'input:not([disabled]):not([type="hidden"])', 'select:not([disabled])', '[tabindex]:not([tabindex="-1"])'].join(',')
+      )).filter(el => el.offsetWidth > 0 || el.offsetHeight > 0 || el === document.activeElement)
+    }
+    focusables()[0]?.focus()
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab') return
+      const items = focusables()
+      if (items.length === 0) { event.preventDefault(); return }
+      const first = items[0]
+      const last = items[items.length - 1]
+      const active = document.activeElement as HTMLElement | null
+      if (event.shiftKey) {
+        if (active === first || !panel?.contains(active)) { event.preventDefault(); last.focus() }
+      } else if (active === last || !panel?.contains(active)) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown, true)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown, true)
+      restoreFocusRef.current?.focus?.()
+    }
+  }, [detailItemId, item?.id])
 
   // 切换详情条目时必须把本地草稿重置为新条目的内容。
   // 这是"外部数据变化 -> 同步本地编辑态"的合法场景：本组件由 store 驱动、
@@ -228,7 +266,7 @@ const ClipboardDetail: React.FC = () => {
   if (!item) {
     return (
       <div className="absolute inset-0 z-50 flex items-center justify-center p-4 detail-backdrop" style={{ background: 'color-mix(in srgb, var(--bg-root) 72%, transparent)', backdropFilter: 'blur(10px)' }}>
-        <div className="w-full max-w-sm rounded-lg p-5 text-center detail-panel" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-card)' }}>
+        <div role="dialog" aria-modal="true" aria-label={t('detail.title')} className="w-full max-w-sm rounded-lg p-5 text-center detail-panel" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-card)' }}>
           <p className="text-[13px] mb-4" style={{ color: 'var(--text-secondary)' }}>{t('detail.missing')}</p>
           <button onClick={onClose} className="px-4 py-2 rounded-lg text-[12px]" style={{ background: 'var(--color-primary)', color: 'white' }}>{t('detail.close')}</button>
         </div>
@@ -250,7 +288,14 @@ const ClipboardDetail: React.FC = () => {
   const timeFormatter = new Intl.DateTimeFormat(language, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 
   return (
-    <div className="absolute inset-0 z-50 flex flex-col detail-panel" style={{ background: 'var(--bg-root)' }}>
+    <div
+      ref={panelRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label={t('detail.title')}
+      className="absolute inset-0 z-50 flex flex-col detail-panel"
+      style={{ background: 'var(--bg-root)' }}
+    >
       <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid var(--border-divider)' }}>
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: typeBg }}>

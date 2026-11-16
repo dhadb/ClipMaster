@@ -5,6 +5,7 @@ import { useI18n } from '../i18n'
 import { createTextMetadataBackup } from '../utils/backup'
 import { getBoundedImportSource, MAX_IMPORT_FILE_BYTES } from '../utils/limits'
 import ConfirmDialog from './ConfirmDialog'
+import Modal from './ui/Modal'
 
 type ClearMode = 'kept' | 'all' | null
 
@@ -26,6 +27,7 @@ const TabBar: React.FC<Props> = memo(({ variant = 'tabs' }) => {
   const { t } = useI18n()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+  const menuButtonRef = useRef<HTMLButtonElement>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [clearMode, setClearMode] = useState<ClearMode>(null)
   const [importPayload, setImportPayload] = useState<unknown>(null)
@@ -41,6 +43,8 @@ const TabBar: React.FC<Props> = memo(({ variant = 'tabs' }) => {
 
   useEffect(() => {
     if (!menuOpen) return
+    // 打开时把焦点移到第一个菜单项（menu item 语义 + 键盘可达）
+    menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus()
     const close = (event: MouseEvent) => {
       if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false)
     }
@@ -132,16 +136,16 @@ const TabBar: React.FC<Props> = memo(({ variant = 'tabs' }) => {
           {activeTab !== 'stats' && (
             <button onClick={() => setSelectionMode(!selectionMode)} className={`action-btn ${selectionMode ? 'active' : ''}`} title={t('tabs.select')}><CheckSquare size={13} /></button>
           )}
-          <button onClick={() => setMenuOpen(value => !value)} className={`action-btn ${menuOpen ? 'active' : ''}`} title={t('tabs.more')}><MoreHorizontal size={14} /></button>
+          <button ref={menuButtonRef} onClick={() => setMenuOpen(value => !value)} className={`action-btn ${menuOpen ? 'active' : ''}`} title={t('tabs.more')} aria-label={t('tabs.more')} aria-haspopup="menu" aria-expanded={menuOpen}><MoreHorizontal size={14} /></button>
           <input ref={fileInputRef} type="file" accept="application/json,.json" className="hidden" onChange={onImportFile} />
           {menuOpen && (
-            <div className="absolute right-0 top-9 z-40 w-52 overflow-hidden rounded-md p-1 shadow-xl fade-in" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-card-hover)', backdropFilter: 'blur(18px)' }}>
-              <button onClick={() => void onSmartOrganize()} className="menu-item"><Sparkles size={13} />{t('tabs.organize')}</button>
-              <button onClick={() => { fileInputRef.current?.click(); setMenuOpen(false) }} className="menu-item"><Upload size={13} />{t('tabs.import')}</button>
-              <button onClick={onExport} className="menu-item"><Download size={13} />{t('tabs.export')}</button>
+            <div role="menu" aria-label={t('tabs.more')} className="absolute right-0 top-9 z-40 w-52 overflow-hidden rounded-md p-1 shadow-xl fade-in" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-card-hover)', backdropFilter: 'blur(18px)' }}>
+              <button role="menuitem" onClick={() => void onSmartOrganize()} className="menu-item"><Sparkles size={13} />{t('tabs.organize')}</button>
+              <button role="menuitem" onClick={() => { fileInputRef.current?.click(); setMenuOpen(false) }} className="menu-item"><Upload size={13} />{t('tabs.import')}</button>
+              <button role="menuitem" onClick={onExport} className="menu-item"><Download size={13} />{t('tabs.export')}</button>
               {history.length > 0 && <div className="my-1 h-px" style={{ background: 'var(--border-divider)' }} />}
-              {history.length > 0 && <button onClick={() => { setClearMode('kept'); setMenuOpen(false) }} className="menu-item danger"><Trash2 size={13} />{t('tabs.clearKept')}</button>}
-              {history.length > 0 && <button onClick={() => { setClearMode('all'); setMenuOpen(false) }} className="menu-item danger"><X size={13} />{t('tabs.clearAllTitle')}</button>}
+              {history.length > 0 && <button role="menuitem" onClick={() => { setClearMode('kept'); setMenuOpen(false) }} className="menu-item danger"><Trash2 size={13} />{t('tabs.clearKept')}</button>}
+              {history.length > 0 && <button role="menuitem" onClick={() => { setClearMode('all'); setMenuOpen(false) }} className="menu-item danger"><X size={13} />{t('tabs.clearAllTitle')}</button>}
             </div>
           )}
         </div>
@@ -158,30 +162,26 @@ const TabBar: React.FC<Props> = memo(({ variant = 'tabs' }) => {
         onCancel={() => setClearMode(null)}
       />
 
-      {importPayload !== null && (
-        <div className="absolute inset-0 z-[80] flex items-center justify-center p-4 detail-backdrop" style={{ background: 'color-mix(in srgb, var(--bg-root) 76%, transparent)', backdropFilter: 'blur(12px)' }}>
-          <div role="dialog" aria-modal="true" className="w-full max-w-sm overflow-hidden rounded-lg detail-panel" style={{ background: 'var(--bg-app)', border: '1px solid var(--border-card)', boxShadow: 'var(--shadow-app)' }}>
-            <div className="flex items-start gap-3 px-4 py-4">
-              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg" style={{ color: 'var(--color-primary-light)', background: 'color-mix(in srgb, var(--color-primary) 12%, transparent)' }}><Upload size={15} /></div>
-              <div className="min-w-0 flex-1">
-                <h2 className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>{t('tabs.importTitle')}</h2>
-                <p className="mt-1 text-[11px] leading-relaxed" style={{ color: 'var(--text-tertiary)' }}>{t('tabs.importPreview', { count: importCount })}</p>
-              </div>
-              <button onClick={() => setImportPayload(null)} className="action-btn" title={t('quickAdd.cancel')}><X size={14} /></button>
-            </div>
-            <div className="grid grid-cols-2 gap-2 px-4 pb-4">
-              <button onClick={() => void applyImport('merge')} className="rounded-md p-3 text-left interactive-chip" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-card)' }}>
-                <span className="block text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>{t('tabs.importMerge')}</span>
-                <span className="mt-1 block text-[10px] leading-relaxed" style={{ color: 'var(--text-ghost)' }}>{t('tabs.importMergeDesc')}</span>
-              </button>
-              <button onClick={() => void applyImport('replace')} className="rounded-md p-3 text-left interactive-chip" style={{ background: 'color-mix(in srgb, var(--color-warning) 7%, var(--bg-surface))', border: '1px solid color-mix(in srgb, var(--color-warning) 18%, var(--border-card))' }}>
-                <span className="block text-[11px] font-semibold" style={{ color: 'var(--color-warning)' }}>{t('tabs.importReplace')}</span>
-                <span className="mt-1 block text-[10px] leading-relaxed" style={{ color: 'var(--text-ghost)' }}>{t('tabs.importReplaceDesc')}</span>
-              </button>
-            </div>
+      <Modal open={importPayload !== null} onClose={() => setImportPayload(null)} labelledBy="tab-import-title" maxWidth="24rem" zIndex={80} blur={12}>
+        <div className="flex items-start gap-3 px-4 py-4">
+          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg" style={{ color: 'var(--color-primary-light)', background: 'color-mix(in srgb, var(--color-primary) 12%, transparent)' }}><Upload size={15} /></div>
+          <div className="min-w-0 flex-1">
+            <h2 id="tab-import-title" className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>{t('tabs.importTitle')}</h2>
+            <p className="mt-1 text-[11px] leading-relaxed" style={{ color: 'var(--text-tertiary)' }}>{t('tabs.importPreview', { count: importCount })}</p>
           </div>
+          <button onClick={() => setImportPayload(null)} className="action-btn" title={t('quickAdd.cancel')} aria-label={t('quickAdd.cancel')}><X size={14} /></button>
         </div>
-      )}
+        <div className="grid grid-cols-2 gap-2 px-4 pb-4">
+          <button onClick={() => void applyImport('merge')} className="rounded-md p-3 text-left interactive-chip" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-card)' }}>
+            <span className="block text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>{t('tabs.importMerge')}</span>
+            <span className="mt-1 block text-[10px] leading-relaxed" style={{ color: 'var(--text-ghost)' }}>{t('tabs.importMergeDesc')}</span>
+          </button>
+          <button onClick={() => void applyImport('replace')} className="rounded-md p-3 text-left interactive-chip" style={{ background: 'color-mix(in srgb, var(--color-warning) 7%, var(--bg-surface))', border: '1px solid color-mix(in srgb, var(--color-warning) 18%, var(--border-card))' }}>
+            <span className="block text-[11px] font-semibold" style={{ color: 'var(--color-warning)' }}>{t('tabs.importReplace')}</span>
+            <span className="mt-1 block text-[10px] leading-relaxed" style={{ color: 'var(--text-ghost)' }}>{t('tabs.importReplaceDesc')}</span>
+          </button>
+        </div>
+      </Modal>
     </>
   )
 })

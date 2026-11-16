@@ -38,7 +38,7 @@ function App() {
   const showSettings = useClipboardStore(s => s.showSettings)
   const detailItemId = useClipboardStore(s => s.detailItemId)
   const quickAddOpen = useClipboardStore(s => s.quickAddOpen)
-  const filteredHistory = useClipboardStore(s => s.filteredHistory)
+  const historyCount = useClipboardStore(s => s.filteredHistory.length)
   const selectionMode = useClipboardStore(s => s.selectionMode)
   const settings = useClipboardStore(s => s.settings)
   const setHistory = useClipboardStore(s => s.setHistory)
@@ -204,9 +204,9 @@ function App() {
     if (activeTab === 'settings' || showSettings) return <Suspense fallback={<PanelLoading />}><SettingsPanel /></Suspense>
     if (activeTab === 'collections') return <Suspense fallback={<PanelLoading />}><CollectionsPanel /></Suspense>
     if (activeTab === 'stats') return <Suspense fallback={<PanelLoading />}><StatsPanel /></Suspense>
-    if (filteredHistory.length === 0) return <EmptyState />
+    if (historyCount === 0) return <EmptyState />
     return <ClipboardList variant={viewMode} />
-  }, [activeTab, showSettings, filteredHistory.length, viewMode])
+  }, [activeTab, showSettings, historyCount, viewMode])
 
   if (!loaded) {
     return (

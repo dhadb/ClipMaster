@@ -1,39 +1,42 @@
 import type { ClipboardItem } from './clipboard'
-import type { Settings, PrivacyState } from '../store/clipboardStore'
-import type { ViewMode } from '../store/clipboardStore'
 import type { StorageHealth } from './storageHealth'
+// P1-A：类型统一来自 shared IPC 契约（单一事实来源）。
+import type {
+  BatchUpdateItemPatch,
+  ClipboardItemDraft,
+  DataSecurityStatus,
+  ImageInfoPayload,
+  ImageCacheCleanupResult,
+  ImagePayloadSize,
+  ImportHistoryResult,
+  ImportMode,
+  PauseMonitoringRequest,
+  PrivacyState,
+  Settings,
+  UpdateDownloadProgress,
+  UpdateInfo,
+  ViewMode,
+} from '../../shared/ipc-contract'
 
-export interface ClipboardItemDraft {
-  content: string
-  tags?: string[]
-  pinned?: boolean
-  favorited?: boolean
-}
-
-export interface UpdateInfo {
-  currentVersion: string
-  latestVersion: string
-  hasUpdate: boolean
-  releaseUrl: string
-  downloadUrl: string
-  releaseNotes: string
-  publishedAt: string | null
-}
-
-export interface UpdateDownloadProgress {
-  receivedBytes: number
-  totalBytes: number | null
-  percent: number | null
-}
-
-export interface DataSecurityStatus {
-  available: boolean
-  active: boolean
-  migrating: boolean
+export type {
+  BatchUpdateItemPatch,
+  ClipboardItemDraft,
+  DataSecurityStatus,
+  ImageInfoPayload,
+  ImageCacheCleanupResult,
+  ImagePayloadSize,
+  ImportHistoryResult,
+  ImportMode,
+  PauseMonitoringRequest,
+  PrivacyState,
+  Settings,
+  UpdateDownloadProgress,
+  UpdateInfo,
+  ViewMode,
 }
 
 export interface ElectronAPI {
-  getImageDataUrl: (imagePath?: string, size?: 'thumb' | 'detail') => Promise<string | null>
+  getImageDataUrl: (imagePath?: string, size?: ImagePayloadSize) => Promise<string | null>
   openExternalUrl: (url: string) => Promise<boolean>
   showFileInFolder: (filePath: string) => Promise<boolean>
   getHistory: () => Promise<ClipboardItem[]>
@@ -51,23 +54,23 @@ export interface ElectronAPI {
   deleteItem: (id: string) => Promise<ClipboardItem[]>
   deleteItems: (ids: string[]) => Promise<{ history: ClipboardItem[]; deleted: ClipboardItem[] }>
   restoreItems: (items: ClipboardItem[]) => Promise<ClipboardItem[]>
-  batchUpdateItems: (ids: string[], patch: { pinned?: boolean; favorited?: boolean; addTags?: string[] }) => Promise<ClipboardItem[]>
+  batchUpdateItems: (ids: string[], patch: BatchUpdateItemPatch) => Promise<ClipboardItem[]>
   togglePin: (id: string) => Promise<ClipboardItem[]>
   toggleFavorite: (id: string) => Promise<ClipboardItem[]>
   clearHistory: () => Promise<ClipboardItem[]>
   getSettings: () => Promise<Settings>
   updateSettings: (settings: Partial<Settings>) => Promise<Settings>
   getPrivacyState: () => Promise<PrivacyState>
-  pauseMonitoring: (mode: number | 'until-resume' | 'current-application') => Promise<PrivacyState>
+  pauseMonitoring: (mode: PauseMonitoringRequest) => Promise<PrivacyState>
   resumeMonitoring: () => Promise<PrivacyState>
   minimizeWindow: () => Promise<void>
   closeWindow: () => Promise<void>
   toggleMaximize: () => Promise<void>
   setWindowMode: (mode: ViewMode) => Promise<void>
-  getImageInfo: (imagePath?: string) => Promise<{ bytes: number; width: number; height: number } | null>
-  cleanupImageCache: () => Promise<{ deleted: number; bytes: number }>
+  getImageInfo: (imagePath?: string) => Promise<ImageInfoPayload | null>
+  cleanupImageCache: () => Promise<ImageCacheCleanupResult>
   clearAllHistory: () => Promise<ClipboardItem[]>
-  importHistory: (payload: unknown, mode?: 'merge' | 'replace') => Promise<{ history: ClipboardItem[]; imported: number }>
+  importHistory: (payload: unknown, mode?: ImportMode) => Promise<ImportHistoryResult>
   onHistoryUpdated: (callback: (history: ClipboardItem[]) => void) => () => void
   onSettingsUpdated: (callback: (settings: Settings) => void) => () => void
   onPrivacyUpdated: (callback: (state: PrivacyState) => void) => () => void

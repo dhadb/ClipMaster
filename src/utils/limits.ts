@@ -29,3 +29,33 @@ export function getBoundedImportSource(payload: unknown): unknown[] {
         : []
   return source.slice(0, MAX_IMPORT_ITEMS)
 }
+
+export interface ImportByteSizeInput {
+  content?: unknown
+  html?: unknown
+  rtf?: unknown
+}
+
+/**
+ * 导入历史聚合预算（P2）：单条文本有 MAX_TEXT_BYTES 上限，但 import-history 一次
+ * 可带入数千条，单条校验相加仍可能超出落盘预算。导入前把所有条目的
+ * text/html/rtf 字节数累计起来，超过 MAX_PERSISTED_DATA_BYTES 就整批拒绝。
+ */
+export function getImportedItemByteLength(item: ImportByteSizeInput): number {
+  let total = 0
+  if (typeof item.content === 'string') total += getUtf8ByteLength(item.content)
+  if (typeof item.html === 'string') total += getUtf8ByteLength(item.html)
+  if (typeof item.rtf === 'string') total += getUtf8ByteLength(item.rtf)
+  return total
+}
+
+export function getImportedItemsTotalByteLength(items: ImportByteSizeInput[]): number {
+  let total = 0
+  for (const item of items) total += getImportedItemByteLength(item)
+  return total
+}
+
+/** 聚合预算校验：返回 true 表示可导入，false 表示超出 MAX_PERSISTED_DATA_BYTES 需整批拒绝。 */
+export function isImportedItemsWithinBudget(items: ImportByteSizeInput[]): boolean {
+  return getImportedItemsTotalByteLength(items) <= MAX_PERSISTED_DATA_BYTES
+}

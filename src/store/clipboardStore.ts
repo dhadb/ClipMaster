@@ -1,80 +1,27 @@
 import { create } from 'zustand'
 import type {} from '../electron-api'
-import type { LanguageSetting } from '../i18n'
 import { createClipboardSearchIndex, matchesClipboardQuery, normalizeTags, searchClipboardIndex, type ClipboardSearchIndex } from '../utils/clipboard'
-import { isThemeSetting, type ThemeSetting } from '../theme'
-import { isAccentSetting, type AccentSetting } from '../personalization'
-import { defaultSensitiveContentRules, normalizeSensitiveContentRules, type SensitiveContentRules } from '../utils/privacy'
+import { isThemeSetting } from '../theme'
+import { isAccentSetting } from '../personalization'
+import { defaultSensitiveContentRules, normalizeSensitiveContentRules } from '../utils/privacy'
 import { normalizeBlockedApplications } from '../utils/applicationPrivacy'
 import type { ClipboardItem, SavedFilter } from '../types/clipboard'
+// P1-A：IPC 契约成为单一事实来源——Settings/PrivacyState 等此前在
+// store/preload/main 三处重复定义的接口收敛到 shared/ipc-contract。
+import type {
+  ClipboardItemDraft,
+  PrivacyState,
+  Settings,
+  UpdateDownloadProgress,
+  UpdateInfo,
+  ViewMode,
+} from '../../shared/ipc-contract'
 
 export type { ClipboardItem, SavedFilter }
-
-export interface Settings {
-  maxHistory: number
-  hotkey: string
-  searchHotkey: string
-  clearHotkey: string
-  autoStart: boolean
-  minimizeToTray: boolean
-  theme: ThemeSetting
-  accentColor: AccentSetting
-  language: LanguageSetting
-  opacity: number
-  fontSize: number
-  windowWidth: number
-  windowHeight: number
-  showPreview: boolean
-  listDensity: 'compact' | 'normal' | 'comfortable'
-  copyOnSelect: boolean
-  recordImages: boolean
-  soundEnabled: boolean
-  ignoreSensitive: boolean
-  sensitiveRules: SensitiveContentRules
-  blockedApplications: string[]
-  ignoredPatterns: string[]
-  hideAfterCopy: boolean
-  quickPaste: boolean
-  recentSearches: string[]
-  savedFilters: SavedFilter[]
-  autoDeleteDays: number
-  verificationCodeTtlMinutes: number
-  autoCheckUpdates: boolean
-}
-
-export interface PrivacyState {
-  paused: boolean
-  pauseUntil: number
-  pauseMode: 'timed' | 'until-resume' | 'application' | null
-  protectedToday: number
-}
-
-export interface ClipboardItemDraft {
-  content: string
-  tags?: string[]
-  pinned?: boolean
-  favorited?: boolean
-}
-
-export interface UpdateInfo {
-  currentVersion: string
-  latestVersion: string
-  hasUpdate: boolean
-  releaseUrl: string
-  downloadUrl: string
-  releaseNotes: string
-  publishedAt: string | null
-}
-
-export interface UpdateDownloadProgress {
-  receivedBytes: number
-  totalBytes: number | null
-  percent: number | null
-}
+export type { Settings, PrivacyState, ClipboardItemDraft, UpdateInfo, UpdateDownloadProgress, ViewMode }
 
 export type UpdateStatus = 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'installing' | 'current' | 'error'
 export type ActiveTab = 'history' | 'favorites' | 'collections' | 'stats' | 'settings'
-export type ViewMode = 'quick' | 'library'
 export type SortMode = 'newest' | 'oldest' | 'most-used'
 export type TimeFilter = 'all' | 'today' | 'week'
 

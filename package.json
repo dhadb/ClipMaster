@@ -70,6 +70,7 @@
       "uninstallerIcon": "public/icon.ico",
       "installerHeaderIcon": "public/icon.ico",
       "deleteAppDataOnUninstall": false,
+      "include": "build/installer.nsh",
       "license": null
     },
     "portable": {

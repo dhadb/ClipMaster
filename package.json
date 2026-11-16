@@ -77,21 +77,21 @@
     }
   },
   "dependencies": {
-    "date-fns": "^2.30.0",
-    "lucide-react": "^0.292.0",
+    "date-fns": "^4.4.0",
+    "lucide-react": "^1.73.0",
     "pinyin-pro": "^3.28.2",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "safe-regex2": "^5.1.1",
-    "zustand": "^4.4.6"
+    "zustand": "^5.1.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
-    "@types/react": "^18.2.37",
-    "@types/react-dom": "^18.2.15",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^5.2.0",
     "@vitest/coverage-v8": "^4.1.10",
     "autoprefixer": "^10.4.16",

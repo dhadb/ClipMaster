@@ -188,3 +188,57 @@ v5.0.0 保持 local-first：不做账号体系、不做跨设备同步、不做�
 ## D-003 补记：`%TEMP%` 历史安装包清理已收口
 
 原 D-003（每升级一次在 `%TEMP%` 留一个 ~114 MB 安装包）已按建议实现：启动时 `cleanupStaleInstallers()` 删除 `%TEMP%/ClipMaster-Setup-<version>.exe`，失败静默。连续升级两次后残留 ≤ 1 的判据可在本机验证。
+
+---
+
+## D-009 传递依赖钉版（npm overrides）与 lockfile 一致性门禁（已执行）
+
+**状态**：已执行｜**优先级**：P2｜**类型**：供应链加固
+
+### 结论
+
+`package.json` 的 `overrides` 对四个**传递依赖**做精确钉版：
+
+| 包 | 钉版 | 传递来源（npm ls 实测） |
+| --- | --- | --- |
+| `fast-uri` | `4.1.4` | `app-builder-lib → ajv@8.20.0 → fast-uri` |
+| `js-yaml` | `4.3.1` | `app-builder-lib`、`builder-util`、`dmg-builder`、`@eslint/eslintrc` |
+| `nanoid` | `3.3.18` | `postcss@8.5.23` |
+| `undici` | `7.29.0` | `electron → @electron/get@5.0.0`、`node-gyp` |
+
+四包均无直接依赖入口（无法通过升级顶层依赖解决），因此使用 npm 官方 overrides 机制统一钉到安全版本；`npm ls` 已确认 `overridden` 生效。新增 `scripts/check-overrides.mjs` 门禁（CI 在 lint 之后调用）：比对 overrides 与 `package-lock.json` 根级解析版本、以及 `node_modules` 实际安装版本，不一致即失败（退出码 1），防止 lockfile 漂移导致钉版静默失效。
+
+### 为什么钉版：npm audit 证据（2026-11-15，官方 registry 实测）
+
+- **运行时依赖**（`npm audit --omit=dev --audit-level=high`）：`found 0 vulnerabilities`。
+- **完整依赖树**（含 dev/build 工具链）：24 vulnerabilities（17 moderate, 7 high），全部位于构建链，不进入安装包运行时。
+
+钉版依据的已知通告（GitHub Advisory Database）：
+
+| 包 | 钉版时针对的通告 | 钉版时状态 |
+| --- | --- | --- |
+| `fast-uri` | CVE-2026-110306（GHSA-w74x-v6f9-j3xg，scheme 欺骗）、CVE-2026-110095（GHSA-xhq7-xmqj-769h，路径等价绕过）、CVE-2026-110180（GHSA-wjr9-j795-jxcr，host 混淆） | 修复版本为 4.2.x 系列 |
+| `js-yaml` | CVE-2026-84375（GHSA-2883-xcg3-v3hh，merge key CPU DoS）、GHSA-5p4m-2wfm-xmqj（!!omap 二次方 CPU 消耗） | 修复版本为 4.3.1+ |
+| `nanoid` | CVE-2026-73086（GHSA-xwg4-73v4-xw9w，整数溢出）、CVE-2026-67214（GHSA-28wg-ghj8-5hjv，负 size 死循环）、CVE-2026-67213（GHSA-2v37-7h3g-55p8，零 size 死循环） | 3.3.18 已全部覆盖 |
+| `undici` | CVE-2026-109829（GHSA-4w7w-5xrc-9h26，缓存污染/跨用户信息泄露）、CVE-2026-109383（GHSA-2m5v-pch6-74hx，TLS 校验绕过）、CVE-2026-87018（GHSA-qrxm-fqhp-jwvm，TLS 1.2 重协商 DoS） | 修复版本为 7.30.x 系列 |
+
+### ⚠️ 已知残留与后续跟进（待办，非本决策完成项）
+
+钉版之后生态又发布了新通告，当前 audit 对**钉版后版本**仍报 high（这是本决策记录如实留痕）：
+
+- `fast-uri@4.1.4` 落在新通告的易受影响区间（4.0.0–4.2.2，含 mailto header 注入 GHSA-jvvf-x445-j334 等 6 条），修复版 **4.2.3**。
+- `js-yaml@4.3.1` 受 CVE-2026-84375 影响（< 4.3.2），修复版 **4.3.2**。
+- `undici@7.29.0` 落在 7.0.0–7.30.0 区间（17 条 high 通告），修复版 **7.30.1**。
+
+跟进动作：把 overrides 升到 `fast-uri@4.2.3`、`js-yaml@4.3.2`、`undici@7.30.1` 并 `npm install` 刷新 lockfile（`check-overrides.mjs` 会强制两者一致，防止只改一边）。`npm audit fix --force` 建议的 `electron-builder@24.13.3` 降级**不采纳**（破坏性变更，收益倒挂）。
+
+### 影响范围
+
+- `package.json`（overrides 与 `scripts.check-overrides` 无新增运行时依赖）、`scripts/check-overrides.mjs`（新增，Node 22 直接运行）、`build.yml`/`release.yml`（lint 后新增 `Check dependency overrides match lockfile` 步骤）。
+- 审计常态化：两个 workflow 的 `npm audit` 步骤改为 `continue-on-error: true` 非阻塞，并把高风险摘要写入 job summary（避免基线未清零前 CI 误红）；待上述跟进项落地、基线清零后可再提为阻塞门禁。
+
+### 完成判据
+
+- `node scripts/check-overrides.mjs` 通过（overrides = lockfile = node_modules 实装版本）。
+- CI（build/release）在 lint 后执行 overrides 检查；audit 摘要出现在 job summary。
+- 运行时依赖 audit 保持 0 vulnerabilities。

@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.1.1 - 2026-11-16
+
+### Fixed
+
+- Fixed image previews and image clipboard saving being broken in 5.1.0: the refactored services fell back to an empty filesystem port, so every file-backed main-process operation failed at runtime. The port now defaults to the real Node filesystem implementation, with a regression test covering the default wiring.
+
 ## 5.1.0 - 2026-11-16
 
 ### Security and data protection

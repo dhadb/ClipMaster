@@ -1,5 +1,34 @@
 # Changelog
 
+## 5.1.0 - 2026-11-16
+
+### Security and data protection
+
+- Hardened in-app navigation to a strict allowlist (the app entry document only), with redirects and webview attachment blocked, so injected local pages can no longer reach the IPC bridge.
+- Encrypted clipboard images at rest with DPAPI, backward compatible with existing plaintext images.
+- Tightened the production CSP by removing `unsafe-inline` scripts and localhost development origins; dev-only origins are now injected by the Vite dev-server plugin.
+- Restricted `show-file-in-folder` to paths recorded in clipboard history or inside the image cache, and resolved image paths with realpath checks to resist symlink escapes.
+- Capped history import batches by aggregate byte budget and regenerate imported record IDs on import.
+- Added circuit breaking for user-supplied regex ignore rules (subject cap, per-match timing, automatic disabling) and stale temp-file cleanup on quit.
+
+### Reliability
+
+- Automatically rebuild the main window after a renderer crash (with a crash-loop circuit breaker), alert on an unresponsive UI, flush pending saves on fatal errors, and surface startup failures.
+- Added an uninstall-time prompt to optionally remove clipboard data; data is kept by default.
+
+### Accessibility and UI
+
+- Unified dialog and menu ARIA semantics with focus trapping and restoration, and added listbox semantics plus labels for clipboard rows.
+- Added plural-aware i18n messages and safer fallbacks for unknown record types.
+- Split image thumbnail and detail caches so large previews no longer evict list thumbnails.
+
+### Engineering
+
+- Split the 2,560-line Electron main process into domain services with a typed IPC contract (single source of truth for 34 invoke channels and 8 events) and injectable ports; added contract tests.
+- Added CI gates for lint, coverage reporting, dependency audits, Actions SHA pinning, and lockfile/overrides consistency.
+- Upgraded to React 19.3, zustand 5.1, date-fns 4.4, and lucide-react 1.73.
+- Added component behavior tests for BulkActionBar, SearchBar, UpdateBanner, and QuickAddDialog (156 tests total).
+
 ## 5.0.0 - 2026-09-06
 
 ### Quick Paste Workspace

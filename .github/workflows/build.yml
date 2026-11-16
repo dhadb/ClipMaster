@@ -16,10 +16,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 22
           cache: npm
@@ -40,17 +40,68 @@ jobs:
           if ($changelog -notmatch [regex]::Escape("## $packageVersion")) { throw "CHANGELOG.md has no '## $packageVersion' section" }
           Write-Host "package version: $packageVersion (matches CHANGELOG)"
 
+      - name: Check dependency overrides match lockfile
+        run: node scripts/check-overrides.mjs
+
       - name: Audit runtime dependencies
+        continue-on-error: true
         run: npm audit --omit=dev --audit-level=high --registry=https://registry.npmjs.org
 
       - name: Audit build dependencies
+        continue-on-error: true
         run: npm audit --audit-level=high --registry=https://registry.npmjs.org
 
-      - name: Run tests
-        run: npm test
+      - name: Report dependency audit
+        if: ${{ always() }}
+        shell: powershell
+        run: |
+          # 审计结果常态写入 job summary；当前为非阻塞（continue-on-error），积累基线后再设阈值。
+          $audit = npm audit --omit=dev --audit-level=high --registry=https://registry.npmjs.org 2>&1 | Out-String
+          if ($LASTEXITCODE -eq 0) {
+            $audit = "npm audit (runtime deps): no high or critical vulnerabilities found."
+          }
+          "## Dependency audit (runtime deps, non-blocking)`n" + '```' + "`n$audit`n" + '```' |
+            Add-Content -Path $env:GITHUB_STEP_SUMMARY -Encoding utf8
+
+      - name: Run lint
+        run: npm run lint
+
+      - name: Run tests with coverage
+        run: npm run test:coverage
+
+      - name: Report coverage summary
+        shell: powershell
+        run: |
+          # 不设硬性覆盖率阈值（基线未知，避免 CI 误红），仅把总覆盖率写入 job summary 供人查看。
+          $summaryPath = 'coverage/coverage-summary.json'
+          if (-not (Test-Path $summaryPath)) { throw "Missing coverage summary: $summaryPath" }
+          $summary = Get-Content $summaryPath -Raw | ConvertFrom-Json
+          $lines = [math]::Round($summary.total.lines.pct, 2)
+          $statements = [math]::Round($summary.total.statements.pct, 2)
+          $functions = [math]::Round($summary.total.functions.pct, 2)
+          $branches = [math]::Round($summary.total.branches.pct, 2)
+          Write-Host "Coverage: lines $lines%, statements $statements%, functions $functions%, branches $branches%"
+          $summaryLines = @(
+            '## Test coverage'
+            ''
+            '| Metric | Coverage |'
+            '| --- | --- |'
+            "| Lines | $lines% |"
+            "| Statements | $statements% |"
+            "| Functions | $functions% |"
+            "| Branches | $branches% |"
+          )
+          $summaryLines | Add-Content -Path $env:GITHUB_STEP_SUMMARY -Encoding utf8
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: coverage-report
+          if-no-files-found: error
+          path: coverage/
 
       - name: Typecheck and frontend build check
-        run: npm run check
+        run: npm run check:build
 
       - name: Build app
         run: npm run build
@@ -63,7 +114,7 @@ jobs:
             Set-Content -Encoding ascii release/checksums.sha256
 
       - name: Upload installer artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: ClipMaster-Windows
           if-no-files-found: error

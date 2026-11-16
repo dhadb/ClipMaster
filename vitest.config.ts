@@ -6,7 +6,7 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   test: {
-    include: ['src/**/*.test.{ts,tsx}'],
+    include: ['src/**/*.test.{ts,tsx}', 'electron/**/*.test.{ts,tsx}'],
     setupFiles: ['./vitest.setup.ts'],
     // 默认 node 环境（纯逻辑测试快）。
     // 需要 DOM 的组件测试请在文件首行加：// @vitest-environment jsdom
@@ -14,7 +14,7 @@ export default defineConfig({
     restoreMocks: true,
     coverage: {
       provider: 'v8',
-      reporter: ['text-summary', 'text', 'html'],
+      reporter: ['text-summary', 'text', 'html', 'json-summary'],
       reportsDirectory: './coverage',
       include: ['src/**/*.{ts,tsx}'],
       exclude: [

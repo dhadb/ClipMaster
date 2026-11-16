@@ -76,4 +76,33 @@ export default tseslint.config(
       '@typescript-eslint/no-explicit-any': 'off',
     },
   },
+  {
+    // Electron 主进程：纯 Node/CommonJS 风格源码（无 DOM、无 JSX）。
+    files: ['electron/**/*.{ts,tsx}'],
+    languageOptions: {
+      ecmaVersion: 2023,
+      sourceType: 'module',
+      globals: { ...globals.node },
+    },
+    rules: {
+      // TS 由编译器负责符号解析，no-undef 在 TS 文件里只会误报
+      'no-undef': 'off',
+    },
+  },
+  {
+    // 以下为 electron/main.ts 存量问题的按行关闭（CI 接入 lint 时不阻塞门禁）。
+    // 每处都注明行号与理由，修复合并后应删除对应条目，而不是长期保留。
+    files: ['electron/main.ts'],
+    rules: {
+      // L286 `try { JSON.parse(...) } catch {}`：空 catch 是刻意吞掉解析失败，
+      // 失败时走后续类型推断分支，非遗漏处理。
+      'no-empty': ['error', { allowEmptyCatch: true }],
+      // L289/939/946/2017/2035：字符串里的正则转义被误判（文件里含 PowerShell
+      // here-string 片段，`\[` `\"` 是字符串字面量内容而非正则字面量）。
+      'no-useless-escape': 'off',
+      // L564/570：`/[\u0000-\u001f]/g` 是刻意匹配控制字符并清洗它们，
+      // no-control-regex 在此属于误报。
+      'no-control-regex': 'off',
+    },
+  },
 )

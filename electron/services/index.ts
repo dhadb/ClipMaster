@@ -9,6 +9,7 @@ import {
   electronClipboard,
   electronHttpFetcher,
   electronShell,
+  nodeFileSystem,
   type AppInfoPort,
   type ClipboardPort,
   type Clock,
@@ -71,7 +72,8 @@ export function createAppServices(options: CreateServicesOptions): AppServices {
 
   services.runtime = createAppRuntime({
     clock: options.clock,
-    fs: options.fs,
+    // fs 缺省必须回落到真实 Node 实现，否则图片等文件系统服务运行时全崩。
+    fs: options.fs ?? nodeFileSystem,
     isDev: options.isDev,
     isPackaged: options.isPackaged,
     paths: options.paths,

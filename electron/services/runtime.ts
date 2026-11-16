@@ -4,7 +4,7 @@ import type { ClipboardItem } from '../../src/types/clipboard'
 import type { StorageHealth } from '../../src/types/storageHealth'
 import type { Settings, PauseMode, ViewMode, UpdateInfo } from '../../shared/ipc-contract'
 import type { IpcEventChannel } from '../../shared/ipc-contract'
-import type { Clock, FileSystemPort, ForegroundTarget } from './ports'
+import { nodeFileSystem, type Clock, type FileSystemPort, type ForegroundTarget } from './ports'
 
 export type { ForegroundTarget }
 export type HotkeyAction = 'toggle' | 'search' | 'clear'
@@ -109,7 +109,8 @@ export interface CreateRuntimeOptions {
 export function createAppRuntime(options: CreateRuntimeOptions): AppRuntime {
   const { isDev, isPackaged, paths, settings } = options
   const clock = options.clock ?? { now: () => Date.now() }
-  const fs = options.fs ?? ({} as FileSystemPort)
+  // fs 端口必须回退到真实 Node 实现：{} 会让图片等依赖文件系统的服务在运行时全部崩溃。
+  const fs = options.fs ?? nodeFileSystem
 
   const runtime: AppRuntime = {
     ports: { clock, fs },
